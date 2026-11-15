@@ -43,7 +43,9 @@ them into the runner. Behaviour stays the same.
 
 - **FR-WRK-1** All worker control shall go through one interface:
   `start(role, card, prompt) -> handle`, `alive(handle)`, `stop(handle)`.
-  No other code may start, signal or detect worker processes.
+  No other code may start, signal or detect worker processes. A worker's
+  lock shall only be removed when `alive(handle)` is false; a live
+  worker's lock is never treated as stale.
 - **FR-WRK-2** The default `process` backend shall run the harness's
   headless worker command and log output to one file per worker.
 - **FR-WRK-6** The board column shall decide whether a worker finished its
