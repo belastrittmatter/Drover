@@ -13,6 +13,7 @@ import time
 import unittest
 
 KIT = Path(__file__).resolve().parents[1]
+IDLE_ROUND_CALLS = 3  # measured at d0b7d5a; see docs/baseline.md
 # The skills the readiness check needs for every lane (see test_skill_dispatch.py).
 NAMES = ['super-board', 'super-build', 'super-qa', 'super-review', 'super-collect', 'visual', 'git-sync',
          'ui-refine-loop', 'pr-security-review', 'tdd', 'implement', 'codebase-design', 'code-review',
@@ -270,6 +271,21 @@ class RunnerRounds(unittest.TestCase):
         self.assertFalse([c for c in calls if c[:2] in (['pr', 'create'], ['pr', 'close'])])
         [second] = [p for p in self.worker_pids(expect=2) if p != first]
         self.assertIn('Run super-build on issue #12 ', (self.workers / str(second)).read_text())
+
+    # NFR-6 measurement: GitHub calls in one round with nothing to do. Prints the
+    # call list; asserts only the count measured at the fork point (docs/baseline.md).
+    def test_idle_round_github_calls(self):
+        self.board({'number': 1, 'status': 'Backlog'}, {'number': 2, 'status': 'Blocked'},
+                   {'number': 3, 'status': 'Done'})
+        out = self.run_board(cycles=1)
+        self.assertIn('exiting cleanly', out)
+        self.assertEqual(self.worker_pids(), [])
+        startup, round_ = self.calls('startup'), self.calls('round')
+        for name, calls in [('startup', startup), ('idle round', round_)]:
+            print('\n%s: %d gh calls' % (name, len(calls)), file=sys.stderr)
+            for c in calls:
+                print('  gh ' + ' '.join(a.split('\n')[0] for a in c), file=sys.stderr)
+        self.assertLessEqual(len(round_), IDLE_ROUND_CALLS)
 
 
 if __name__ == '__main__':

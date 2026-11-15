@@ -94,3 +94,24 @@ check, making `reap_finished_locks()` ignore liveness (line 478) makes it fail
 - **Re-dispatch on a no-op exit:** a worker that exits without moving its
   card gets the same card back on the next tick, until the runaway gate
   stops the run (rows 1-6).
+
+## GitHub calls in an idle round (NFR-6)
+
+Measured by `tests/test_run_rounds.py::test_idle_round_github_calls`. A fake
+`gh` on `PATH` logs every call. The board has one card each in Backlog,
+Blocked and Done, so there is nothing to do, and the runner gets one round.
+
+**Idle round: 3 calls. That is within NFR-6's limit of 5.** The test fails if
+the count rises above 3.
+
+```
+gh api rate_limit                                   # gh_rate_guard (REST)
+gh api graphql -f query=query{rateLimit{...}}       # sb_gh_quota_merge (GraphQL bucket)
+gh api graphql --paginate --slurp -f query=...      # fetch_project_items (board)
+```
+
+Startup, before the first round, makes 4 calls: the same three, then one more
+board read after `reclaim_stranded_building`. The board read is one `gh` call
+but one HTTP request per 100 cards (`--paginate`). An idle round ends the run
+("all active-pipeline columns empty"). A round where every lane is at
+`max_workers` takes the cheap-tick path and makes 0 calls.
