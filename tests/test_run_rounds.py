@@ -58,7 +58,13 @@ elif args[:2] == ['project', 'view']:
 elif args[:2] == ['pr', 'list']:
     m = re.search(r'issue-(\d+)-', ' '.join(args))
     print(os.environ.get('PR_FOR_' + m.group(1), '') if m else '')
-elif args[:2] in (['issue', 'edit'], ['issue', 'comment'], ['pr', 'comment'], ['project', 'item-edit']):
+elif args[:2] == ['project', 'item-edit']:  # the board remembers column moves
+    item, option = args[args.index('--id') + 1], args[args.index('--single-select-option-id') + 1]
+    for c in board:
+        if 'item%d' % c['number'] == item:
+            c['status'] = option[len('opt_'):]
+    json.dump(board, open(os.environ['BOARD'], 'w'))
+elif args[:2] in (['issue', 'edit'], ['issue', 'comment'], ['pr', 'comment']):
     pass
 else:
     sys.exit('unexpected gh call: %r' % args)
@@ -194,6 +200,76 @@ class RunnerRounds(unittest.TestCase):
         self.run_board(cycles=1)
         self.assertIsNone(self.lock(7))
         self.assertIn(['issue', 'edit', '7', '--remove-assignee', 'bot'], self.calls())
+
+    def done_moves(self):
+        return [c[c.index('--id') + 1] for c in self.calls()
+                if c[:2] == ['project', 'item-edit'] and c[-1] == 'opt_Done']
+
+    # FR-BRD-3: the runner never moves an open card to Done; the merge gate
+    # (test-merge-gate.sh) is what proves a merge before the reviewer moves it.
+    def test_done_only_after_merge(self):
+        self.env['FAKE_CLAUDE'] = 'exit'  # the reviewer ends without merging
+        self.board({'number': 6, 'status': 'Review', 'state': 'CLOSED'},
+                   {'number': 5, 'status': 'Review'})
+        self.run_board(cycles=2)
+        self.assertNotIn('item5', self.done_moves(), 'an unmerged open card reached Done')
+        self.assertIn('item6', self.done_moves(), 'a closed issue is reconciled to Done')
+        self.assertTrue(self.worker_pids(expect=1), 'the open card got a reviewer')
+        self.assertTrue(all('issue #5 ' in (self.workers / str(p)).read_text() for p in self.worker_pids()))
+
+    def started_build(self, issue, pr):
+        # A card mid-build: issue branch pushed, its worktree, an open PR, a live worker.
+        origin = self.base / 'origin.git'
+        subprocess.run(['git', 'init', '-q', '--bare', str(origin)], check=True)
+        self.git('remote', 'add', 'origin', str(origin))
+        branch = 'issue-%d-fix' % issue
+        self.git('checkout', '-q', '-b', branch)
+        self.git('commit', '-q', '--allow-empty', '-m', 'wip on #%d' % issue)
+        self.git('push', '-q', 'origin', branch)
+        self.git('checkout', '-q', 'main')
+        self.git('worktree', 'add', '-q', '.claude/worktrees/issue-%d-build' % issue, branch)
+        self.env['PR_FOR_%d' % issue] = str(pr)
+        self.board({'number': issue, 'status': 'Ready'})
+        self.run_board(cycles=1)
+        [pid] = self.worker_pids(expect=1)
+        self.assertTrue(alive(pid))
+        self.board({'number': issue, 'status': 'Building'})  # the builder moved its card
+        return branch, pid
+
+    # FR-RUN-10: stop comments on issue and PR, releases the claim, stops the worker,
+    # keeps branch, PR and worktree.
+    def test_stop(self):
+        branch, pid = self.started_build(12, pr=34)
+        self.calls_path.unlink()
+        self.stop()
+        self.wait_dead(pid)
+        calls = self.calls()
+        comments = [c for c in calls if c[:2] in (['issue', 'comment'], ['pr', 'comment'])]
+        self.assertEqual([c[:3] for c in comments], [['issue', 'comment', '12'], ['pr', 'comment', '34']])
+        self.assertTrue(all('stopped' in c[c.index('--body') + 1] for c in comments))
+        self.assertIn(['issue', 'edit', '12', '--remove-assignee', 'bot'], calls)
+        self.assertIsNone(self.lock(12))
+        self.assertFalse([c for c in calls if c[:2] in (['pr', 'close'], ['pr', 'merge'], ['issue', 'close'])])
+        self.assertTrue(self.git('branch', '--list', branch).strip())
+        self.assertTrue(self.git('ls-remote', '--heads', 'origin', branch).strip())
+        self.assertTrue((self.root / '.claude/worktrees/issue-12-build').is_dir())
+
+    # FR-RUN-11: run after a stop sends the card back to a builder on the same branch.
+    def test_resume_after_stop(self):
+        branch, first = self.started_build(12, pr=34)
+        self.stop()
+        self.wait_dead(first)
+        self.calls_path.unlink()
+        self.run_board(cycles=1)
+        calls = self.calls()
+        self.assertIn(['project', 'item-edit', '--id', 'item12', '--project-id', 'P', '--field-id', 'F',
+                       '--single-select-option-id', 'opt_Ready'], calls)
+        [note] = [c for c in calls if c[:3] == ['issue', 'comment', '12']]
+        self.assertIn('branch %s kept' % branch, note[note.index('--body') + 1])
+        self.assertTrue(self.git('ls-remote', '--heads', 'origin', branch).strip(), 'branch was dropped')
+        self.assertFalse([c for c in calls if c[:2] in (['pr', 'create'], ['pr', 'close'])])
+        [second] = [p for p in self.worker_pids(expect=2) if p != first]
+        self.assertIn('Run super-build on issue #12 ', (self.workers / str(second)).read_text())
 
 
 if __name__ == '__main__':
