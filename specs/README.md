@@ -208,9 +208,9 @@ New or changed:
 | 1 audit | extras.md, NFR-8 |
 | 2 cut, 3 rename | all "Preserved" tables must still pass; FR-CFG-1 |
 | 4 conventions | conventions.md FR-CNV, board.md FR-BRD-6 |
-| 5 CLI + harness | config.md |
+| 5 CLI + harness | config.md (incl. FR-HRN-4) |
 | 0 baseline | also metrics.md FR-MET-1 |
-| 6 runner | runner.md FR-RUN-2, 7, 8, FR-WRK-1/2/6/8; metrics.md FR-MET |
+| 6 runner | runner.md FR-RUN-2, 7, 8, 13, FR-WRK-1/2/6/8/10; board.md FR-BRD-3; metrics.md FR-MET |
 | 7 reviewer | roles.md FR-REV-1, 3, 6, 8-12, FR-BLD-7, FR-CTX; gate.md FR-MRG-4 |
 | 8 evidence | conventions.md FR-EVD |
 | 9 hc add-on | runner.md FR-WRK-3/4/5/7, board.md FR-STS-2 |

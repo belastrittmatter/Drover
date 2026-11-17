@@ -34,23 +34,16 @@ harness-neutral `.drover/worktrees/`).
 
 Config shape: [specs/config.md](specs/config.md).
 
-## Stage 0: baseline (0.5 day)
+## Stage 0: baseline (done)
 
-- Run `bash tests/run-safety.sh` on the untouched fork; save the output as
-  `docs/baseline.txt`.
-- A reference run on `claude-p` exists (local manifest and FactoryBench
-  attempts, not in this repo). It did not reach Done: live workers' locks
-  were deleted as stale a few minutes after dispatch. Write up the cause in
-  `docs/baseline.md`, without project names or paths, and add a regression
-  test (specs/runner.md FR-WRK-1).
-- Add the missing regression tests for preserved behaviour the refactor
-  could break (rows marked "none (add in stage 0)" in specs/board.md and
-  specs/runner.md: Done-only-after-merge, stop, resume).
-- Measure GitHub API calls in an idle round (specs/README.md NFR-6).
-- The reference run's FactoryBench attempts are the upstream numbers
-  drover's runs are compared against.
-
-Spec: every "Preserved" table in `specs/`.
+Result in `docs/baseline.md`: upstream suite green (64 suites), new tests
+for FR-WRK-1, stop, resume and the open-card side of Done, idle round 3
+GitHub calls (NFR-6 holds). The reference run on `claude-p` failed because
+its headless workers' first command needed approval, so each quit within
+seconds and the card was re-dispatched until the runaway gate stopped the
+run. Locks were reaped only after workers exited; FR-WRK-1 stays as a
+preventive rule. Follow-ups: FR-HRN-4 (stage 5), FR-RUN-13, FR-WRK-10,
+FR-BRD-3 (stage 6).
 
 ## Stage 1: audit (1-1.5 days)
 
@@ -138,6 +131,8 @@ new tags; tests green.
   each checked to exist for the harness before dispatch (reuse the
   readiness check from `super-board-skills-ready.py`, minus `REGISTRY`).
   Onboard writes upstream's current routing as the starting config.
+- Headless permissions in `harnesses/claude.json`, passed at worker start;
+  test that every command in the role rules is covered (FR-HRN-4).
 
 - `config-schema.json` per specs/config.md "Keys"; validation at every
   command start (FR-CFG-2).
@@ -160,6 +155,9 @@ Exit: a fresh repo onboards with only `.drover/config.json` added; tests green.
     and adds missing risk labels with a one-line reason (FR-RUN-7);
   - usage pause: per harness (`usage_probe` in the harness entry; Claude's
     status-line `rate_limits` today), checked before each dispatch.
+- Failed-dispatch halt (FR-RUN-13), one-tick grace before stopping a
+  worker whose card left its lane (FR-WRK-10), closed-without-merge goes to
+  Blocked not Done (FR-BRD-3); each with a test.
 - Run manifest and worker logs move to git-ignored `.drover/runs/`, format
   unchanged (FR-MET-1/3).
 - FactoryBench attempt per card in the runner, OTLP env per worker

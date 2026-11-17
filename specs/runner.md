@@ -39,6 +39,12 @@ them into the runner. Behaviour stays the same.
   harness has no usage probe, then it shall say so once per run and
   continue. (Upstream: Claude-only, `workflow` backend only.)
 
+- **FR-RUN-13 (new)** A worker that exits without moving its card or
+  posting its role's report shall count as a failed dispatch. If two
+  dispatches in a row fail on the same card, then the system shall halt the
+  run and print the last 20 lines of the latest worker log. (Upstream
+  re-dispatches every tick until the runaway gate stops the run after 6.)
+
 ### Worker interface
 
 - **FR-WRK-1** All worker control shall go through one interface:
@@ -51,6 +57,10 @@ them into the runner. Behaviour stays the same.
 - **FR-WRK-6** The board column shall decide whether a worker finished its
   card; a worker's report or exit is a signal to check the board, not proof.
 - **FR-WRK-8** `stop` shall only touch workers this runner started.
+- **FR-WRK-10 (changed)** When a worker's card leaves the worker's lane
+  while the worker still runs, the system shall let it run for one more
+  tick before stopping it, so it can finish its handoff. (Upstream's
+  zombie watchdog kills it at once: `scripts/super-board-run.sh:375-412`.)
 
 ### hc add-on
 

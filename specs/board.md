@@ -7,7 +7,6 @@ Part of the [drover spec](README.md).
 | ID | Must keep working | Source @ d0b7d5a | Test |
 |---|---|---|---|
 | FR-BRD-1 | The GitHub Project is the only source of truth for card state | `skills/super-board/SKILL.md`, `references/run.md` | `test-card.sh` |
-| FR-BRD-3 | A card reaches Done only after its merge commit is confirmed on the base branch, or after a deliberate not-planned close with a comment | `references/run.md` merge protocol, "Ordering invariant" | none (add in stage 0) |
 | FR-BRD-4 | Every move to Blocked posts the block comment: reason tag, why, unblock checklist, owner, `blocked-by:` line | `references/block-template.md` | `test-file-bug.sh` (partial) |
 | FR-BRD-5 | When an issue named in `blocked-by:` closes, the next round returns the card to its column | `references/run-workflow.md` round-start sweep | `test-wave-plan.sh` |
 | FR-STS-1 | `status` is read-only and shows column counts, live workers, Blocked grouped by reason | `references/status.md`, `scripts/super-board-status.py` | `test_status_parse.py` |
@@ -19,6 +18,13 @@ Part of the [drover spec](README.md).
 
 ## New or changed
 
+- **FR-BRD-3 (changed, stage 6)** A card shall reach Done only after its
+  merge commit is confirmed on the base branch, or after a not-planned
+  close with a comment. If a card's issue is closed without either, then
+  the system shall move it to Blocked `[needs-you]`. (Upstream moves any
+  closed issue to Done without a merge check:
+  `scripts/super-board-run.sh:216-225`. Stage 0 tests cover only the
+  open-card side.)
 - **FR-BRD-6 (changed)** Reason tags shall be plain text from one fixed list
   defined in a single file read by both writers and the status parser:
   `[blocked:duplicate]`, `[blocked:unclear]`, `[blocked:too-big]`,

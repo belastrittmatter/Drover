@@ -81,6 +81,11 @@ default (`project`, `base_branch`, `verify_commands`, `model_tier`,
   folders, hook install method, optional usage probe.
 - **FR-HRN-2** Adding a harness shall need a new harness file and no change
   to the runner, gate or roles.
+- **FR-HRN-4** The harness file shall declare the permissions a headless
+  worker needs (commands, tools, paths), and drover shall pass them at
+  start. A worker shall never wait on an approval prompt; any command a
+  role's rules tell it to run shall be covered. (Stage 0: upstream's first
+  worker command needed approval, so every headless worker quit.)
 - **FR-HRN-3** v1 shall ship `claude` only. Codex, OpenCode and
   Antigravity are deferred; each needs its headless command, skill folders,
   hook install and permission enforcement confirmed first (upstream notes
