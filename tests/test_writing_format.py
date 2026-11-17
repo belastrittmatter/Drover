@@ -1,4 +1,4 @@
-"""Format tests for the writing standard (skills/super-board/references/writing-standard.md).
+"""Format tests for the writing standard (skills/drover/references/writing-standard.md).
 
 Pins the shapes scripts and agents depend on: the commit subject, the ticket's required
 sections, the comment header, the PR body markers. Each test reads the shipped docs and
@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-REF = ROOT / "skills" / "super-board" / "references"
+REF = ROOT / "skills" / "drover" / "references"
 STANDARD = (REF / "writing-standard.md").read_text(encoding="utf-8")
 
 EMOJI = {
@@ -54,7 +54,7 @@ def test_subject_regex():
         "🐛 [fix] receipts: show a size error over 10 MB",
         "🔧 [chore] loop: close #42 — stream replies",
         "🚧 [wip] loop: #42 partial — schema only",
-        "🧪 [test] super-qa: iter 3 (2 bugs, 9 items, 1 PRs opened)",
+        "🧪 [test] drover-qa: iter 3 (2 bugs, 9 items, 1 PRs opened)",
         "💄 [ui] reports: before/after screenshots",
     ]
     bad = [
@@ -92,7 +92,7 @@ def test_standard_examples_are_valid_subjects():
 
 
 def test_dispatcher_greps_the_standard_loop_subjects():
-    src = (ROOT / "skills" / "super-build" / "scripts" / "drover-build-dispatch.sh").read_text(encoding="utf-8")
+    src = (ROOT / "skills" / "drover-build" / "scripts" / "drover-build-dispatch.sh").read_text(encoding="utf-8")
     pats = re.findall(r'grep -E "\^\[0-9a-f\]\+ (.*?)" \| head', src)
     assert len(pats) == 2, f"expected the close and wip greps, found {pats}"
     close_pat, wip_pat = (p.replace("$N", "42").replace("\\\\", "\\") for p in pats)
@@ -109,7 +109,7 @@ def test_dispatcher_greps_the_standard_loop_subjects():
 
 
 def test_no_old_commit_shapes_in_templates():
-    old = re.compile(r"chore\(loop\)|wip\(loop\)|fix\(super-qa\)|feat\(super-qa\)|refine\(\$?\{?[a-z<]")
+    old = re.compile(r"chore\(loop\)|wip\(loop\)|fix\(drover-qa\)|feat\(drover-qa\)|refine\(\$?\{?[a-z<]")
     allowed = {"drover-build-dispatch.sh"}  # documents and still accepts the legacy shapes
     for p in list((ROOT / "skills").rglob("*.md")) + list((ROOT / "skills").rglob("*.sh")) + list((ROOT / "workflows").glob("*.js")):
         if p.name in allowed or "visual" in p.parts:
@@ -157,7 +157,7 @@ def test_ticket_title_shape():
 def test_comment_header_regex():
     assert COMMENT_HEADER.match("[qa] [report] ❌ failing · round 1")
     assert COMMENT_HEADER.match("[reviewer] [blocker] 🛑 blocked · 🔐 missing key")
-    assert not COMMENT_HEADER.match("🔍 super-board · QA fail · v1")
+    assert not COMMENT_HEADER.match("🔍 drover · QA fail · v1")
     assert not COMMENT_HEADER.match("[QA] [report] ❌ failing")
     assert not COMMENT_HEADER.match("[qa] [fyi] ❌ failing")
 
@@ -171,7 +171,7 @@ def test_comment_examples_follow_the_header():
     for text in (STANDARD, run_md):
         for block in fenced(text):
             lines = block.splitlines()
-            if lines and lines[0].startswith("<!-- super-board:author-note "):
+            if lines and lines[0].startswith("<!-- drover:author-note "):
                 assert lines[0].endswith(" -->"), "author-note marker must stay hidden"
                 labels = re.findall(r"^\*\*(.+?):\*\* \S", block, flags=re.M)
                 assert labels == ["Purpose", "What changed", "Why it matters"], labels

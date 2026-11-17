@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # drover-host.sh — which agent host is this shell inside: `claude`, `codex` or `opencode`.
 #
-# WHY. `/super-board run` launched from a Codex CLI session has no Claude Workflow tool, so the
+# WHY. `/drover run` launched from a Codex CLI session has no Claude Workflow tool, so the
 # workflow backend cannot start. The orchestrator checks its own tool list first; this is the
 # check a script can make, and the tie-breaker when the tool list is unclear. A shell with no
 # known sign gets no answer (exit 65): guessing Claude there starts the wrong backend.

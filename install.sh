@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-board installer.
+# drover installer.
 # Copies skills/, scripts/, workflows/ and the guard hooks once into the target
 # project's shared .agents/ tree, links them into each agent host's folder, and
 # merges the hook settings into .claude/settings.json (backed up first, never duplicated).
@@ -11,13 +11,13 @@
 # guard that blocks direct and force pushes to main/master/base_branch; with
 # --no-hooks it installs that one guard alone. --hosts (or --hosts=…) adds host
 # folders to link; .claude/ is always linked. The installer asks nothing:
-# super-board onboard asks the questions (protect main is one of them).
+# drover onboard asks the questions (protect main is one of them).
 #
 # Layout: .agents/{skills/<skill>,bin,workflows,hooks} hold the files. Each host
 # folder (.claude/ always; .codex/ and .opencode/ when that folder already exists,
 # a config "host" key names it, drover-host.sh reports it, or --hosts asks)
 # gets one link per skill under skills/ and one link per file under bin/,
-# workflows/ and hooks/. Nothing that is not super-board's is touched. Where a
+# workflows/ and hooks/. Nothing that is not drover's is touched. Where a
 # link cannot be made (Windows without symlink rights) the file is copied.
 # Settings and run state (.claude/settings.json, .claude/drover/) stay put.
 #
@@ -25,7 +25,7 @@
 # the file). Environment: DROVER_QUIET_NEXT=1 prints only the "🔧 installing"
 # group, for a wrapper that prints its own header and summary around it.
 #
-# An older super-board already in the target (a different skills/super-board/VERSION,
+# An older drover already in the target (a different skills/drover/VERSION,
 # or one with no VERSION) is recorded in .claude/drover/upgrade.json
 # {from, to, added_skills}; onboard's 🔍 Checks finishes the upgrade and lists it.
 
@@ -55,7 +55,7 @@ TARGET="${TARGET:-$PWD}"
 # Primary: the board and its lanes. Secondary: standalone helpers the lanes
 # can call (visual, git-sync, ui-refine-loop, pr-security-review). Worktree cleanup (cleanup-wt) is a
 # hook, not a skill: it ships with the guard hooks below.
-PRIMARY_SKILLS="super-board super-build super-qa super-review super-collect"
+PRIMARY_SKILLS="drover drover-build drover-qa drover-review drover-collect"
 SECONDARY_SKILLS="visual git-sync ui-refine-loop pr-security-review"
 
 if [ ! -d "$TARGET" ]; then
@@ -91,9 +91,9 @@ PACK_VERSION="$(tr -d '[:space:]' < "$REPO_ROOT/VERSION" 2>/dev/null || echo '?'
 SHARED="$TARGET/.agents"
 
 # Record an upgrade BEFORE the copy overwrites the old VERSION. An install made
-# before .agents/ existed keeps its VERSION under .claude/skills/super-board.
+# before .agents/ existed keeps its VERSION under .claude/skills/drover.
 PREV_VERSION=""
-for d in "$SHARED/skills/super-board" "$TARGET/.claude/skills/super-board"; do
+for d in "$SHARED/skills/drover" "$TARGET/.claude/skills/drover"; do
   if [ -d "$d" ]; then
     PREV_VERSION="$(tr -d '[:space:]' < "$d/VERSION" 2>/dev/null || echo 'older')"
     [ -n "$PREV_VERSION" ] || PREV_VERSION="older"
@@ -107,7 +107,7 @@ if [ -n "$PREV_VERSION" ]; then
   done
 fi
 
-[ -n "$QUIET" ] || echo "🧩 super-board $PACK_VERSION → $TARGET"
+[ -n "$QUIET" ] || echo "🧩 drover $PACK_VERSION → $TARGET"
 echo "🔧 installing"
 
 # Resolve all skill paths before replacing anything. A destination can contain
@@ -199,7 +199,7 @@ COPIED=0
 # Point <host>/<group>/<name> at .agents/<group>/<name>. Already resolving there
 # (a link, or a whole folder linked into .agents/) → nothing to do. A user's own
 # link elsewhere → keep it and write through it, as before .agents/ existed.
-# super-board's own real file or directory → replaced by the link.
+# drover's own real file or directory → replaced by the link.
 link_entry() {
   local host="$1" group="$2" name="$3" src_in_pack="$4" kind="$5" rel="$6"
   local shared="$SHARED/$group/$name" dest="$TARGET/.$host/$group/$name"
@@ -325,6 +325,6 @@ PY
 fi
 
 if [ -z "$QUIET" ]; then
-  echo "🎉 super-board $PACK_VERSION is installed"
-  echo "👉 next: open Claude Code here and run /super-board onboard"
+  echo "🎉 drover $PACK_VERSION is installed"
+  echo "👉 next: open Claude Code here and run /drover onboard"
 fi

@@ -25,7 +25,7 @@ from pathlib import Path
 # The script has a hyphen in its filename, so import via spec_from_file_location.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPT = _REPO_ROOT / "scripts" / "drover-status.py"
-_spec = importlib.util.spec_from_file_location("super_board_status", _SCRIPT)
+_spec = importlib.util.spec_from_file_location("drover_status", _SCRIPT)
 assert _spec is not None and _spec.loader is not None
 sbs = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(sbs)
@@ -125,7 +125,7 @@ def test_lane_handoff_drops_prior_inflight() -> None:
 def test_tick_and_exited_tracked() -> None:
     """`tick —` updates last_tick; `exiting cleanly` flips exited."""
     manifest = (
-        "[10:00:00] super-board run started — config=foo\n"
+        "[10:00:00] drover run started — config=foo\n"
         "[10:02:00] tick — Ready=1 Building=0\n"
         "[10:04:00] tick — Ready=0 Building=1\n"
         "[10:30:00] ✅ all active-pipeline columns empty and all lanes idle — exiting cleanly\n"
@@ -210,7 +210,7 @@ def test_field_status_picks_status_select() -> None:
 
 def test_valid_slug_accepts_normal_slugs() -> None:
     assert sbs.valid_slug("my-project")
-    assert sbs.valid_slug("nsadashboard-super-board")
+    assert sbs.valid_slug("nsadashboard-drover")
     assert sbs.valid_slug("Project_1.0")
     assert sbs.valid_slug("a")
 

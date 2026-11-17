@@ -147,7 +147,7 @@ class ProjectVerifier(unittest.TestCase):
                                   '--map', self.map], capture_output=True, text=True)
         self.assertEqual(process.returncode, 0, process.stderr or process.stdout)
         self.assertEqual(json.loads(process.stdout)['features'], ['cart.total'])
-        starter = self.root / '.claude/skills/super-qa/templates/project-verifier/feature-map.json'
+        starter = self.root / '.claude/skills/drover-qa/templates/project-verifier/feature-map.json'
         self.assertEqual(json.loads(starter.read_text())['features'], [])
         self.assertEqual((self.root / self.skill).read_text(), 'Real app instructions')
 

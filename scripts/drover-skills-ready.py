@@ -16,7 +16,7 @@ import stat
 import subprocess
 import sys
 
-POLICY = 'skills/super-build/references/decision-policy.md'
+POLICY = 'skills/drover-build/references/decision-policy.md'
 REGISTRY = {
     'build_rows': [(['bug'], ['mattpocock-skills:diagnosing-bugs', 'mattpocock-skills:tdd']),
                    (['feature'], ['mattpocock-skills:implement', 'mattpocock-skills:tdd', 'mattpocock-skills:codebase-design']),
@@ -38,9 +38,9 @@ REGISTRY = {
                                    'resolving-merge-conflicts', 'domain-modeling', 'ask-matt', 'to-spec', 'to-tickets', 'implement-spec', 'improve-codebase-architecture'],
                 'ponytail': ['ponytail', 'ponytail-review']},
     'fallbacks': {'ponytail:ponytail': {'id': 'simplest-solution-first', 'source': POLICY + '#simplest-solution-first'},
-                  'ponytail:ponytail-review': {'id': 'over-engineering-ladder', 'source': 'skills/super-review/SKILL.md#over-engineering'}},
+                  'ponytail:ponytail-review': {'id': 'over-engineering-ladder', 'source': 'skills/drover-review/SKILL.md#over-engineering'}},
 }
-CORE = ['super-board', 'super-build', 'super-qa', 'super-review', 'super-collect', 'visual', 'git-sync', 'ui-refine-loop', 'pr-security-review']
+CORE = ['drover', 'drover-build', 'drover-qa', 'drover-review', 'drover-collect', 'visual', 'git-sync', 'ui-refine-loop', 'pr-security-review']
 LANES = ['build', 'qa', 'review']
 NAME = re.compile(r'[a-zA-Z0-9][a-zA-Z0-9._-]*(?::[a-zA-Z0-9][a-zA-Z0-9._-]*)?\Z')
 INTERACTIVE = {'grilling', 'shape', 'clarify', 'mattpocock-skills:grilling', 'mattpocock-skills:shape', 'mattpocock-skills:clarify'}
@@ -129,8 +129,8 @@ def requirements(card, lane=None, require=()):
     explicit = override(card['body'])
     selected = remaining(card, lane)
     for current in selected:
-        source = 'boundary: skills/super-' + current + '/SKILL.md'
-        rows = [('super-board', 'required', source), ('super-' + current, 'required', source)]
+        source = 'boundary: skills/drover-' + current + '/SKILL.md'
+        rows = [('drover', 'required', source), ('drover-' + current, 'required', source)]
         if current == 'build':
             if explicit is not None:
                 row, origin = explicit, 'override: Skills: + ' + POLICY

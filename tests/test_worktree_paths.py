@@ -54,7 +54,7 @@ class WorktreePaths(unittest.TestCase):
                         REPO_DIR=str(self.root), WORKER_CWD=str(Path(self.tmp.name) / "worker-cwd"))
 
     def dispatch(self):
-        return self.run_cmd("bash", str(PACK / "skills/super-build/scripts/drover-build-dispatch.sh"),
+        return self.run_cmd("bash", str(PACK / "skills/drover-build/scripts/drover-build-dispatch.sh"),
                             "9", check=False)
 
     def test_legacy_dispatch_creates_canonical_worktree(self):

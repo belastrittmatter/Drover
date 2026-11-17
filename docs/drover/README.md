@@ -1,20 +1,20 @@
-# super-board: how it works
+# drover: how it works
 
-> **What it does not do:** super-board installs skills, scripts, a workflow and guard hooks,
+> **What it does not do:** drover installs skills, scripts, a workflow and guard hooks,
 > and onboard sets up your GitHub Project. It does not grant `gh` access on its own, add CI, or approve merges you
 > have not allowed. It is not a CI replacement: workers push branches and your CI still runs.
 > It is not a free pass on review: set `human_approves_merge: true` to keep a person on every
 > merge. It is not for cards without acceptance criteria: QA grades against them.
 
-super-board watches a GitHub Project and runs Build → QA → Review for each card, merging when
+drover watches a GitHub Project and runs Build → QA → Review for each card, merging when
 the evidence holds. The board is the only state: every agent re-reads it, so a run survives
-Ctrl-C, restarts and rate-limit pauses, and `/super-board run <slug>` resumes from whatever
+Ctrl-C, restarts and rate-limit pauses, and `/drover run <slug>` resumes from whatever
 column each card is in.
 
 | | |
 |---|---|
 | **What you get** | Merged PRs with evidence: screenshots, test reruns, review findings on the PR |
-| **How you start** | `/super-board run <slug>`, then drag cards into `Ready` |
+| **How you start** | `/drover run <slug>`, then drag cards into `Ready` |
 | **What holds state** | The board. Cards pick up from their column after any stop |
 | **Backend** | In-session dynamic workflow waves by default; headless `claude -p` on opt-in |
 
@@ -22,15 +22,15 @@ column each card is in.
 
 ```mermaid
 flowchart LR
-  collect["/super-collect<br/>sentry · posthog · issues · PRs · architecture"] --> findings["findings doc"]
+  collect["/drover-collect<br/>sentry · posthog · issues · PRs · architecture"] --> findings["findings doc"]
   findings --> spec["/to-spec → /to-tickets"]
   spec -->|"1–5 tickets"| impl["/implement-spec"]
   spec -->|"6+ tickets"| backlog["Backlog"]
-  backlog -->|"/super-board lint, then you"| ready["Ready"]
-  ready --> build["Building<br/>super-build: worktree + draft PR"]
-  build --> qa["QA<br/>super-qa: tests, evidence,<br/>pr-security-review"]
+  backlog -->|"/drover lint, then you"| ready["Ready"]
+  ready --> build["Building<br/>drover-build: worktree + draft PR"]
+  build --> qa["QA<br/>drover-qa: tests, evidence,<br/>pr-security-review"]
   ready -->|"label qa"| qa
-  qa --> review["Review<br/>super-review: own hypotheses,<br/>prior findings"]
+  qa --> review["Review<br/>drover-review: own hypotheses,<br/>prior findings"]
   review --> gate{"merge gate<br/>base + verify_commands"}
   gate -->|green, head unchanged| done["Done (squash-merged)"]
   qa -->|fail| ready
@@ -46,12 +46,12 @@ merge with a hand-off; a card labelled `qa` skips Building.
 
 ## Onboarding
 
-`/super-board onboard` is a 7-step wizard. Each step opens with a numbered agenda strip and
+`/drover onboard` is a 7-step wizard. Each step opens with a numbered agenda strip and
 `N of 7 · <emoji> <Name> — <why>`, then one question with the recommended answer first.
 
 | # | Step | What happens |
 |---|---|---|
-| 1 | 🔍 Checks | Fixes every must-have with no question — skills, scripts, workflows, guard hooks, settings entries, old folders (super-refine, cleanup-wt, arch-loop), config keys, labels, columns — and lists them under "Fixed for you". Asks only to install a system tool (the exact brew / apt / winget command) or sign in, then re-checks until green. An older super-board is upgraded here ("Upgraded for you"). |
+| 1 | 🔍 Checks | Fixes every must-have with no question — skills, scripts, workflows, guard hooks, settings entries, old folders (super-refine, cleanup-wt, arch-loop), config keys, labels, columns — and lists them under "Fixed for you". Asks only to install a system tool (the exact brew / apt / winget command) or sign in, then re-checks until green. An older drover is upgraded here ("Upgraded for you"). |
 | 2 | 🔑 GitHub | Signs in and adds board access (`gh auth refresh -s project,read:project,repo`) only when missing; offers to create the repo. |
 | 3 | 🗂️ Board | Ranks your GitHub Projects by matching columns and recommends reusing the best (adds what is missing, keeps cards), or creates one with a name taken from package.json / README. |
 | 4 | 🌿 Branch | Finds branches and the deploy source; no staging → "Create staging from main" (Recommended). |
@@ -60,8 +60,8 @@ merge with a hand-off; a card labelled `qa` skips Building.
 | 7 | ✅ Review | One compact table, then "Write everything?" — files change once, here. |
 
 Stop at any step: the answers are saved, and the next run shows them and continues. Testing a
-live site with no repo is not a board: `/super-qa <url>`. The full screen-by-screen contract is
-`skills/super-board/references/onboard.md`; the deterministic half is
+live site with no repo is not a board: `/drover-qa <url>`. The full screen-by-screen contract is
+`skills/drover/references/onboard.md`; the deterministic half is
 `scripts/drover-setup.py`.
 
 **Labels.** Every board has the same seven columns. Three labels route a card: `qa` goes Ready →
@@ -77,12 +77,12 @@ card dropped on purpose is closed as not planned and moved to Done with a 🤷 c
 - Three labels route cards: `qa` skips Building (test what exists), `bug` and `feature` are built first; no label is built too.
 - Default backend is in-session dynamic workflows: turn them on in `/config`. Headless `claude -p` is opt-in (`worker_backend: "claude-p"`).
 - Set `verify_commands` in the config. Without them the merge gate cannot prove the result builds, and says so.
-- `onboard` fixes what the board needs without asking (skills, scripts, workflows, guards, settings, old folders, config keys) and asks only to install a system tool or sign in. An older super-board is upgraded in place.
+- `onboard` fixes what the board needs without asking (skills, scripts, workflows, guards, settings, old folders, config keys) and asks only to install a system tool or sign in. An older drover is upgraded in place.
 - `onboard` asks once what the robot may do: auto-merge normal changes up to 400 changed lines (money, auth, destructive schema like DROP/TRUNCATE/RENAME, and bigger PRs wait for you; additive migrations run only on the databases you allow, never live), protect main, and which databases it may migrate (default test + staging). Anything only you may run lands in Blocked tagged 🙋 with the exact command; comment `done` and the next wave merges.
 - Auto-merge needs the merge-gate and `gh pr merge` lines in your allowlist; `onboard` offers them as a diff.
-- Plugin install: the command is `/super-board:super-board onboard`, and its 🔍 Checks step installs the missing scripts, workflows and hooks.
-- Bug sources take any extra source in onboard — a link, app name, API URL, MCP server or command — proven readable (read-only) before it is saved; `/super-collect` runs it like the built-ins.
-- Testing a live site with no repo is not a board: `/super-qa <url>` runs on its own.
+- Plugin install: the command is `/drover:drover onboard`, and its 🔍 Checks step installs the missing scripts, workflows and hooks.
+- Bug sources take any extra source in onboard — a link, app name, API URL, MCP server or command — proven readable (read-only) before it is saved; `/drover-collect` runs it like the built-ins.
+- Testing a live site with no repo is not a board: `/drover-qa <url>` runs on its own.
 - To enable the usage check, add `printf '%s' "$input" | bash <repo>/.claude/bin/drover-usage.sh record` to your status-line script.
 - Cards need acceptance criteria: QA grades against them, and `lint` tells you which are missing.
 
@@ -90,11 +90,11 @@ card dropped on purpose is closed as not planned and moved to Done with a 🤷 c
 
 | Skill | Use it for |
 | --- | --- |
-| `/super-board` | Orchestrator. Validates preconditions, plans waves, launches them. Holds no product context, writes no code. |
-| `/super-build` | `Ready` → `QA`. Worktree, smallest safe change, draft PR. |
-| `/super-qa` | `QA` → `Review`. Tests per AC, test-gap check, screenshots/logs/HARs on the PR, or a bounce with a rebuild label. Off-ticket findings file as `source:qa` cards. |
-| `/super-review` | `Review` → `Done`. Re-runs the Tester's tests, adversarial truth-check, merges through the gate or hands to a human. On a re-review it first checks every finding from its last report. Shape problems are filed to `Backlog`, never blocked on. |
-| `/super-collect` | Finding problems in Sentry, PostHog, unboarded issues, recurring PR problems and architecture, each checked by one verifier, then one findings doc for `/to-spec` and `/to-tickets` (1–5 tickets → `/implement-spec`, 6+ → `Backlog`). |
+| `/drover` | Orchestrator. Validates preconditions, plans waves, launches them. Holds no product context, writes no code. |
+| `/drover-build` | `Ready` → `QA`. Worktree, smallest safe change, draft PR. |
+| `/drover-qa` | `QA` → `Review`. Tests per AC, test-gap check, screenshots/logs/HARs on the PR, or a bounce with a rebuild label. Off-ticket findings file as `source:qa` cards. |
+| `/drover-review` | `Review` → `Done`. Re-runs the Tester's tests, adversarial truth-check, merges through the gate or hands to a human. On a re-review it first checks every finding from its last report. Shape problems are filed to `Backlog`, never blocked on. |
+| `/drover-collect` | Finding problems in Sentry, PostHog, unboarded issues, recurring PR problems and architecture, each checked by one verifier, then one findings doc for `/to-spec` and `/to-tickets` (1–5 tickets → `/implement-spec`, 6+ → `Backlog`). |
 | `/ui-refine-loop` | Polishing one page or component, standalone: Impeccable check → fix rounds ending in a draft PR. The board never runs it. |
 | `/git-sync` | Secondary helper: commit per logical change, merge-pull, push without force. |
 | `/visual` | Secondary helper: a visual recap or plan. Merged-worktree cleanup is a hook (`hooks/cleanup-wt.py`): the merge gate runs it after each merge and SessionStart runs it when a base moved. |
@@ -107,13 +107,13 @@ Lane lifecycles are identical in both.
 |---|---|---|
 | Runs as | in-session dynamic workflow waves | headless `claude -p` workers |
 | Needs | dynamic workflows on in `/config` | nothing extra |
-| Reference | `skills/super-board/references/run-workflow.md` | `scripts/drover-run.sh` |
+| Reference | `skills/drover/references/run-workflow.md` | `scripts/drover-run.sh` |
 
 The legacy dispatcher refuses to run (exit 78) unless the config sets it.
 
-**Stop and resume.** `/super-board stop` posts a "stopped mid-flight" comment on every in-flight
+**Stop and resume.** `/drover stop` posts a "stopped mid-flight" comment on every in-flight
 issue and PR (lane, last commit, resume hint), releases the assignee mutex, and kills workers and
-the dispatcher. Resume with `/super-board run <slug>`. A card stranded in `Building` by a stopped
+the dispatcher. Resume with `/drover run <slug>`. A card stranded in `Building` by a stopped
 wave goes back to `Ready`; its branch is kept and the next Builder continues on it.
 
 ## How a wave runs
@@ -142,25 +142,25 @@ user a question: the run is unattended, and a skill that waits is a skill that h
 
 | Lane | Loads |
 |---|---|
-| **super-build** | Routed by the ticket's type label: `bug` → `diagnosing-bugs`+`tdd`, `feature` → `implement`+`tdd`+`codebase-design`, `refactor`/`tech-debt` → `codebase-design`+`tdd`, `docs` → skip `tdd`. Always `ponytail:ponytail` first (inline ladder if absent), `verification-before-completion`, and `code-review` on its own diff. Official docs first for third-party APIs, upgrades, auth/billing. Mechanics (`vitest` / `playwright-best-practices` / `testing-strategy`) by the localisation ladder, never by label. |
-| **super-qa** | `ask-matt` · `tdd` · `diagnosing-bugs` · the same testing skills |
-| **super-review** | `code-review` (Standards + Spec, merge-base as fixed point) · `codebase-design` · `ponytail:ponytail-review` |
+| **drover-build** | Routed by the ticket's type label: `bug` → `diagnosing-bugs`+`tdd`, `feature` → `implement`+`tdd`+`codebase-design`, `refactor`/`tech-debt` → `codebase-design`+`tdd`, `docs` → skip `tdd`. Always `ponytail:ponytail` first (inline ladder if absent), `verification-before-completion`, and `code-review` on its own diff. Official docs first for third-party APIs, upgrades, auth/billing. Mechanics (`vitest` / `playwright-best-practices` / `testing-strategy`) by the localisation ladder, never by label. |
+| **drover-qa** | `ask-matt` · `tdd` · `diagnosing-bugs` · the same testing skills |
+| **drover-review** | `code-review` (Standards + Spec, merge-base as fixed point) · `codebase-design` · `ponytail:ponytail-review` |
 
-Assignment happens when the ticket is written, not at runtime: super-build routes on the issue's
-**type label**, the same `bug` / `feature` / `ux` / `tests` / `docs` / `tech-debt` labels super-qa
-files, plus `refactor` from super-review. A `Skills:` line in a ticket body replaces its label's row.
+Assignment happens when the ticket is written, not at runtime: drover-build routes on the issue's
+**type label**, the same `bug` / `feature` / `ux` / `tests` / `docs` / `tech-debt` labels drover-qa
+files, plus `refactor` from drover-review. A `Skills:` line in a ticket body replaces its label's row.
 
 **Interactive-only, never in a lane:** `grilling`, `shape`, `clarify` and
 `improve-codebase-architecture`. They prompt, wait or open a browser. They belong to
-`super-board lint` and to you at a keyboard. A worker that wants one is telling you the ticket
+`drover lint` and to you at a keyboard. A worker that wants one is telling you the ticket
 needed a human before the loop started.
 
 ## The six agentic patterns, mapped
 
 ```
   workflows/drover-wave.js   the conductor: owns the patterns
-  skills/super-{build,qa,review}  the sheet music: one lane agent each
-  the prompt it spawns            "Run super-build on #N, follow run.md exactly"
+  skills/drover-{build,qa,review}  the sheet music: one lane agent each
+  the prompt it spawns            "Run drover-build on #N, follow run.md exactly"
 ```
 
 | Pattern | When |
@@ -262,7 +262,7 @@ Minimal config at `.claude/drover/configs/<slug>.json`:
   max_workers           optional wave throttle; absent or 0 = unlimited (claude-p defaults to 3)
   tick_seconds          claude-p GraphQL budget floor, default 120
   usage_pause_pct       pause new waves at this % of the Claude usage window, default 95
-  refine, collect       optional blocks for ui-refine-loop and super-collect (collect.custom = extra sources)
+  refine, collect       optional blocks for ui-refine-loop and drover-collect (collect.custom = extra sources)
 ```
 
 ```
@@ -274,7 +274,7 @@ Minimal config at `.claude/drover/configs/<slug>.json`:
                          └ hardening code that already exists
 ```
 
-Every key, with notes: `skills/super-board/references/config-schema.json`.
+Every key, with notes: `skills/drover/references/config-schema.json`.
 
 ## How workers decide what test to write
 
@@ -306,12 +306,12 @@ between independently deployed services, which a single-app repo does not have.
 
 ## Start with low autonomy
 
-- Run `/super-board lint` first and fix what it flags.
+- Run `/drover lint` first and fix what it flags.
 - Start with `human_approves_merge: true` and a few cards; read the PR comments each lane leaves.
 - Set `verify_commands` before you allow auto-merge, and add `Bash(gh pr merge:*)` to the
   allowlist only when you mean it: it removes the last human gate.
 - Label a few cards `qa` on code that already exists before letting Builders loose.
-- Run `/super-collect` in its default dry-run before `--yes`.
+- Run `/drover-collect` in its default dry-run before `--yes`.
 
 Missing, unreadable or stale evidence is a hold for a person, never a pass.
 
@@ -337,4 +337,4 @@ Missing, unreadable or stale evidence is a hold for a person, never a pass.
 
 The minimal `.claude-plugin/plugin.json` exists for plugin installs;
 `install.sh` stays the install path. The full lane-to-skill mapping, including the skills kept
-because Matt's pack has no equivalent, is in `skills/super-build/references/decision-policy.md`.
+because Matt's pack has no equivalent, is in `skills/drover-build/references/decision-policy.md`.

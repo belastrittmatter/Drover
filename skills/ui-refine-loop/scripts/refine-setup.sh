@@ -183,7 +183,7 @@ case "$cmd" in
     S=$(detect)
     PM=$(field packageManager <<<"$S"); LOCK=$(field lockfile <<<"$S")
     DEV=$(field devCommand <<<"$S"); READY=$(field readyPath <<<"$S")
-    [ -n "$DEV" ] || die "no dev command: set refine.dev_command in the super-board config" 70
+    [ -n "$DEV" ] || die "no dev command: set refine.dev_command in the drover config" 70
     [ -n "$SLUG" ] || die "up needs --slug" 64
     ROOT="${SUPER_REFINE_WT_ROOT:-.claude/worktrees}"
     mkdir -p "$ROOT"

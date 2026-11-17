@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# drover-stop.sh — graceful shutdown of an in-flight super-board run.
+# drover-stop.sh — graceful shutdown of an in-flight drover run.
 #
 # What it does:
 #   1. Find every in-flight worker (lock files under .claude/drover/inflight/).
@@ -20,7 +20,7 @@
 #   - Touch branches or PRs. State lives on the GitHub Project board.
 #
 # Resume:
-#   super-board run <slug>     — same command. The board is the state. Cards sit
+#   drover run <slug>     — same command. The board is the state. Cards sit
 #                                in whichever column they were in. Workers re-claim
 #                                from the "stopped" comment context.
 #
@@ -101,10 +101,10 @@ post_stop_comment() {
 
   # Comment format: writing-standard.md § 4.
   body="[orchestrator] [report] 🛑 stopped · ${lane:-unknown} lane
-Did: \`super-board stop\` ended worker PID ${pid:-unknown} at ${TS}
+Did: \`drover stop\` ended worker PID ${pid:-unknown} at ${TS}
 ✅ Done: resume point is the last pushed commit — ${commit}
 ❌ Not done: interrupted work may be uncommitted; inspect the preserved worktree
-Next: preserve edits before \`super-board run ${CONFIG_SLUG}\`; dirty or legacy worktrees need inspection"
+Next: preserve edits before \`drover run ${CONFIG_SLUG}\`; dirty or legacy worktrees need inspection"
 
   gh issue comment "$issue" --body "$body" >/dev/null 2>&1 \
     && log "  💬 issue comment posted on #${issue}" \
@@ -148,7 +148,7 @@ kill_pid() {
 
 # ───────────────────────────── main ─────────────────────────────
 echo "════════════════════════════════════════════════════════"
-echo "  super-board stop · ${CONFIG_SLUG}"
+echo "  drover stop · ${CONFIG_SLUG}"
 echo "════════════════════════════════════════════════════════"
 
 # 1. Inventory in-flight workers BEFORE killing anything.
@@ -165,7 +165,7 @@ if [ -d "$INFLIGHT_DIR" ]; then
 fi
 
 DISPATCHER_PIDS=$(pgrep -f 'drover-run\.sh' 2>/dev/null || true)
-ORPHAN_WORKERS=$(pgrep -f 'claude -p .*super-board' 2>/dev/null || true)
+ORPHAN_WORKERS=$(pgrep -f 'claude -p .*drover' 2>/dev/null || true)
 CODEX_WAVE_MARKER=".claude/drover/codex-wave.pid"
 CODEX_WAVE_PID=""
 if [ -f "$CODEX_WAVE_MARKER" ]; then
@@ -210,10 +210,10 @@ if [ "${#WORKERS[@]}" -gt 0 ]; then
   done
 fi
 
-# 3. Sweep any untracked claude -p super-board workers.
+# 3. Sweep any untracked claude -p drover workers.
 if [ -n "$ORPHAN_WORKERS" ]; then
   log ""
-  log "🧹 sweeping untracked claude -p super-board workers"
+  log "🧹 sweeping untracked claude -p drover workers"
   for pid in $ORPHAN_WORKERS; do
     kill_pid "$pid" "orphan-worker"
   done
@@ -246,5 +246,5 @@ echo ""
 echo "════════════════════════════════════════════════════════"
 echo "  ✅ stopped: ${#WORKERS[@]} worker(s), ${DISP_COUNT} dispatcher(s)"
 echo "  📝 wrap-up comments posted on each in-flight issue + PR"
-echo "  ▶  Resume: super-board run ${CONFIG_SLUG}"
+echo "  ▶  Resume: drover run ${CONFIG_SLUG}"
 echo "════════════════════════════════════════════════════════"

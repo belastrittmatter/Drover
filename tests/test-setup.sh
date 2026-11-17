@@ -20,15 +20,15 @@ q() { jq -e "$@" >/dev/null; }
 #     must-have with no question, runs git init, and the re-check is green.
 T="$WORK/bare"; mkdir -p "$T"
 OUT=$(python3 "$SETUP" check --root "$T" || true)
-echo "$OUT" | q '.green == false and (.missing | index("skill super-board")) and .git == false' \
-  || fail "bare folder should be red with super-board missing: $OUT"
+echo "$OUT" | q '.green == false and (.missing | index("skill drover")) and .git == false' \
+  || fail "bare folder should be red with drover missing: $OUT"
 OUT=$(python3 "$SETUP" fix --root "$T" --no-helpers || true)
-echo "$OUT" | q '.fixed | index("super-board skills, scripts and board engine installed")' || fail "fix should install: $OUT"
+echo "$OUT" | q '.fixed | index("drover skills, scripts and board engine installed")' || fail "fix should install: $OUT"
 echo "$OUT" | q '.fixed | index("git repo created (git init)")' || fail "fix should git init: $OUT"
 echo "$OUT" | q '.missing == [] and .git == true and .upgraded == false' || fail "re-check after fix should have nothing missing: $OUT"
 [ -x "$T/.claude/bin/drover-setup.py" ] || fail "the setup script installs itself into .claude/bin"
 TXT=$(python3 "$SETUP" check --root "$T" --text || true)
-echo "$TXT" | grep -q "✓ super-board skills, scripts and board engine present" || fail "text report should list what is present: $TXT"
+echo "$TXT" | grep -q "✓ drover skills, scripts and board engine present" || fail "text report should list what is present: $TXT"
 
 # 1b — missing safety helpers must trigger a repair even on a current installation.
 for helper in drover-approval.py drover-github-read.py drover-project-verifier.py; do
@@ -41,12 +41,12 @@ for helper in drover-approval.py drover-github-read.py drover-project-verifier.p
   echo "$OUT" | q '.missing == []' || fail "repair must leave no missing scripts: $OUT"
 done
 
-# 2 — upgrade: an older super-board (VERSION 1.8.2, removed skill folders, a qa-only
+# 2 — upgrade: an older drover (VERSION 1.8.2, removed skill folders, a qa-only
 #     config with Skipped, old collect keys, telegram) is detected and upgraded with
 #     no question, backed up first, and listed as "Upgraded for you".
-T="$WORK/old"; mkdir -p "$T/.claude/skills/super-board" "$T/.claude/drover/configs"
+T="$WORK/old"; mkdir -p "$T/.claude/skills/drover" "$T/.claude/drover/configs"
 git -C "$T" init -q
-echo "1.8.2" > "$T/.claude/skills/super-board/VERSION"
+echo "1.8.2" > "$T/.claude/skills/drover/VERSION"
 for d in super-refine cleanup-wt arch-loop; do mkdir -p "$T/.claude/skills/$d"; echo x > "$T/.claude/skills/$d/SKILL.md"; done
 cat > "$T/.claude/drover/configs/books.json" <<'JSON'
 {"version":1,"variant":"qa-only","project":{"owner":"eric","number":2},
@@ -61,7 +61,7 @@ echo "$OUT" | q '.upgrade == true and .from == "1.8.2" and .old_dirs == ["super-
   || fail "older install should be detected: $OUT"
 OUT=$(python3 "$SETUP" fix --root "$T" --no-helpers || true)
 echo "$OUT" | q '.upgraded == true and .from == "1.8.2"' || fail "fix should report the upgrade: $OUT"
-echo "$OUT" | q '.fixed | any(test("^skills updated; added .*super-collect"))' || fail "upgrade should name the added skills: $OUT"
+echo "$OUT" | q '.fixed | any(test("^skills updated; added .*drover-collect"))' || fail "upgrade should name the added skills: $OUT"
 echo "$OUT" | q '.fixed | index("removed old folders: super-refine, cleanup-wt, arch-loop")' || fail "old folders line missing: $OUT"
 echo "$OUT" | q '.fixed | any(test("^config moved to the new keys"))' || fail "config line missing: $OUT"
 for d in super-refine cleanup-wt arch-loop; do [ ! -e "$T/.claude/skills/$d" ] || fail "$d should be removed"; done

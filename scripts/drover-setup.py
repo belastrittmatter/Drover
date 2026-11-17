@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""drover-setup.py — the deterministic half of `/super-board onboard`.
+"""drover-setup.py — the deterministic half of `/drover onboard`.
 
 Onboard asks the questions; this script finds things out and fixes the must-haves,
 so step 1 (Checks) can say "Fixed for you" without asking anything.
@@ -61,9 +61,9 @@ import sys
 COLUMNS = ["Backlog", "Ready", "Building", "QA", "Review", "Blocked", "Done"]
 HOSTS = ("claude", "codex", "opencode")  # config `host`; drover-host.sh accepts the same
 LABELS = {
-    "qa": ("0e8a16", "Test what exists; skips Building (super-board)"),
-    "bug": ("d73a4a", "Something is broken; built, tested, reviewed (super-board)"),
-    "feature": ("1d76db", "New behaviour; built, tested, reviewed (super-board)"),
+    "qa": ("0e8a16", "Test what exists; skips Building (drover)"),
+    "bug": ("d73a4a", "Something is broken; built, tested, reviewed (drover)"),
+    "feature": ("1d76db", "New behaviour; built, tested, reviewed (drover)"),
 }
 # Type labels from older packs and common trackers → the three v3 labels.
 OLD_LABELS = {
@@ -71,7 +71,7 @@ OLD_LABELS = {
     "bug-fix": "bug", "bugfix": "bug", "type:bug": "bug", "kind:bug": "bug",
     "qa-only": "qa", "type:qa": "qa", "kind:qa": "qa",
 }
-SKILLS = ["super-board", "super-build", "super-qa", "super-review", "super-collect", "visual", "git-sync", "ui-refine-loop", "pr-security-review"]
+SKILLS = ["drover", "drover-build", "drover-qa", "drover-review", "drover-collect", "visual", "git-sync", "ui-refine-loop", "pr-security-review"]
 OLD_SKILL_DIRS = ["super-refine", "cleanup-wt", "arch-loop"]
 BIN = ["drover-project-verifier.py", "drover-skills-ready.py", "drover-host.sh", "drover-codex-wave.sh", "drover-lane.sh", "drover-codex-lane.sh", "drover-verification-ready.py", "drover-github-read.py", "drover-collect-state.py", "drover-run.sh", "drover-gh-guard.sh", "drover-card.sh", "drover-status.py", "drover-wave-plan.sh",
        "drover-deps.sh", "drover-preflight.sh", "drover-merge-gate.sh",
@@ -167,9 +167,9 @@ def find_pack(explicit=None):
     home = os.path.expanduser("~/.claude/plugins")
     if os.path.isdir(home):
         cands += sorted(os.path.dirname(p) for p in glob.glob(os.path.join(home, "**", "install.sh"), recursive=True)
-                        if "super-board" in p and "node_modules" not in p)
+                        if "drover" in p and "node_modules" not in p)
     for c in cands:
-        if c and os.path.isfile(os.path.join(c, "install.sh")) and os.path.isdir(os.path.join(c, "skills", "super-board")):
+        if c and os.path.isfile(os.path.join(c, "install.sh")) and os.path.isdir(os.path.join(c, "skills", "drover")):
             return os.path.abspath(c)
     return None
 
@@ -253,7 +253,7 @@ def migrate_config(cfg, host=None):
     tgt = c.get("target") or {}
     if tgt.get("type") == "url":
         c["target"] = {"type": "repo+url" if c.get("repo") else "repo", "url": tgt.get("url")}
-        changes.append("URL-only target → repo board (a live site alone: /super-qa <url>)")
+        changes.append("URL-only target → repo board (a live site alone: /drover-qa <url>)")
     col = c.get("collect")
     if isinstance(col, dict) and any(k in col for k in ("errors", "feedback_paths", "lookback_runs")):
         errors = col.pop("errors", None)
@@ -276,7 +276,7 @@ def migrate_config(cfg, host=None):
         changes.append("migrations: test + staging allowed (defaults)")
     n = c.get("notifications")
     if isinstance(n, dict) and n.get("channel") not in (None, "session"):
-        changes.append(f"notifications: \"{n.get('channel')}\" → session (super-board sends no messages)")
+        changes.append(f"notifications: \"{n.get('channel')}\" → session (drover sends no messages)")
         n["channel"], n["chat_id"] = "session", None
     if not c.get("timezone"):
         c["timezone"] = machine_tz()
@@ -293,7 +293,7 @@ def migrate_config(cfg, host=None):
 # ── check / fix ────────────────────────────────────────────────────────────────
 
 def installed_version(root):
-    return read(os.path.join(root, ".claude", "skills", "super-board", "VERSION")) or None
+    return read(os.path.join(root, ".claude", "skills", "drover", "VERSION")) or None
 
 
 def check(root, pack, host="claude", home=None, catalog=None):
@@ -349,7 +349,7 @@ def check(root, pack, host="claude", home=None, catalog=None):
     git = is_git_repo(root)
     ok = []
     if not missing:
-        ok.append("super-board skills, scripts and board engine present")
+        ok.append("drover skills, scripts and board engine present")
         if hook_files:
             ok.append(f"{len(hook_files)} safety guards on")
     if git:
@@ -410,7 +410,7 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
         if before["upgrade"]:
             fixed.append("scripts, board engine and safety guards updated")
         else:
-            fixed.append("super-board skills, scripts and board engine installed")
+            fixed.append("drover skills, scripts and board engine installed")
             if any(m.startswith("hook") or m.startswith("settings") for m in before["missing"]):
                 n = len(glob.glob(os.path.join(pack, "hooks", "*.py")))
                 fixed.append(f"{n} safety guards switched on")

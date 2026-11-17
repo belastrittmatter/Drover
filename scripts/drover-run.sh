@@ -5,7 +5,7 @@
 # Holds NO Claude session state — re-reads GitHub on every tick.
 #
 # Anti-zombie controls (added 2026-05-22 after #381 worker-storm incident):
-#   1. Orphan scan on startup — refuses to start if super-board claude workers already running.
+#   1. Orphan scan on startup — refuses to start if drover claude workers already running.
 #   2. Issue-level lock files in .claude/drover/inflight/<N> — survives runner restart.
 #   3. Atomic GitHub assignee claim BEFORE spawning worker (closes 10-30s claude -p cold-start race).
 #   4. Rate-limit guard — sleeps until reset when GraphQL remaining < 200.
@@ -70,7 +70,7 @@ fi
 # saying "qa-only" is refused, same as the wave planner.
 VARIANT=$(jq -r '.variant // "full"' "$CONFIG_PATH")
 if [ "$VARIANT" != "full" ]; then
-  echo "config still says variant \"$VARIANT\" — removed in v3.0.0. Run /super-board onboard to upgrade." >&2
+  echo "config still says variant \"$VARIANT\" — removed in v3.0.0. Run /drover onboard to upgrade." >&2
   exit 65
 fi
 PROJECT_OWNER=$(jq -r '.project.owner' "$CONFIG_PATH")
@@ -92,7 +92,7 @@ MAX_DISPATCHES=$(jq -r '.max_dispatches // 0' "$CONFIG_PATH")
 # when the config opts in explicitly — never by accident or stale habit.
 if [ "$WORKER_BACKEND" != "claude-p" ]; then
   echo "🛑 board '${CONFIG_SLUG}' uses the workflow backend (worker_backend=${WORKER_BACKEND})." >&2
-  echo "    Run it in-session: /super-board run ${CONFIG_SLUG}  (see references/run-workflow.md)" >&2
+  echo "    Run it in-session: /drover run ${CONFIG_SLUG}  (see references/run-workflow.md)" >&2
   echo "    To use this legacy dispatcher, set \"worker_backend\": \"claude-p\" in the config." >&2
   exit 78
 fi
@@ -334,9 +334,9 @@ dispatch_lane() {
     return 0
   fi
   case "$lane" in
-    build)  prompt="Run super-build on issue #${issue} for super-board run. Read .claude/skills/super-board/references/run.md → Builder lifecycle. Config: ${CONFIG_PATH}." ;;
-    qa)     prompt="Run super-qa on issue #${issue} for super-board run. Read .claude/skills/super-board/references/run.md → Tester lifecycle. Config: ${CONFIG_PATH}." ;;
-    review) prompt="Run super-review on issue #${issue} for super-board run. Read .claude/skills/super-board/references/run.md → Reviewer lifecycle. Config: ${CONFIG_PATH}." ;;
+    build)  prompt="Run drover-build on issue #${issue} for drover run. Read .claude/skills/drover/references/run.md → Builder lifecycle. Config: ${CONFIG_PATH}." ;;
+    qa)     prompt="Run drover-qa on issue #${issue} for drover run. Read .claude/skills/drover/references/run.md → Tester lifecycle. Config: ${CONFIG_PATH}." ;;
+    review) prompt="Run drover-review on issue #${issue} for drover run. Read .claude/skills/drover/references/run.md → Reviewer lifecycle. Config: ${CONFIG_PATH}." ;;
     *) log "unknown lane: $lane"; return 1 ;;
   esac
   prompt="First operation: run .claude/bin/drover-skills-ready.py --root '$PWD' --host claude --cards - --lane '$lane' --hydrate with $card as stdin. Halt on exit 10 before worktree creation or lifecycle writes; preserve claims and approval evidence. Load resolved paths and only declared fallbacks; recheck conditionals with --require before activation. $prompt"
@@ -354,7 +354,7 @@ dispatch_lane() {
   DISPATCH_COUNT=$((DISPATCH_COUNT + 1))
   DISPATCH_LOG="${DISPATCH_LOG}${issue}
 "
-  # v1.3.0+ lock format: bash-assignment style so `super-board stop` can source it
+  # v1.3.0+ lock format: bash-assignment style so `drover stop` can source it
   # to recover lane + dispatch time. issue_locked()/reap_finished_locks() still work
   # because PID= is the first line.
   printf 'PID=%s\nLANE=%s\nSTARTED=%s\n' "$pid" "$lane" "$(date -u +%FT%TZ)" > "$INFLIGHT_DIR/$issue"
@@ -592,14 +592,14 @@ trap halt_cleanup EXIT
 gh_checkpoint
 
 # ───────────────────────────── preconditions ─────────────────────────────
-log "super-board run started — config=${CONFIG_SLUG} base=${BASE_BRANCH} tick=${TICK_SECONDS}s max_workers=${MAX_WORKERS} no_progress_cycles=${NO_PROGRESS_CYCLES} max_dispatches=${MAX_DISPATCHES}"
+log "drover run started — config=${CONFIG_SLUG} base=${BASE_BRANCH} tick=${TICK_SECONDS}s max_workers=${MAX_WORKERS} no_progress_cycles=${NO_PROGRESS_CYCLES} max_dispatches=${MAX_DISPATCHES}"
 
 # Orphan-worker guard. `|| true` defends against pipefail when pgrep finds nothing.
-ORPHANS=$(pgrep -f 'claude -p .*super-board run' 2>/dev/null | grep -v "^$$\$" | wc -l | tr -d ' ' || true)
+ORPHANS=$(pgrep -f 'claude -p .*drover run' 2>/dev/null | grep -v "^$$\$" | wc -l | tr -d ' ' || true)
 ORPHANS=${ORPHANS:-0}
 if [ "$ORPHANS" -gt 0 ]; then
-  log "🛑 refusing to start: ${ORPHANS} super-board claude workers already running."
-  log "    Stop them first: pkill -f 'claude -p .*super-board run'"
+  log "🛑 refusing to start: ${ORPHANS} drover claude workers already running."
+  log "    Stop them first: pkill -f 'claude -p .*drover run'"
   log "    Then re-run: $0 $CONFIG_SLUG"
   exit 73
 fi
@@ -775,4 +775,4 @@ while true; do
   sleep "$TICK_SECONDS"
 done
 
-log "super-board run finished. manifest: $RUN_MANIFEST"
+log "drover run finished. manifest: $RUN_MANIFEST"

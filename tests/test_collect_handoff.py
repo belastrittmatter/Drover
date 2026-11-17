@@ -1,8 +1,8 @@
-"""super-collect's hand-off to Matt Pocock's planning chain (collect_handoff.py).
+"""drover-collect's hand-off to Matt Pocock's planning chain (collect_handoff.py).
 
 route  — /to-spec and /to-tickets installed → planning; either missing → backlog + why
 doc    — one findings doc, verified findings grouped, drops listed; dry-run writes nothing
-fork   — 1–5 tickets → /implement-spec, 6+ → super-board Backlog, 0 → refused
+fork   — 1–5 tickets → /implement-spec, 6+ → drover Backlog, 0 → refused
 
 Offline: a temp project and a temp home; the real skills-ready resolver decides "installed".
 
@@ -19,8 +19,8 @@ import unittest
 from pathlib import Path
 
 KIT = Path(__file__).resolve().parents[1]
-CLI = KIT / "skills/super-collect/scripts/collect_handoff.py"
-SKILL = KIT / "skills/super-collect/SKILL.md"
+CLI = KIT / "skills/drover-collect/scripts/collect_handoff.py"
+SKILL = KIT / "skills/drover-collect/SKILL.md"
 
 FINDINGS = [
     {"title": "Checkout 500 on empty cart", "type": "bug", "source": "sentry", "group": "checkout",
@@ -119,14 +119,14 @@ class Handoff(unittest.TestCase):
 
     # fork ----------------------------------------------------------------
     def test_fork_boundaries(self):
-        for n, build in ((1, "implement-spec"), (5, "implement-spec"), (6, "super-board"), (40, "super-board")):
+        for n, build in ((1, "implement-spec"), (5, "implement-spec"), (6, "drover"), (40, "drover")):
             out = json.loads(self.run_cli("fork", "--tickets", str(n)).stdout)
             self.assertEqual(out["build"], build, n)
         self.run_cli("fork", "--tickets", "0", expected=64)
 
     def test_fork_without_implement_spec_goes_to_the_board(self):
         out = json.loads(self.run_cli("fork", "--tickets", "3", "--no-implement-spec").stdout)
-        self.assertEqual(out["build"], "super-board")
+        self.assertEqual(out["build"], "drover")
         self.assertIn("implement-spec", out["why"])
 
     # SKILL.md names the chain exactly --------------------------------------

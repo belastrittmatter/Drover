@@ -4,7 +4,7 @@
 
 # build artifacts
 /dist/
-super-board-v*.zip
+drover-v*.zip
 
 # editor / OS noise
 .idea/
@@ -15,7 +15,7 @@ super-board-v*.zip
 __pycache__/
 *.pyc
 
-# super-board runtime state (if anyone runs the loop *inside* this repo)
+# drover runtime state (if anyone runs the loop *inside* this repo)
 .claude/drover/active
 .claude/drover/collect/
 .claude/drover/inflight/

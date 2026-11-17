@@ -14,7 +14,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SCRIPT="$REPO_ROOT/skills/super-collect/scripts/drover-collect-file.sh"
+SCRIPT="$REPO_ROOT/skills/drover-collect/scripts/drover-collect-file.sh"
 TICKETS="$REPO_ROOT/tests/fixtures/collect/tickets"
 WORK="$(mktemp -d)"
 export SB_GITHUB_RETRY_DELAY=0 SB_GITHUB_HALT_FILE="$WORK/halt.json"
@@ -100,7 +100,7 @@ is  "dry-run plans a duplicate" "duplicate|#301|bug|Checkout crashes when the la
 OUT=$(STUB_HITS="$OPEN" run "${BUG[@]}" --yes)
 is  "--yes returns the existing issue" "301" "$OUT"
 has "comments on #301" "$(cat "$GH_LOG")" "issue comment 301"
-is  "comment opens with 'Seen again' and the source" "Seen again by super-collect (sentry)." "$(head -1 "$COMMENT_LOG")"
+is  "comment opens with 'Seen again' and the source" "Seen again by drover-collect (sentry)." "$(head -1 "$COMMENT_LOG")"
 has "comment carries the new evidence" "$(cat "$COMMENT_LOG")" "37 events, 14 users"
 lacks "no issue create" "$(cat "$GH_LOG")" "issue create"
 lacks "no labels or board moves on a duplicate" "$(awk '/^(label create|project item-(add|edit)) /' "$GH_LOG")" "project"

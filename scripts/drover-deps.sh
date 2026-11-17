@@ -15,7 +15,7 @@
 # Parsing this section naively gets it wrong in three ways that were all observed
 # on a real board on 2026-08-20:
 #
-#   1. The preflight banner at the top of every super-board ticket quotes the words
+#   1. The preflight banner at the top of every drover ticket quotes the words
 #      "## Blocked by" inside backticks. A parser that takes the FIRST match reads
 #      the banner and finds no blockers. This takes the LAST heading-shaped match.
 #

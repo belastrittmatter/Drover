@@ -15,7 +15,7 @@ import unittest
 KIT = Path(__file__).resolve().parents[1]
 IDLE_ROUND_CALLS = 3  # measured at d0b7d5a; see docs/baseline.md
 # The skills the readiness check needs for every lane (see test_skill_dispatch.py).
-NAMES = ['super-board', 'super-build', 'super-qa', 'super-review', 'super-collect', 'visual', 'git-sync',
+NAMES = ['drover', 'drover-build', 'drover-qa', 'drover-review', 'drover-collect', 'visual', 'git-sync',
          'ui-refine-loop', 'pr-security-review', 'tdd', 'implement', 'codebase-design', 'code-review',
          'diagnosing-bugs', 'verification-before-completion', 'testing-strategy']
 
@@ -270,7 +270,7 @@ class RunnerRounds(unittest.TestCase):
         self.assertTrue(self.git('ls-remote', '--heads', 'origin', branch).strip(), 'branch was dropped')
         self.assertFalse([c for c in calls if c[:2] in (['pr', 'create'], ['pr', 'close'])])
         [second] = [p for p in self.worker_pids(expect=2) if p != first]
-        self.assertIn('Run super-build on issue #12 ', (self.workers / str(second)).read_text())
+        self.assertIn('Run drover-build on issue #12 ', (self.workers / str(second)).read_text())
 
     # NFR-6 measurement: GitHub calls in one round with nothing to do. Prints the
     # call list; asserts only the count measured at the fork point (docs/baseline.md).

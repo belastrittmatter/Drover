@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """PreToolUse(Bash) guard: no direct or force pushes to a protected base branch.
 
-Opt-in. `super-board onboard` asks once ("Block direct/force pushes to main?") and
+Opt-in. `drover onboard` asks once ("Block direct/force pushes to main?") and
 `install.sh --protect-main` wires it. Lanes push feature branches and merge through
 `drover-merge-gate.sh` (`gh pr merge`), so nothing in the loop needs to push a base.
 

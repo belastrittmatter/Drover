@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# drover-qa-file-bug.sh — file one Super QA finding as a GitHub issue on the
+# drover-qa-file-bug.sh — file one Drover QA finding as a GitHub issue on the
 # Super Ultimate QA project board.
 #
 # The QA loop runs unattended, so this is the carved exception to "ask before
@@ -12,7 +12,7 @@
 # leave a future headless session re-discovering the bug from scratch: the body
 # needs Problem · Context (lettered steps under Where) · Evidence (the folded
 # 12-row table) · Fix · Acceptance Criteria (a checklist) · Risk — the ticket
-# format in skills/super-board/references/writing-standard.md § 3.
+# format in skills/drover/references/writing-standard.md § 3.
 #
 # Usage:
 #   drover-qa-file-bug.sh --title "<one-line>" --body-file <path.md> \
@@ -21,12 +21,12 @@
 #     [--category functional|visual|network|console|i18n|a11y|data|testability] \
 #     [--area <area>] [--route <route>] [--spec <path>] [--iter <n>] \
 #     [--fingerprint "<slug>|<tc>|<signature>"] \
-#     [--suggested-skill super-build|super-qa|ui-refine-loop|super-review] \
+#     [--suggested-skill drover-build|drover-qa|ui-refine-loop|drover-review] \
 #     [--check-body]      # run the body checks only, then exit (no gh calls)
 #       (ui-refine-loop only labels a UI ticket; a human can run /ui-refine-loop —
 #        the board never triggers it)
 #
-# Project resolution (per super-qa/SKILL.md → "Project resolution"):
+# Project resolution (per drover-qa/SKILL.md → "Project resolution"):
 #   owner  $DROVER_QA_PROJECT_OWNER, else the current repo's owner
 #   title  $DROVER_QA_PROJECT_TITLE, else "Super Ultimate QA"
 # Never falls back to the repo's primary project — column semantics differ.
@@ -76,8 +76,8 @@ if [ -n "$CATEGORY" ]; then
     *) die "--category must be one of functional|visual|network|console|i18n|a11y|data|testability (got: $CATEGORY)" 64 ;; esac
 fi
 if [ -n "$SUGGESTED_SKILL" ]; then
-  case "$SUGGESTED_SKILL" in super-build|super-qa|ui-refine-loop|super-review) ;;
-    *) die "--suggested-skill must be super-build|super-qa|ui-refine-loop|super-review (got: $SUGGESTED_SKILL; ui-refine-loop = UI ticket, a human can run /ui-refine-loop)" 64 ;; esac
+  case "$SUGGESTED_SKILL" in drover-build|drover-qa|ui-refine-loop|drover-review) ;;
+    *) die "--suggested-skill must be drover-build|drover-qa|ui-refine-loop|drover-review (got: $SUGGESTED_SKILL; ui-refine-loop = UI ticket, a human can run /ui-refine-loop)" 64 ;; esac
 fi
 
 BODY_RAW=$(cat "$BODY_FILE")

@@ -144,13 +144,13 @@ def grade(card):
               f"--kind comments -- api repos/{{owner}}/{{repo}}/issues/{card['number']}/comments --paginate --slurp. "
               'Grade complexity (low|medium|high) by the scope of change required. Read only: change no file, '
               'label, comment or board state. Exit 79 from the read helper means stop and return nothing.\n')
-    with tempfile.TemporaryDirectory(prefix='super-board-codex-grade-') as temporary:
+    with tempfile.TemporaryDirectory(prefix='drover-codex-grade-') as temporary:
         schema_path, output = Path(temporary) / 'schema.json', Path(temporary) / 'grade.json'
         schema_path.write_text(json.dumps(GRADE_SCHEMA))
         command = ['codex', 'exec', '-m', ROUTER_MODEL, '-C', str(root), '-c', 'approval_policy="never"',
-                   '-c', 'default_permissions="super-board-grade"',
-                   '-c', 'permissions.super-board-grade.filesystem={":root"="read", ":slash_tmp"="write", ":tmpdir"="write"}',
-                   '-c', 'permissions.super-board-grade.network.enabled=true',
+                   '-c', 'default_permissions="drover-grade"',
+                   '-c', 'permissions.drover-grade.filesystem={":root"="read", ":slash_tmp"="write", ":tmpdir"="write"}',
+                   '-c', 'permissions.drover-grade.network.enabled=true',
                    '--output-schema', str(schema_path), '--output-last-message', str(output), '-']
         with mutex:
             if halted.is_set():

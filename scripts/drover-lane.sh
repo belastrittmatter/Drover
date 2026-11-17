@@ -168,14 +168,14 @@ if not skills['ready']:
     result('halted', 'skills-readiness: missing ' + ', '.join(dict.fromkeys(e['name'] for e in skills['entries'] if e['status'] == 'missing')))
     sys.exit(10)
 
-skill = {'build': 'super-build', 'qa': 'super-qa', 'review': 'super-review'}[args.lane]
+skill = {'build': 'drover-build', 'qa': 'drover-qa', 'review': 'drover-review'}[args.lane]
 section = {'build': 'Builder', 'qa': 'Tester', 'review': 'Reviewer'}[args.lane]
 prompt = f'''Run {skill} for issue #{card['number']} as a {backend.label} lane worker.
 First operation: recheck .claude/bin/drover-skills-ready.py --root {root} --host {backend.name} --cards - --lane {args.lane} with the Card JSON below as a one-element stdin array, before worktree creation, classification or lifecycle writes. Exit 10 means status=halted, detail=skills-readiness:, preserve all state. Load resolved_path files and only declared fallback IDs from the report. Before activating any conditional helper, repeat with --require <exact-name>.
 Resolved skill report: {json.dumps(skills)}
 Config: {config_path}
 Card: {json.dumps(card)}
-Read .claude/skills/{skill}/SKILL.md and .claude/skills/super-board/references/run.md → {section} lifecycle; follow all its board, branch, worktree, comments, test and merge requirements.
+Read .claude/skills/{skill}/SKILL.md and .claude/skills/drover/references/run.md → {section} lifecycle; follow all its board, branch, worktree, comments, test and merge requirements.
 Source .claude/bin/drover-gh-guard.sh and use its quota checks. Required GitHub reads go through .claude/bin/drover-github-read.py; a read that misses its --kind shape exits 64 for that call only and prints the valid form, so fix the read. A --kind diff read needs --meta <file> from a --kind metadata read first. Check --check before new writes, migrations and merges; exit 79 means status=halted, no more GitHub calls, preserve claims/worktree/card/approval. Never retry a mutation.
 Use .claude/bin/drover-card.sh for board reads/moves and .claude/bin/drover-pr-body.sh for owned PR blocks; follow writing-standard.md and pr-author-notes.md.
 Use your own worktree under .drover/worktrees/; never edit the main checkout. Clean up on ordinary exit, preserve work on halt/interruption.
@@ -189,7 +189,7 @@ elif args.lane == 'qa' and card['status'] == 'Ready':
     prompt += 'This qa-labelled Ready card skips Building: move Ready → QA and create the issue branch from the base; test the existing product per run.md qa cards.\n'
 elif args.lane == 'review':
     prompt += f'''The owner explicitly chose run {flag}: you may review and own the merge. First load the latest <!-- drover-review:report -->; grade prior R-ids fixed/not fixed/no longer applies, bounce any not fixed and edit the same report in place. Form hypotheses from the issue AC and diff before reading the Builder narrative.
-Rerun the Tester's tests. When truth_gate triggers, apply super-review's fixed Adversarial mode brief inline in two distinct passes (code-grounder and historian); collect evidence and aggregate confidence against truth_threshold. Over-engineering is Should fix, never Blocker alone and never lowers confidence. Missing evidence fails closed.
+Rerun the Tester's tests. When truth_gate triggers, apply drover-review's fixed Adversarial mode brief inline in two distinct passes (code-grounder and historian); collect evidence and aggregate confidence against truth_threshold. Over-engineering is Should fix, never Blocker alone and never lowers confidence. Missing evidence fails closed.
 Merge ONLY through the unchanged .claude/bin/drover-merge-gate.sh, pinning the exact head you reviewed at review pass using --expect-head "$HEAD" --config <config> --pr <N> --subject <title> --body-file <msg.md>. Never run bare gh pr merge or bypass the gate. Follow run.md Merge protocol and route every gate exit exactly: 2/5 rebase pass, 3 Blocked, 4 stay Review, 6 fresh review, 7/8 human gate with pinned approval-request; 9 verification-readiness means halt and preserve card/worktree/approval/claims until config repair and explicit restart, never a Build bounce or rebase retry. Respect human_approves_merge and merge_policy. Confirm MERGED <sha>, fetch base and prove merge-base --is-ancestor <sha> origin/<base> before closing issue or moving Done.
 '''
 
@@ -230,7 +230,7 @@ def interrupted(signum, frame):
     sys.exit(128 + signum)
 signal.signal(signal.SIGTERM, interrupted)
 signal.signal(signal.SIGINT, interrupted)
-with tempfile.TemporaryDirectory(prefix=f'super-board-{backend.name}-') as temporary:
+with tempfile.TemporaryDirectory(prefix=f'drover-{backend.name}-') as temporary:
     run = dict(root=root, git_dir=git_dir, common_dir=common_dir, model=model, prompt=prompt,
                schema_path=Path(temporary) / 'schema.json', output=Path(temporary) / 'result.json')
     run['schema_path'].write_text(json.dumps(schema))

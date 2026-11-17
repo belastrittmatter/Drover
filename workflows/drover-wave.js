@@ -1,7 +1,7 @@
 export const meta = {
   name: 'drover-wave',
-  description: 'Drain one super-board wave: classify, then build → qa → review per card (lifecycles per run.md)',
-  whenToUse: 'Launched by the super-board run-workflow backend with args from drover-wave-plan.sh. Not for direct ad-hoc use.',
+  description: 'Drain one drover wave: classify, then build → qa → review per card (lifecycles per run.md)',
+  whenToUse: 'Launched by the drover run-workflow backend with args from drover-wave-plan.sh. Not for direct ad-hoc use.',
   phases: [
     { title: 'Pre-flight', detail: 'per Ready card: already done? in progress? file overlap? unclear? (run.md → Builder pre-flight)' },
     { title: 'Classify', detail: 'haiku router: kind (feature | bug | qa) + complexity per Ready card' },
@@ -30,7 +30,7 @@ if (!input || !Array.isArray(input.cards) || !input.configPath) {
 // `variant` was removed in v3.0.0; the planner refuses a "qa-only" config, so a
 // wave launched with one is a stale caller. Refuse rather than guess.
 if (input.variant && input.variant !== 'full') {
-  throw new Error(`drover-wave: variant "${input.variant}" was removed in v3.0.0 — labels route cards; run /super-board onboard to upgrade`)
+  throw new Error(`drover-wave: variant "${input.variant}" was removed in v3.0.0 — labels route cards; run /drover onboard to upgrade`)
 }
 // Lane for a card entering at Ready: the planner's `lane`, else its labels.
 const labelsOf = (card) => (card.labels || []).map((l) => String(l).toLowerCase())
@@ -86,9 +86,9 @@ const STAGE_SCHEMA = {
 }
 
 const LANE = {
-  build:  { skill: 'super-build',  section: 'Builder',  phase: 'Build' },
-  qa:     { skill: 'super-qa',     section: 'Tester',   phase: 'QA' },
-  review: { skill: 'super-review', section: 'Reviewer', phase: 'Review' },
+  build:  { skill: 'drover-build',  section: 'Builder',  phase: 'Build' },
+  qa:     { skill: 'drover-qa',     section: 'Tester',   phase: 'QA' },
+  review: { skill: 'drover-review', section: 'Reviewer', phase: 'Review' },
 }
 
 // The merge-race guard used to live here, as a promise chain around the whole
@@ -117,10 +117,10 @@ const REVIEW_MEMORY = [
   // Independent pass (run.md → Reviewer step 3): hypotheses before the builder's account.
   `Read the issue ACs and the diff before the builder's PR summary; form your own hypotheses, then check their claims.`,
   `Class every finding Gap / Bug / Verification miss / Scope drift / Over-engineering, and list what you verified correct.`,
-  // Simplest-solution pass (super-review step 3): Should fix at most, never a bounce on its own.
+  // Simplest-solution pass (drover-review step 3): Should fix at most, never a bounce on its own.
   `Run ponytail:ponytail-review on the merge-base diff (inline ladder if the plugin is absent); Over-engineering never blocks merge alone.`,
-  // Truth-check brief is fixed (super-review → Adversarial mode); a hand-written one once made over-building blocking.
-  `Truth-check sub-agents get the fixed brief from super-review → "Adversarial mode", verbatim. After collecting, reclass any Over-engineering Blocker to Should fix; it never decides merge or bounce.`,
+  // Truth-check brief is fixed (drover-review → Adversarial mode); a hand-written one once made over-building blocking.
+  `Truth-check sub-agents get the fixed brief from drover-review → "Adversarial mode", verbatim. After collecting, reclass any Over-engineering Blocker to Should fix; it never decides merge or bounce.`,
   // Merge policy + migrations live in the gate (run.md → Merge protocol step 5).
   `Merge only via drover-merge-gate.sh. Exit 7 = merge_policy says a human merges (money/auth/schema/size): Blocked with the 🙋 template quoting its human-gate lines; To unblock = merge it yourself, or comment done to approve.`,
   `Exit 8 = 🙋 needs you (migration for a DB the robot may not touch, failed migrate, declared human step): Blocked with the 🙋 template, exact commands from its needs-you lines, label needs-you.`,
@@ -132,7 +132,7 @@ const REVIEW_MEMORY = [
 // and its Status options with `gh project field-list` (101) before each move.
 const BOARD_IO = () =>
   `Board moves and reads: .claude/bin/drover-card.sh --config ${input.configPath} move <issue> <Status> ` +
-  `(1 GraphQL point) · status <issue> · items. Comments, labels, PR reads: REST per .claude/skills/super-board/references/rate-limit-etiquette.md → "Price list". Read GitHub once per decision, never in a sleep loop.`
+  `(1 GraphQL point) · status <issue> · items. Comments, labels, PR reads: REST per .claude/skills/drover/references/rate-limit-etiquette.md → "Price list". Read GitHub once per decision, never in a sleep loop.`
 
 // The orchestrator resolves every remaining chain before claims. The runtime has
 // no subprocess API; each worker repeats the deterministic CLI before its writes.
@@ -146,12 +146,12 @@ const SKILLS_CHECK = (cards, lane) => [
 const lanePrompt = (lane, card) => [
   SKILLS_CHECK([card], lane),
   READ_FAILURE,
-  `Run ${LANE[lane].skill} on issue #${card.number} ("${card.title}") for a super-board workflow wave.`,
-  `Read .claude/skills/super-board/references/run.md → "${LANE[lane].section}" lifecycle and follow it EXACTLY:`,
+  `Run ${LANE[lane].skill} on issue #${card.number} ("${card.title}") for a drover workflow wave.`,
+  `Read .claude/skills/drover/references/run.md → "${LANE[lane].section}" lifecycle and follow it EXACTLY:`,
   `create your own worktree under .drover/worktrees/, work on the issue branch, post the required PR/issue comments,`,
   `move the project card yourself, clean up the worktree on exit. Config: ${input.configPath}.`,
   BOARD_IO(),
-  `Commits, PR title, PR body blocks, comments: .claude/skills/super-board/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/drover-pr-body.sh.`,
+  `Commits, PR title, PR body blocks, comments: .claude/skills/drover/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/drover-pr-body.sh.`,
   ...(lane === 'review' ? REVIEW_MEMORY : []),
   ...(lane === 'qa' && card.status === 'Ready'
     ? [`This card is labelled qa: it skips Building. Move it Ready → QA yourself, create the issue branch from the base branch, and test what is already there (run.md → "qa cards").`]
@@ -237,7 +237,7 @@ const preflightPrompt = (batch) => [
   SKILLS_CHECK(batch),
   READ_FAILURE,
   `Builder pre-flight for issues ${batch.map((c) => `#${c.number} ("${c.title}")`).join(', ')}. Config: ${input.configPath}.`,
-  `Read .claude/skills/super-board/references/run.md → "Builder pre-flight" and follow it EXACTLY. You write no code.`,
+  `Read .claude/skills/drover/references/run.md → "Builder pre-flight" and follow it EXACTLY. You write no code.`,
   `Other cards in this wave: ${JSON.stringify(input.cards.map(({ number, status, title }) => ({ number, status, title })))}`,
   `Run .claude/bin/drover-preflight.sh once for the whole batch, then judge its candidates semantically.`,
   `hold / sequence-behind → post the Block template (block-template.md) and move the card to Blocked yourself.`,

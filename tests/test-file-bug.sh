@@ -34,7 +34,7 @@ CSV upload reports success but no rows land in the imports table.
   - c. Click **Submit**
 - **Who:** any signed-in user
 
-![imports](https://github.com/acme/app/raw/abc1234/docs/super-qa/report/imports/tc-1/en/after-submit.png)
+![imports](https://github.com/acme/app/raw/abc1234/docs/drover-qa/report/imports/tc-1/en/after-submit.png)
 
 ## Evidence
 <details><summary>12 rows · no Sentry event · 1 user</summary>
@@ -62,7 +62,7 @@ Make the import job reach a terminal state; see `server/imports/job-handler.ts`.
 ## Acceptance Criteria
 - [ ] Uploaded rows are visible after submit
 - [ ] Regression coverage added
-- [ ] Super QA rerun passes /imports
+- [ ] Drover QA rerun passes /imports
 
 ## Risk
 🟢 **Low** · one handler, covered by the imports spec.
@@ -71,7 +71,7 @@ BODY
 # A valid body padded to ~460 KB inside Evidence and Acceptance Criteria, so a
 # check that pipes the body into `grep -q` loses the race (SIGPIPE + pipefail).
 awk 'BEGIN { for (i = 0; i < 6000; i++) pad = pad "padding line " i " of the evidence log\n" }
-  { print } /^<\/details>$|^- \[ \] Super QA rerun/ { printf "```\n%s```\n", pad }' \
+  { print } /^<\/details>$|^- \[ \] Drover QA rerun/ { printf "```\n%s```\n", pad }' \
   "$WORK/good.md" > "$WORK/big.md"
 sed '/## Evidence/,/## Fix/d' "$WORK/good.md" > "$WORK/no-evidence.md"
 sed 's|CSV upload reports success but no rows land in the imports table.|<one sentence: what is wrong and where>|' "$WORK/good.md" > "$WORK/placeholder.md"
@@ -164,13 +164,13 @@ is "accepts a large valid body (5 runs, no broken-pipe false reject)" 0 "$BIG_RC
 echo "── happy path"
 OUT=$(run "${BASE[@]}" --kind bug --priority high --category functional \
   --area imports --route /imports --spec e2e/paths/imports.spec.ts --iter 3 \
-  --fingerprint "imports|tc-1|silent-drop" --suggested-skill super-build)
+  --fingerprint "imports|tc-1|silent-drop" --suggested-skill drover-build)
 is  "returns the issue number"   "77" "$OUT"
 has "board-readable title"       "$(cat "$GH_LOG")" "🐛 [bug] imports: CSV upload silently drops rows"
 has "labels the source"          "$(cat "$GH_LOG")" "source:qa"
 has "labels the priority"        "$(cat "$GH_LOG")" "priority:high"
 has "labels the qa category"     "$(cat "$GH_LOG")" "qa:functional"
-has "labels the owner"           "$(cat "$GH_LOG")" "skill:super-build"
+has "labels the owner"           "$(cat "$GH_LOG")" "skill:drover-build"
 has "lands in Bug column"        "$(cat "$GH_LOG")" "opt_Bug"
 has "prepends Board summary"     "$(cat "$BODY_CAPTURE")" "## Board summary"
 has "appends Blocked by when absent" "$(cat "$BODY_CAPTURE")" "## Blocked by"

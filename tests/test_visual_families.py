@@ -37,7 +37,7 @@ probe = r"""
   const check = (ok, message) => { if (!ok) failures.push(message); };
   const $ = s => document.querySelector(s), all = s => [...document.querySelectorAll(s)];
   const diagnostic = () => {
-    const el = $('.mit[data-v="super-board"]'), r = el?.getBoundingClientRect();
+    const el = $('.mit[data-v="drover"]'), r = el?.getBoundingClientRect();
     return {hash:location.hash,ghosts:!!$('#m-ghosts'),fonts:document.fonts.status,columns:all('.mcol').length,
       rect:r?.toJSON(),scroll:$('.miller')?.scrollLeft,viewport:[innerWidth,innerHeight],
       target:r && document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.outerHTML.slice(0,300)};
@@ -64,26 +64,26 @@ probe = r"""
     check(!!ideas && !!bugs && !!board, 'root draws the two doors and the board family box');
     if (ideas && bugs && board) {
       for (const id of ['grill-me','wayfinder']) check(contains(box(ideas),nodeBox(id)), 'Ideas door contains '+id);
-      check(contains(box(bugs),nodeBox('super-collect')), 'Bugs door contains super-collect');
-      for (const id of ['super-board','super-build','super-qa','super-review'])
+      check(contains(box(bugs),nodeBox('drover-collect')), 'Bugs door contains drover-collect');
+      for (const id of ['drover','drover-build','drover-qa','drover-review'])
         check(contains(box(board),nodeBox(id)), 'board contains '+id);
       for (const id of ['implement-spec','super-deploy','ui-refine-loop','visual'])
         check(!contains(box(board),nodeBox(id)), id+' stays outside the board');
       check(nodeBox('to-spec').x > nodeBox('wayfinder').x && nodeBox('to-tickets').x > nodeBox('to-spec').x && nodeBox('route-fork').x > nodeBox('to-tickets').x, 'both doors meet at to-spec, then to-tickets, then the fork');
-      check(nodeBox('super-build').x < nodeBox('super-qa').x && nodeBox('super-qa').x < nodeBox('super-review').x, 'lanes read Build → QA → Review');
+      check(nodeBox('drover-build').x < nodeBox('drover-qa').x && nodeBox('drover-qa').x < nodeBox('drover-review').x, 'lanes read Build → QA → Review');
     }
-    const column = all('.mcol').find(c => c.querySelector('[data-v="super-board"]'));
+    const column = all('.mcol').find(c => c.querySelector('[data-v="drover"]'));
     check(!!column, 'browser exposes board family');
     if (column) {
       const buttons = [...column.querySelectorAll('.mit')];
       facts.rootOrder = buttons.map(b => b.dataset.v);
-      check(facts.rootOrder.slice(0,7).join(',') === 'wayfinder,super-collect,to-spec,to-tickets,super-board,super-build,super-qa', 'owner browser order');
+      check(facts.rootOrder.slice(0,7).join(',') === 'wayfinder,drover-collect,to-spec,to-tickets,drover,drover-build,drover-qa', 'owner browser order');
       check(column.getBoundingClientRect().width >= 210, 'column has readable width');
       check(buttons.every(b => b.getBoundingClientRect().height >= 32), 'rows have >=32px click targets');
       check(buttons.every(b => getComputedStyle(b.querySelector('span')).whiteSpace !== 'nowrap'), 'labels wrap without truncation');
       const miller = $('.miller');
       check(getComputedStyle(miller).overflowX === 'auto', 'column browser scrolls horizontally');
-      const button = column.querySelector('[data-v="super-board"]');
+      const button = column.querySelector('[data-v="drover"]');
       // renderTree initially reveals the last column. Reveal this row synchronously,
       // then wait for the physical hit target, including the sidebar's initial layout.
       button.scrollIntoView({behavior:'instant',block:'nearest',inline:'nearest'});
@@ -94,12 +94,12 @@ probe = r"""
       const r = button.getBoundingClientRect();
       const target = document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
       check(target && target.closest('button') === button, 'board row is physically clickable');
-      click(target); await waitFor(() => viewReady('super-board'), 'board navigation');
-      check(new URLSearchParams(location.hash.slice(1)).get('view') === 'super-board', 'board row opens its view');
+      click(target); await waitFor(() => viewReady('drover'), 'board navigation');
+      check(new URLSearchParams(location.hash.slice(1)).get('view') === 'drover', 'board row opens its view');
       const childColumn = all('.mcol').find(c => c.querySelector('[data-v="sb-onboard"]'));
       facts.boardChildren = childColumn ? [...childColumn.querySelectorAll('.mit')].map(b => b.dataset.v) : [];
-      check(facts.boardChildren.slice(0,3).join(',') === 'super-build,super-qa,super-review', 'board column lists its three lanes first');
-      for (const id of ['sb-onboard','sb-lint','super-board-run','sb-status','sb-stop']) check(facts.boardChildren.includes(id), 'board column exposes '+id);
+      check(facts.boardChildren.slice(0,3).join(',') === 'drover-build,drover-qa,drover-review', 'board column lists its three lanes first');
+      for (const id of ['sb-onboard','sb-lint','drover-run','sb-status','sb-stop']) check(facts.boardChildren.includes(id), 'board column exposes '+id);
     }
     click($('.mit[data-v="ui-refine-loop"]')); await waitFor(() => viewReady('ui-refine-loop'), 'loop navigation');
     check(new URLSearchParams(location.hash.slice(1)).get('view') === 'ui-refine-loop', 'standalone loop is reachable');
@@ -145,7 +145,7 @@ try {
   const cdp=(method,params={})=>new Promise((resolve,reject)=>{const id=++next;pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}));});
   const evaluate=async expression=>{const r=await cdp('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
   await cdp('Page.enable'); await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
-  const diagnostic=()=>evaluate(`(()=>{const el=document.querySelector('.mit[data-v="super-board"]'),r=el?.getBoundingClientRect();return {hash:location.hash,ghosts:!!document.querySelector("#m-ghosts"),fonts:document.fonts.status,columns:document.querySelectorAll(".mcol").length,rect:r?.toJSON(),scroll:document.querySelector('.miller')?.scrollLeft,viewport:[innerWidth,innerHeight],target:r && document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.outerHTML.slice(0,300)};})()`);
+  const diagnostic=()=>evaluate(`(()=>{const el=document.querySelector('.mit[data-v="drover"]'),r=el?.getBoundingClientRect();return {hash:location.hash,ghosts:!!document.querySelector("#m-ghosts"),fonts:document.fonts.status,columns:document.querySelectorAll(".mcol").length,rect:r?.toJSON(),scroll:document.querySelector('.miller')?.scrollLeft,viewport:[innerWidth,innerHeight],target:r && document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.outerHTML.slice(0,300)};})()`);
   const waitFor=async (expression,name)=>{const end=performance.now()+10000;while(!await evaluate(expression)){if(performance.now()>end)throw Error('Timed out waiting for '+name+': '+JSON.stringify(await diagnostic()));await delay(20);}};
   await cdp('Page.navigate',{url:url+'#shot=1'});
   await waitFor('window.__instant && !!document.querySelector(".mcol") && !document.querySelector("#m-ghosts")','family initial column browser');
@@ -168,11 +168,11 @@ try {
     await waitFor(`new URLSearchParams(location.hash.slice(1)).get('view')==='${id}' && !!document.querySelector('.mit[data-v="${id}"][aria-current="page"]')`,'completed '+id+' navigation');
     await waitFor(sidebarReady,'completed '+id+' sidebar width');
   };
-  await click('super-board');
+  await click('drover');
   facts.boardView=await evaluate('new URLSearchParams(location.hash.slice(1)).get("view")');
   facts.afterWidth=await evaluate('document.querySelector("#m-tree").getBoundingClientRect().width');
   check(facts.afterWidth>facts.beforeWidth,'board navigation triggers sidebar resizing');
-  check(facts.boardView==='super-board','animated board navigation finishes its hash update');
+  check(facts.boardView==='drover','animated board navigation finishes its hash update');
   await click('ui-refine-loop');
   facts.nextView=await evaluate('new URLSearchParams(location.hash.slice(1)).get("view")');
   check(facts.nextView==='ui-refine-loop','resizing does not lock subsequent navigation');

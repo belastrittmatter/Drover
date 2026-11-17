@@ -1,4 +1,4 @@
-"""Unit tests for super-collect's `custom` source plug-in (collect_custom.py).
+"""Unit tests for drover-collect's `custom` source plug-in (collect_custom.py).
 
 Covers onboard's "➕ Add another source": classify what the user typed, the read-only
 ping, saving to collect.custom[], and collect → candidates that carry the
@@ -20,7 +20,7 @@ import urllib.error
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "skills", "super-collect", "scripts"))
+sys.path.insert(0, os.path.join(HERE, "..", "skills", "drover-collect", "scripts"))
 import collect_custom as cu  # noqa: E402
 
 

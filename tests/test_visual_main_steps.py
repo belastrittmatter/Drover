@@ -29,7 +29,7 @@ visible = {nid for v in views.values() for nid in v.get("nodeIds", [])}
 missing = set(nodes) - visible
 assert not missing, f"nodes lost from all views: {sorted(missing)}"
 
-main_views = ("super-board-run", "sb-onboard", "super-collect", "ui-refine-loop")
+main_views = ("drover-run", "sb-onboard", "drover-collect", "ui-refine-loop")
 for vid in main_views:
     view = views[vid]
     step_ids = view.get("stepIds", view["nodeIds"])
@@ -45,7 +45,7 @@ for vid in main_views:
         node = {**nodes[nid], **view.get("nodeOverrides", {}).get(nid, {})}
         assert node.get("opensView") in views, f"{vid}: {nid} hides detail without a sub-view"
 
-run = views["super-board-run"]
+run = views["drover-run"]
 assert run["nodeIds"][0] == "sb-run", "run must start with its trigger"
 assert "5" in run.get("caption", "") and any(word in run["caption"].lower() for word in ("parallel", "once", "batch", "concurrent")), "run must explain card concurrency"
 
@@ -54,12 +54,12 @@ for vid in ("merge-policy", "size-cap", "needs-you", "usage-pause", "guard-prote
     policy = views[vid]
     assert len(policy["nodeIds"]) <= 4, f"{vid}: policy sub-view is not small"
     cursor = policy
-    while cursor.get("parent") and cursor["id"] != "super-board-run":
+    while cursor.get("parent") and cursor["id"] != "drover-run":
         cursor = views[cursor["parent"]]
-    assert cursor["id"] == "super-board-run", f"{vid}: policy is detached from the run"
+    assert cursor["id"] == "drover-run", f"{vid}: policy is detached from the run"
 
 # Root (two doors, the route fork, the board, side tools) and verb chooser offer decisions, not state/scripts.
-for vid, limit in (("root", 16), ("super-board", 6)):
+for vid, limit in (("root", 16), ("drover", 6)):
     view = views[vid]
     assert len(view["nodeIds"]) <= limit, f"{vid}: overly wide summary"
     assert all(nodes[nid]["kind"] in {"public", "lane", "external", "verb", "step"} for nid in view["nodeIds"]), f"{vid}: implementation clutter"

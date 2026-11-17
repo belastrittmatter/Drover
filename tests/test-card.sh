@@ -121,7 +121,7 @@ G -C "$TMP/super" submodule add -q "$TMP/origin" projects/a
 (unset SB_CARD_CACHE_DIR; cd "$TMP/super" && card move 232 QA >/dev/null) || fail "move in normal repo"
 [ -f "$TMP/super/.claude/drover/cache/board-acme-15.json" ] || fail "normal repo cache moved"
 (unset SB_CARD_CACHE_DIR; cd "$TMP/super/projects/a" && card move 232 QA >/dev/null) || fail "move in submodule"
-[ -f "$TMP/super/.git/modules/projects/a/super-board/cache/board-acme-15.json" ] || fail "submodule cache not in its own git dir"
+[ -f "$TMP/super/.git/modules/projects/a/drover/cache/board-acme-15.json" ] || fail "submodule cache not in its own git dir"
 [ ! -e "$TMP/super/.git/modules/.claude" ] || fail "submodule cache leaked into shared .git/modules"
 ok "cache stays inside its own repo (normal + submodule)"
 

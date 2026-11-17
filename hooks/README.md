@@ -1,4 +1,4 @@
-# super-board guard hooks
+# drover guard hooks
 
 Claude Code hook scripts. Python 3 standard library only (no jq, no node). Each reads the
 hook JSON on stdin, prints a decision only when it blocks, and exits 0 on its own errors
@@ -90,7 +90,7 @@ branches stay allowed: the rebase pass needs them. `SB_ALLOW_PROTECTED_PUSH=1` t
 session.
 
 It is installed but not wired by default: a brand-new repo often pushes its first commits straight
-to `main`. `super-board onboard` asks once ("Block direct/force pushes to main? Recommended for
+to `main`. `drover onboard` asks once ("Block direct/force pushes to main? Recommended for
 existing apps; skip for brand-new repos"), and `./install.sh --protect-main` wires it. After a
 `--no-hooks` install, onboard does not wire a script that is not there; it names
 `./install.sh --no-hooks --protect-main <dir>`, which installs this one guard alone. Either way the

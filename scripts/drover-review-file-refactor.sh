@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # drover-review-file-refactor.sh — file a deepening opportunity spotted during review.
 #
-# Super Review's gate is merge-or-bounce. A shallow module in an otherwise-correct
+# Drover Review's gate is merge-or-bounce. A shallow module in an otherwise-correct
 # diff is a future ticket, not a reason to hold a green PR — so this script files
 # the card and gets out of the way. Missing optional column configuration is a
 # warning; unavailable required evidence or an unknown write outcome pauses the
@@ -9,7 +9,7 @@
 #
 # A card with real acceptance criteria lands in Ready; one without lands in Backlog.
 # A bare note has had no human eyes on it; auto-promoting it to Ready would feed the
-# build lane work nobody asked for. It waits for `super-board lint` like any other
+# build lane work nobody asked for. It waits for `drover lint` like any other
 # unrefined ticket.
 #
 # Usage:
@@ -105,7 +105,7 @@ fi
 #
 # A card with real acceptance criteria is buildable, so it goes to `Ready` and the
 # next wave takes it. A card without them is a note, and `Ready` feeds the Builder
-# lane directly — so it goes to the holding column and waits for `super-board
+# lane directly — so it goes to the holding column and waits for `drover
 # lint` like any other unrefined ticket.
 #
 # This used to be an unconditional `Backlog`, which was wrong twice over: it fed
@@ -132,7 +132,7 @@ trap 'rm -f "$BODY_TMP"' EXIT
     echo
     echo "## Acceptance Criteria"
     echo
-    echo "- [ ] _Not written by the Reviewer that filed this. Run \`super-board lint\` on this card"
+    echo "- [ ] _Not written by the Reviewer that filed this. Run \`drover lint\` on this card"
     echo "      before it is built — a card graded against criteria nobody wrote is graded against"
     echo "      nothing._"
   fi
@@ -161,7 +161,7 @@ trap 'rm -f "$BODY_TMP"' EXIT
   if [ -n "$PR" ]; then echo "**Spotted reviewing:** #${PR}"; fi
   echo "**Recommendation strength:** ${STRENGTH}"
   echo
-  echo "_Filed by Super Review. Not a merge blocker — the PR that surfaced this merged._"
+  echo "_Filed by Drover Review. Not a merge blocker — the PR that surfaced this merged._"
   echo "_Run \`improve-codebase-architecture\` against this card to design the fix._"
   echo
   echo "$STAMP"

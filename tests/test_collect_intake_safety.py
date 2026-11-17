@@ -10,7 +10,7 @@ import hashlib
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-ROUTER = ROOT/'skills/super-collect/scripts/drover-collect-file.sh'
+ROUTER = ROOT/'skills/drover-collect/scripts/drover-collect-file.sh'
 BODY = '''## Problem
 PRIVATE_NOTE_DO_NOT_STORE: the request fails.
 ## Context

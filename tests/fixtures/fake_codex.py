@@ -12,7 +12,7 @@ if 'Grade complexity' in prompt:
     output.write_text(json.dumps(dict(complexity=os.environ.get('SB_CODEX_TEST_GRADE', 'medium'))))
     sys.exit(int(os.environ.get('SB_CODEX_TEST_GRADE_EXIT', '0')))
 card = json.loads(re.search(r'^Card: (.+)$', prompt, re.M).group(1))
-lane = re.search(r'Run super-(build|qa|review)', prompt).group(1)
+lane = re.search(r'Run drover-(build|qa|review)', prompt).group(1)
 with open(os.environ['SB_CODEX_TEST_LOG'], 'a') as log:
     fcntl.flock(log, fcntl.LOCK_EX)
     counter = Path(os.environ['SB_CODEX_TEST_LOG'] + '.active')

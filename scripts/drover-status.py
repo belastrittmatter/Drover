@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""drover-status.py — read-only live snapshot of the super-board pipeline.
+"""drover-status.py — read-only live snapshot of the drover pipeline.
 
 Renders the richer status template defined in
-`.claude/skills/super-board/references/status.md` (fixed 80-col Kanban
+`.claude/skills/drover/references/status.md` (fixed 80-col Kanban
 plus dedicated Workers / Block-reasons / Recent / Health sections).
 
 The same template can be hand-rendered by the model — but the token-by-
@@ -120,14 +120,14 @@ def hms_to_epoch(today_iso: str, hms: str) -> int:
 
 
 def parse_manifest(text: str, today_iso: str) -> dict[str, Any]:
-    """Parse a super-board run manifest into structured state.
+    """Parse a drover run manifest into structured state.
 
     Pure function (no I/O, no global state) so it can be unit-tested with
     hand-crafted fixtures. Returns a dict with:
       inflight: {lane → {pid, issue, ts}}    — workers currently dispatched
       recents: [{epoch, verb, glyph, issue, target, detail}, ...]
       last_tick: HH:MM:SS of the most recent `tick —` line, or None
-      start_hms: HH:MM:SS of the most recent `super-board run started`, or None
+      start_hms: HH:MM:SS of the most recent `drover run started`, or None
       exited: True if the run has logged `exiting cleanly`
       reaped_count: number of `reaped stale lock ...` lines seen
     """
@@ -146,7 +146,7 @@ def parse_manifest(text: str, today_iso: str) -> dict[str, Any]:
         hms = f"{h}:{mi}:{s}"
         ep = hms_to_epoch(today_iso, hms)
 
-        if "super-board run started" in rest:
+        if "drover run started" in rest:
             start_hms = hms
             exited = False
             continue
@@ -398,7 +398,7 @@ query($owner:String!, $number:Int!, $after:String) {
 """
 
 # Hard ceiling on pagination depth. 20 pages × 100 items = 2000 cards, which
-# is well past any realistic super-board project (the dispatcher's 5000-pt/hr
+# is well past any realistic drover project (the dispatcher's 5000-pt/hr
 # GraphQL budget makes a 20-page snapshot a meaningful chunk of quota). If a
 # project ever exceeds this, we print a truncation warning rather than loop
 # forever on a buggy server response.
@@ -649,7 +649,7 @@ def main() -> int:
     )
     max_workers = cfg.get("max_workers", 3)
 
-    print(f"📊 super-board · {proj['title']} (#{proj['number']})")
+    print(f"📊 drover · {proj['title']} (#{proj['number']})")
     print("─" * 80)
     print(f"config: {config_slug}   labels: qa · bug · feature   base: {cfg.get('base_branch', '?')}")
     print(f"mode:   {mode_label:<22} truth gate: {gate_label}")
@@ -665,7 +665,7 @@ def main() -> int:
 
     if not run_active and active == 0:
         print(f"▎Workers  (claim: {bot_login})")
-        print("   (no active run — `super-board run` to start)")
+        print("   (no active run — `drover run` to start)")
     else:
         print(f"▎Workers  (claim: {bot_login} · {active}/{max_workers} active)")
         if active == 0:

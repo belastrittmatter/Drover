@@ -1,18 +1,18 @@
-# super-board — agent-facing notes
+# drover — agent-facing notes
 
-This repo ships nine skills under `skills/`: five you type (`super-board`, `super-collect`,
-`ui-refine-loop`, `visual`, `git-sync`) and four the board runs (the lane workers `super-build`, `super-qa`,
-`super-review`, plus `pr-security-review`, which super-qa runs on every PR). Cloudflare's
-`security-audit` is not shipped: onboard fetches it with `npx skills`, and no lane runs it. Architecture findings come from `/super-collect architecture`.
+This repo ships nine skills under `skills/`: five you type (`drover`, `drover-collect`,
+`ui-refine-loop`, `visual`, `git-sync`) and four the board runs (the lane workers `drover-build`, `drover-qa`,
+`drover-review`, plus `pr-security-review`, which drover-qa runs on every PR). Cloudflare's
+`security-audit` is not shipped: onboard fetches it with `npx skills`, and no lane runs it. Architecture findings come from `/drover-collect architecture`.
 Worktree cleanup (`hooks/cleanup-wt.py`) is a hook, not a skill.
 
 ## The cardinal rule
 
-**`super-board` is an autonomous trader. The interactive Claude session that invokes `/super-board run` is an *orchestrator*, NOT a worker.** Its only jobs are:
+**`drover` is an autonomous trader. The interactive Claude session that invokes `/drover run` is an *orchestrator*, NOT a worker.** Its only jobs are:
 
 1. Verify preconditions (clean git, no orphan workers, GraphQL quota, etc.).
 2. Dispatch per the config's `worker_backend`:
-   - `"workflow"` (default) — stay in-session and run the wave loop in `skills/super-board/references/run-workflow.md`: plan a wave, claim assignees, launch the `drover-wave` dynamic workflow, reconcile, repeat. Lane agents inside the workflow do all product work.
+   - `"workflow"` (default) — stay in-session and run the wave loop in `skills/drover/references/run-workflow.md`: plan a wave, claim assignees, launch the `drover-wave` dynamic workflow, reconcile, repeat. Lane agents inside the workflow do all product work.
    - `"claude-p"` (legacy, explicit opt-in only) — spawn the headless runner `nohup .claude/bin/drover-run.sh <slug> &`, report PID + log path, exit. The runner refuses to start (exit 78) unless the config sets this value.
 3. Report back to the user (dispatch confirmation, or one status line per wave).
 
@@ -27,7 +27,7 @@ If a problem surfaces during the run, the orchestrator's reply is: "I saw X. Wan
 
 ## Worker rules
 
-Workers (`super-build`, `super-qa`, `super-review`) share the dispatcher's `gh` token bucket. They MUST:
+Workers (`drover-build`, `drover-qa`, `drover-review`) share the dispatcher's `gh` token bucket. They MUST:
 
 - Required GitHub reads use `.claude/bin/drover-github-read.py`; exit 79 stops the run.
 - Check its `--check` before GitHub writes, migrations, merges, and new dispatch; preserve work when halted.
@@ -37,7 +37,7 @@ Workers (`super-build`, `super-qa`, `super-review`) share the dispatcher's `gh` 
 - Cap adversarial sub-agents at 50 gh calls each. If a sub-agent runs out, it returns `confidence: insufficient_data` rather than burning the shared quota.
 - Append `gh-quota-on-exit: graphql=<n>/5000 rest=<n>/5000` to the PR handoff comment.
 
-See `skills/super-board/references/rate-limit-etiquette.md` for the full discipline.
+See `skills/drover/references/rate-limit-etiquette.md` for the full discipline.
 
 ## Installation contract
 
@@ -46,7 +46,7 @@ once into the target project's shared `.agents/` tree, then links each host fold
 link per skill under `skills/`, one per file under `bin/`, `workflows/`, `hooks/`. `.claude/` is
 always linked; `.codex/` and `.opencode/` only when that folder already exists, a config `host`
 key names it, `drover-host.sh` reports it, or `--hosts` asks. A real-directory `.claude/`
-install is replaced by links on upgrade; a user's own links and anything not super-board's are
+install is replaced by links on upgrade; a user's own links and anything not drover's are
 left alone; where no symlink can be made the file is copied. Settings and run state stay in `.claude/`.
 
 ```
@@ -54,12 +54,12 @@ left alone; where no symlink can be made the file is copied. Settings and run st
 ├── skills/<all nine>/...
 ├── hooks/guard-*.py, cleanup-wt.py   (wired into settings.json; --no-hooks skips)
 ├── workflows/drover-wave.js, ui-refine-loop.js
-└── bin/super-board-*.sh (incl. pr-body), super-board-*.py (status, merge-policy, settings, setup), drover-qa-file-bug.sh, drover-review-file-refactor.sh
+└── bin/drover-*.sh (incl. pr-body), drover-*.py (status, merge-policy, settings, setup), drover-qa-file-bug.sh, drover-review-file-refactor.sh
 ```
 
 It also records an older install in
 `.claude/drover/upgrade.json`, prints grouped emoji output, and asks nothing:
-`super-board onboard` asks the questions. Onboard's 🔍 Checks (`scripts/drover-setup.py`)
+`drover onboard` asks the questions. Onboard's 🔍 Checks (`scripts/drover-setup.py`)
 fixes must-haves and finishes upgrades with no question.
 
 ## Board shape (v3.0.0)
@@ -74,7 +74,7 @@ Skills call the dispatcher scripts as `.claude/bin/<script>`.
 ## Writing
 
 Commits, PR bodies, tickets and comments in this repo follow
-`skills/super-board/references/writing-standard.md`, the same standard super-board writes into
+`skills/drover/references/writing-standard.md`, the same standard drover writes into
 every project it is installed in.
 
 | Thing | Format |
@@ -83,7 +83,7 @@ every project it is installed in.
 | PR body | marker blocks, one owner each: status · problem · solution · ac · history · visual · risk |
 | Ticket | Problem · Context · Fix · Acceptance Criteria · Risk · Blocked by (+ Evidence for bugs) |
 | Comment | `[role] [label] status` · Did · ✅ Done · ❌ Not done · Next · ≤ 8 lines |
-| PR author notes | Purpose · What changed · Why it matters, in native file/inline review comments; follow `skills/super-board/references/pr-author-notes.md` |
+| PR author notes | Purpose · What changed · Why it matters, in native file/inline review comments; follow `skills/drover/references/pr-author-notes.md` |
 
 - NEVER rewrite a whole PR body: `scripts/drover-pr-body.sh` rewrites one block.
 - ALWAYS change a format in `writing-standard.md` first, then the templates and `tests/test_writing_format.py`.

@@ -53,7 +53,7 @@
 # the Builder and goes straight to the Tester (lane "qa"); every other Ready card,
 # labelled or not, is built first (lane "build"). Each picked card carries `lane`
 # and its `labels`. The old per-board `variant` is gone: a config still saying
-# "qa-only" is refused (exit 65) until `super-board onboard` upgrades it, because
+# "qa-only" is refused (exit 65) until `drover onboard` upgrades it, because
 # reading it as "full" would start building on a board meant only for testing.
 #
 # Usage:
@@ -109,7 +109,7 @@ fi
 # guessed: a guess either builds on a test-only board or strands the QA column.
 case "$VARIANT" in
   ""|full) COLUMNS='["Review","QA","Ready"]' ;;
-  qa-only) echo "config still says variant \"qa-only\" — removed in v3.0.0. Run /super-board onboard: it upgrades the config and labels those cards qa." >&2; exit 65 ;;
+  qa-only) echo "config still says variant \"qa-only\" — removed in v3.0.0. Run /drover onboard: it upgrades the config and labels those cards qa." >&2; exit 65 ;;
   *) echo "invalid variant in config: ${VARIANT} (variant was removed in v3.0.0 — delete the key)" >&2; exit 65 ;;
 esac
 

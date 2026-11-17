@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Tests skills/super-collect/scripts/drover-collect-file.sh. Deterministic, no
-# network: `gh` is a stub on PATH, and the real super-qa / super-review filers
+# Tests skills/drover-collect/scripts/drover-collect-file.sh. Deterministic, no
+# network: `gh` is a stub on PATH, and the real drover-qa / drover-review filers
 # run underneath it. Covers dry-run default, per-source fingerprint shapes,
 # repo-wide dedupe, recurrence, holding-column resolution (never Ready), routing,
 # extra labels (needs-triage), and --adopt.
@@ -10,7 +10,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SCRIPT="$REPO_ROOT/skills/super-collect/scripts/drover-collect-file.sh"
+SCRIPT="$REPO_ROOT/skills/drover-collect/scripts/drover-collect-file.sh"
 WORK="$(mktemp -d)"
 export SB_GITHUB_RETRY_DELAY=0 SB_GITHUB_HALT_FILE="$WORK/halt.json"
 trap 'rm -rf "$WORK"' EXIT

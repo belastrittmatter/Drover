@@ -10,7 +10,7 @@ A security pass on one PR: only high-confidence, exploitable vulnerabilities the
 
 ## When It Runs
 
-- **On every PR, in the QA lane.** `super-qa` runs it as its one security check; each finding fails QA and sends the card back to Super Build.
+- **On every PR, in the QA lane.** `drover-qa` runs it as its one security check; each finding fails QA and sends the card back to Drover Build.
 - Standalone, as `/pr-security-review`, on any branch with a base.
 
 For a deep audit of the whole repository, run `security-audit` (installed alongside, never run by the board).
@@ -21,4 +21,4 @@ Ported from [anthropics/claude-code-security-review](https://github.com/anthropi
 
 ## Install
 
-Part of the super-board pack: `./install.sh /path/to/project`, or the plugin. Not the same as Claude Code's built-in `/security-review`, which it leaves alone.
+Part of the drover pack: `./install.sh /path/to/project`, or the plugin. Not the same as Claude Code's built-in `/security-review`, which it leaves alone.

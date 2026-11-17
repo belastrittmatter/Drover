@@ -2526,7 +2526,7 @@
         g.edges.filter(e => e.how === 'fallback').forEach(e => (routes.fallbackEdges ||= []).push(`${v.id}: ${e.from}(${e.fs})→${e.to}(${e.ts})`)); });
       host.remove();
       const deep = views.filter(v => v.parent).sort((a, b) => chain(b.id).length - chain(a.id).length || (b.nodeIds || []).length - (a.nodeIds || []).length)[0];
-      const laneView = laneReport['super-build'] ? 'super-build' : Object.keys(laneReport)[0] || null;
+      const laneView = laneReport['drover-build'] ? 'drover-build' : Object.keys(laneReport)[0] || null;
       return { overlaps: out, routes, layouts, lanes: laneReport, checked: views.length + ' views', childView: deep ? deep.id : null, laneView };
     };
   }

@@ -12,7 +12,7 @@ import time
 import unittest
 
 KIT = Path(os.environ.get('SB_TEST_PACK', Path(__file__).resolve().parents[1]))
-NAMES = ['super-board','super-build','super-qa','super-review','super-collect','visual','git-sync','ui-refine-loop','pr-security-review',
+NAMES = ['drover','drover-build','drover-qa','drover-review','drover-collect','visual','git-sync','ui-refine-loop','pr-security-review',
          'tdd','implement','codebase-design','code-review','diagnosing-bugs','verification-before-completion','testing-strategy']
 
 class Dispatch(unittest.TestCase):
@@ -47,7 +47,7 @@ if 'Grade complexity' in prompt:
     result={'complexity':'low'}
 else:
     card=json.loads(re.search(r'^Card: (.+)$',prompt,re.M).group(1))
-    lane=re.search(r'Run super-(build|qa|review)',prompt).group(1)
+    lane=re.search(r'Run drover-(build|qa|review)',prompt).group(1)
     result={'status':'advanced','column':{'build':'QA','qa':'Review','review':'Done'}[lane], 'detail':'fixture','prUrl':None,'branch':None,'priorFindings':None}
 output.write_text(json.dumps(result))
 ''')
@@ -149,9 +149,9 @@ dispatch_lane build 1
         for name in ['drover-github-read.py','drover-skills-ready.py']:
             shutil.copy2(KIT/'scripts'/name,directory/name)
         self.env.update(REPO_DIR=str(self.root),BASE_BRANCH=subprocess.check_output(['git','-C',str(self.root),'branch','--show-current'],text=True).strip())
-        result=subprocess.run(['bash',str(KIT/'skills/super-build/scripts/drover-build-dispatch.sh'),'1'],cwd=self.root,env=self.env,text=True,capture_output=True)
+        result=subprocess.run(['bash',str(KIT/'skills/drover-build/scripts/drover-build-dispatch.sh'),'1'],cwd=self.root,env=self.env,text=True,capture_output=True)
         self.assertEqual(result.returncode,10,result.stderr)
-        self.assertFalse((self.root/'.planning/super-build-logs').exists())
+        self.assertFalse((self.root/'.planning/drover-build-logs').exists())
         self.assertFalse((self.root/'.drover/worktrees/issue-1').exists())
         self.assertTrue(all(c['tool']=='gh' and c['args'][:2]==['issue','view'] for c in self.calls()))
         self.preserved()

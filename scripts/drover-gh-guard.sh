@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # drover-gh-guard.sh — worker-side rate-limit etiquette.
 #
-# Sourced by super-board workers (Builder / Tester / Reviewer) before any
+# Sourced by drover workers (Builder / Tester / Reviewer) before any
 # burst of gh calls. The dispatcher's gh_rate_guard only protects the
 # dispatcher's own ticks; workers run as independent claude -p sessions and
 # share the same gh-auth bucket. Without this guard, a single Reviewer in
@@ -20,7 +20,7 @@ SB_GH_GUARD_MIN_REMAINING_DEFAULT=200
 SB_GH_GUARD_REST_MIN_REMAINING=500
 SB_GH_GUARD_BUDGET_DEFAULT=150     # per-worker soft cap on gh calls
 SB_GH_GUARD_SUBAGENT_BUDGET=50     # per adversarial-mode sub-agent cap
-SB_GH_GUARD_STATE_FILE="${SB_GH_GUARD_STATE_FILE:-${TMPDIR:-/tmp}/super-board-gh-budget-$$}"
+SB_GH_GUARD_STATE_FILE="${SB_GH_GUARD_STATE_FILE:-${TMPDIR:-/tmp}/drover-gh-budget-$$}"
 
 # This file's own path: BASH_SOURCE under bash, the %x prompt escape under zsh.
 if [ -n "${BASH_SOURCE[0]:-}" ]; then _sb_guard_src="${BASH_SOURCE[0]}"; else eval '_sb_guard_src="${(%):-%x}"'; fi
