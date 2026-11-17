@@ -3,8 +3,8 @@
 // the schema. Strip comments before validating an actual config file as JSON.
 //
 // One config per GitHub project this repo drives, written to
-// `.claude/super-board/configs/<slug>.json` (committed). The active
-// pointer `.claude/super-board/active` is gitignored and per-machine.
+// `.claude/drover/configs/<slug>.json` (committed). The active
+// pointer `.claude/drover/active` is gitignored and per-machine.
 
 {
   "version": 1,
@@ -34,7 +34,7 @@
   // Agent host this project runs on: "claude" | "codex" | "opencode". Separate from
   // worker_backend. Onboard and setup's fix ALWAYS write it (setup fills a missing key
   // from --host and never replaces a set one); setup's check flags any other value.
-  // `drover-host.sh --config <this file>` uses it only when SUPER_BOARD_HOST and
+  // `drover-host.sh --config <this file>` uses it only when DROVER_HOST and
   // every env sign (Codex ids, OPENCODE, CLAUDECODE) are absent. See docs/hosts.md.
   "host": "claude",
 

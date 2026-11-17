@@ -24,7 +24,7 @@ plant_decoys() { for d in decoy-one decoy-two decoy-three; do mkdir -p "$1/.clau
 decoys_intact() { [ "$(ls "$1/.claude/skills" | grep -c '^decoy')" -eq 3 ]; }
 
 # A Codex shell would add .codex/ links by detection; keep the default layout predictable.
-unset CODEX_THREAD_ID CODEX_SESSION_ID SUPER_BOARD_HOST
+unset CODEX_THREAD_ID CODEX_SESSION_ID DROVER_HOST
 
 SKILLS="super-board super-build super-qa super-review"
 ALL_SKILLS="$SKILLS super-collect ui-refine-loop visual git-sync pr-security-review"
@@ -250,7 +250,7 @@ rm -rf "$T"
 # 11 — AGENTS.md and CLAUDE.md are the project's own: install leaves both byte for
 #      byte, managed markers included; the last line names onboard as the one next step.
 T=$(mktemp -d)
-printf '# AGENTS.md\n\n- keep me\n<!-- super-board:begin v0.0.1 -->\nold\n<!-- super-board:end -->\n- and me\n' > "$T/AGENTS.md"
+printf '# AGENTS.md\n\n- keep me\n<!-- drover:begin v0.0.1 -->\nold\n<!-- drover:end -->\n- and me\n' > "$T/AGENTS.md"
 printf '# Rules\n- pnpm\n' > "$T/CLAUDE.md"
 cp "$T/AGENTS.md" "$T/AGENTS.before"; cp "$T/CLAUDE.md" "$T/CLAUDE.before"
 OUT=$("$INSTALL" --no-hooks "$T" 2>&1)
@@ -258,10 +258,10 @@ cmp -s "$T/AGENTS.md" "$T/AGENTS.before" || fail "install changed AGENTS.md"
 cmp -s "$T/CLAUDE.md" "$T/CLAUDE.before" || fail "install changed CLAUDE.md"
 [ "$(echo "$OUT" | tail -1)" = "👉 next: open Claude Code here and run /super-board onboard" ] || fail "last line should name onboard, got: $(echo "$OUT" | tail -1)"
 rm -rf "$T"
-# SUPER_BOARD_QUIET_NEXT=1 (for a wrapper that prints its own header and next step)
+# DROVER_QUIET_NEXT=1 (for a wrapper that prints its own header and next step)
 # prints only the 🔧 installing group: one line per group of files, no per-file list.
 T=$(mktemp -d)
-OUT=$(SUPER_BOARD_QUIET_NEXT=1 "$INSTALL" "$T" 2>&1)
+OUT=$(DROVER_QUIET_NEXT=1 "$INSTALL" "$T" 2>&1)
 [ "$(echo "$OUT" | head -1)" = "🔧 installing" ] || fail "quiet mode should start at the installing group, got: $OUT"
 echo "$OUT" | grep -q "next:" && fail "quiet mode must not print the next step"
 echo "$OUT" | grep -q "✓ skills, scripts and workflows → .agents/" || fail "quiet mode should print the grouped files line"
@@ -270,18 +270,18 @@ echo "$OUT" | grep -q "🛡️  6 guard hooks → .claude/settings.json (new fil
 rm -rf "$T"
 
 # 12 — upgrade record: an older super-board in the target is written to
-#      .claude/super-board/upgrade.json (from, to, the skills that are new) for onboard.
+#      .claude/drover/upgrade.json (from, to, the skills that are new) for onboard.
 T=$(mktemp -d); mkdir -p "$T/.claude/skills/super-board" "$T/.claude/skills/super-build"
 echo "1.8.2" > "$T/.claude/skills/super-board/VERSION"
 OUT=$("$INSTALL" --no-hooks "$T" 2>&1)
 jq -e --arg v "$(cat ../VERSION)" '.from == "1.8.2" and .to == $v and (.added_skills | index("super-collect")) and (.added_skills | index("super-build") | not)' \
-  "$T/.claude/super-board/upgrade.json" >/dev/null || fail "upgrade.json wrong: $(cat "$T/.claude/super-board/upgrade.json" 2>&1)"
+  "$T/.claude/drover/upgrade.json" >/dev/null || fail "upgrade.json wrong: $(cat "$T/.claude/drover/upgrade.json" 2>&1)"
 echo "$OUT" | grep -q "⬆️  upgrade from 1.8.2" || fail "the upgrade should be one grouped line, got: $OUT"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1
-jq -e '.from == "1.8.2"' "$T/.claude/super-board/upgrade.json" >/dev/null || fail "a second install must keep the original from-version"
+jq -e '.from == "1.8.2"' "$T/.claude/drover/upgrade.json" >/dev/null || fail "a second install must keep the original from-version"
 rm -rf "$T"
 T=$(mktemp -d); "$INSTALL" --no-hooks "$T" >/dev/null 2>&1
-[ -e "$T/.claude/super-board/upgrade.json" ] && fail "a fresh install is not an upgrade"
+[ -e "$T/.claude/drover/upgrade.json" ] && fail "a fresh install is not an upgrade"
 rm -rf "$T"
 T=$(mktemp -d); printf '# AGENTS.md\n- mine\n' > "$T/AGENTS.md"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1
@@ -332,8 +332,8 @@ T=$(mktemp -d); mkdir -p "$T/.codex"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1; resolves "$T" codex
 [ ! -e "$T/.opencode" ] || fail "detection: .codex/ alone must not add .opencode/"
 rm -rf "$T"
-T=$(mktemp -d); mkdir -p "$T/.claude/super-board/configs"
-echo '{"host": "opencode"}' > "$T/.claude/super-board/configs/app.json"
+T=$(mktemp -d); mkdir -p "$T/.claude/drover/configs"
+echo '{"host": "opencode"}' > "$T/.claude/drover/configs/app.json"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1; resolves "$T" opencode
 rm -rf "$T"
 T=$(mktemp -d)
@@ -360,7 +360,7 @@ done
 [ "$(cat "$T/.claude/skills/other-skill/SKILL.md")" = mine ] && [ ! -L "$T/.claude/skills/other-skill" ] || fail "upgrade: other-skill was touched"
 [ "$(cat "$T/.claude/bin/mine.sh")" = mine ] && [ "$(cat "$T/.claude/hooks/my-hook.py")" = mine ] || fail "upgrade: user bin/hooks were touched"
 [ ! -e "$T/.agents/skills/other-skill" ] || fail "upgrade: other-skill must not move into .agents/"
-jq -e '.from == "1.8.2"' "$T/.claude/super-board/upgrade.json" >/dev/null || fail "upgrade: upgrade.json not recorded"
+jq -e '.from == "1.8.2"' "$T/.claude/drover/upgrade.json" >/dev/null || fail "upgrade: upgrade.json not recorded"
 rm -rf "$T"
 
 # 17 — a second run changes nothing (tree, link targets, file contents).

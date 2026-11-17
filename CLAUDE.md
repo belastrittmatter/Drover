@@ -58,7 +58,7 @@ left alone; where no symlink can be made the file is copied. Settings and run st
 ```
 
 It also records an older install in
-`.claude/super-board/upgrade.json`, prints grouped emoji output, and asks nothing:
+`.claude/drover/upgrade.json`, prints grouped emoji output, and asks nothing:
 `super-board onboard` asks the questions. Onboard's 🔍 Checks (`scripts/drover-setup.py`)
 fixes must-haves and finishes upgrades with no question.
 

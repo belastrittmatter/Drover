@@ -273,7 +273,7 @@ top_card_in_column Review
         subprocess.run(['git', '-C', str(main), 'worktree', 'add', '-q', '--detach', str(linked)], check=True)
         self.env['SB_REPO_PATH'] = str(linked)
         self.assertEqual(self.read([{'rc': 1}]).returncode, 79)
-        marker = main / '.claude/super-board/github-halt.json'
+        marker = main / '.claude/drover/github-halt.json'
         self.assertTrue(marker.exists())
         self.env['SB_REPO_PATH'] = str(main)
         self.assertEqual(self.read([{'out': '{}'}]).returncode, 79)
@@ -300,7 +300,7 @@ top_card_in_column Review
         self.git('-C', str(sup), 'submodule', 'add', '-q', str(self.root / 'origin-b'), 'projects/b')
         self.env['SB_REPO_PATH'] = str(sup / 'projects/a')
         self.assertEqual(self.read([{'rc': 1}]).returncode, 79)
-        self.assertTrue((sup / '.git/modules/projects/a/super-board/github-halt.json').exists())
+        self.assertTrue((sup / '.git/modules/projects/a/drover/github-halt.json').exists())
         self.assertFalse((sup / '.git/modules/projects/.claude').exists())
         self.env['SB_REPO_PATH'] = str(sup / 'projects/b')
         self.assertEqual(self.read([{'out': '{}'}]).returncode, 0)

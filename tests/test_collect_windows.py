@@ -48,7 +48,7 @@ class WindowsIntakeTests(intake.IntakeTests):
     """Every intake regression again, through the portable lock path."""
     def setUp(self):
         super().setUp()
-        self.env.update(SUPER_BOARD_BIN=str(shim_bin(self.root)), SB_TEST_REAL_STATE=str(STATE))
+        self.env.update(DROVER_BIN=str(shim_bin(self.root)), SB_TEST_REAL_STATE=str(STATE))
 
     def test_portable_path_never_passes_an_fd_token(self):
         log = self.root/'fds.log'

@@ -460,8 +460,8 @@ def main(argv=None):
     selection.add_argument('--profile', choices=['setup'])
     parser.add_argument('--lane', choices=LANES)
     parser.add_argument('--require', action='append', default=[])
-    parser.add_argument('--home', default=os.environ.get('SUPER_BOARD_SKILLS_HOME'))
-    parser.add_argument('--catalog', default=os.environ.get('SUPER_BOARD_SKILLS_CATALOG'))
+    parser.add_argument('--home', default=os.environ.get('DROVER_SKILLS_HOME'))
+    parser.add_argument('--catalog', default=os.environ.get('DROVER_SKILLS_CATALOG'))
     parser.add_argument('--hydrate', action='store_true')
     args = parser.parse_args(argv)
     try:

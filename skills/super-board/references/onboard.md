@@ -32,7 +32,7 @@ only enabled entries applying to this project count.
 | Recommended first | every question puts its recommended option FIRST, labelled `(Recommended)`, so Enter takes it |
 | One tool | ask with `AskUserQuestion` (≤ 4 questions per call, ≤ 4 options per question; the built-in "Other" box is the free-text option). NEVER free-text a choice that has options |
 | Fix, don't ask | a must-have (skills, scripts, workflows, guard hooks, settings entries, old folders, config keys, labels, columns) is fixed with NO question and listed under "Fixed for you". Only system tools and sign-ins are asked — through Claude Code's own permission prompt on the exact command |
-| Save as you go | every answer is written to `.claude/super-board/onboard-answers.json` the moment it is given |
+| Save as you go | every answer is written to `.claude/drover/onboard-answers.json` the moment it is given |
 | Write once | files in the repo (config, settings.json allow lines, docs) change only at step 7, after "Write everything". GitHub-side actions the user just picked (create or extend the board, create `staging`) run in their own step |
 | Secrets | NEVER read, grep, cat or source a dotenv file. Key names only, via `.claude/bin/drover-env-check.sh` |
 
@@ -89,7 +89,7 @@ then re-run onboard.`
 the question:
 
 ```
-⏺ Bash(cat .claude/super-board/onboard-answers.json)
+⏺ Bash(cat .claude/drover/onboard-answers.json)
   ⎿  saved 2 Oct, 18:40 · stopped at Policies & permissions
 ⏺ 💾 Found your answers from last time:
   ✓ GitHub: erictech        ✓ board: Ledgerly Roadmap
@@ -110,7 +110,7 @@ the step-7 table, then "Onboard found an existing setup. What now?" [Keep all �
 
 ## The answers file
 
-`.claude/super-board/onboard-answers.json` (gitignored — step 7 adds it):
+`.claude/drover/onboard-answers.json` (gitignored — step 7 adds it):
 
 ```json
 { "version": 2, "updated": "<iso>", "last_step": "policies",
@@ -130,7 +130,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
 
 ```
 0. SILENT DETECT (no questions, nothing printed but the start screen)
-   ├─ answers file, .claude/super-board/configs/*.json → resume / re-run screens
+   ├─ answers file, .claude/drover/configs/*.json → resume / re-run screens
    ├─ manifests + README (board names), branches + deploy signals ($SB/drover-setup.py branch)
    ├─ migration dirs (supabase/migrations, prisma/migrations, drizzle, **/migrations/*.sql,
    │    db/migrate, alembic/versions) and migrate scripts in the manifest (db:migrate, …)
@@ -149,7 +149,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
 
 1. 🔍 CHECKS — nothing asked except system tools and sign-ins
    ├─ python3 $SB/drover-setup.py fix --host <actual-worker-host> --text
-   │    Fixes with NO question, backed up first to .claude/super-board/backup/<ts>/:
+   │    Fixes with NO question, backed up first to .claude/drover/backup/<ts>/:
    │    skills, .claude/bin scripts, workflows, guard hooks + settings.json entries (runs the
    │    pack's install.sh), removes old skill folders (super-refine, cleanup-wt, arch-loop),
    │    migrates every config to the v3 keys, git init, Matt Pocock's helper skills and
@@ -180,7 +180,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    workflows must be ON in /config.
    └─ OLDER SUPER-BOARD (the result says `upgraded: true`): same rule, no question. Header
       `1 of 7 · 🔍 Checks — found super-board v<from>; upgrading to v<pack>.` and the list:
-          ⏺ Upgraded for you (backup: .claude/super-board/backup/<ts>/)
+          ⏺ Upgraded for you (backup: .claude/drover/backup/<ts>/)
             ✓ skills updated; added super-collect, visual, git-sync, ui-refine-loop, pr-security-review
             ✓ removed old folders: super-refine, cleanup-wt, arch-loop
             ✓ scripts, board engine and safety guards updated
@@ -194,7 +194,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
       maps old labels, labels every card `qa` on a board that was "qa-only", moves Skipped
       cards to Done, removes Skipped and restores any status the change cleared. Keep the board
       idle during this operation. The helper saves every card/status and label conversion plan
-      in `.claude/super-board/migrations/` before writing to GitHub. A failed upgrade is not a
+      in `.claude/drover/migrations/` before writing to GitHub. A failed upgrade is not a
       completed setup: keep the recovery file and re-run the same command from the same project
       root (or with the same `--root`). It resumes the saved plan and verifies remote results;
       it never takes a new snapshot over a partially upgraded board. No extra setup question.
@@ -339,14 +339,14 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    ├─ AskUserQuestion "Write everything?" (header "Save") [Write everything (Recommended) /
    │    Change one thing → pick the step, walk only it, back here / Cancel — nothing written].
    ├─ Write, in order (each atomic; stop and report on the first failure — answers are kept):
-   │    ├─ .claude/super-board/configs/<slug>.json (committed): description, project, target
+   │    ├─ .claude/drover/configs/<slug>.json (committed): description, project, target
    │    │    {type: repo | repo+url}, repo, base_branch, timezone, columns (the seven), labels,
    │    │    paths, merge_policy, migrations, collect (incl. custom), notifications {channel:
    │    │    "session", bot_identity}, worker_backend "workflow", host (always: `bash $SB/drover-host.sh`;
    │    │    on exit 65 ask claude/codex/opencode), verify_commands (non-blank project checks). No `variant`.
-   │    ├─ .claude/super-board/active ← <slug>
-   │    ├─ .gitignore += .claude/super-board/active, onboard-answers.json, onboard-staged/,
-   │    │    backup/, inflight/, migrations/, upgrade.json (all under .claude/super-board/)
+   │    ├─ .claude/drover/active ← <slug>
+   │    ├─ .gitignore += .claude/drover/active, onboard-answers.json, onboard-staged/,
+   │    │    backup/, inflight/, migrations/, upgrade.json (all under .claude/drover/)
    │    ├─ settings.json: drover-settings.py allow … ; protect main →
    │    │    drover-settings.py hooks .claude/settings.json <pack>/hooks/settings-protect-main.json
    │    ├─ staged project verifier skill/map/scenarios/runner, if source-backed; then
@@ -411,10 +411,10 @@ remove a pending recovery record; use its saved state to reconcile a conflict be
 
 ## Worker self-check (mandatory before the 🎉 screen)
 
-1. **Config validates** — `.claude/super-board/configs/<slug>.json` parses, has every required
+1. **Config validates** — `.claude/drover/configs/<slug>.json` parses, has every required
    field from `config-schema.json` (incl. `notifications.bot_identity`, `merge_policy`,
    `migrations`), has no `variant`, and `columns` is the seven.
-2. **Active pointer** — `.claude/super-board/active` holds exactly the slug + `\n`.
+2. **Active pointer** — `.claude/drover/active` holds exactly the slug + `\n`.
 3. **Board columns and labels** — `gh project field-list <n> --owner <o>` returns Backlog, Ready,
    Building, QA, Review, Blocked, Done (no Skipped); `gh label list` has qa, bug, feature.
 4. **Setup green** — `python3 .claude/bin/drover-setup.py check` exits 0 (or only `needs`

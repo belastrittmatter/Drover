@@ -30,8 +30,8 @@ when their target is a readable, nonempty regular `SKILL.md`. A lockfile,
 cache directory or another host's install is not evidence.
 
 `--home` isolates home discovery; `--catalog` supplies the enabled active
-inventory. Launchers accept `SUPER_BOARD_SKILLS_HOME` and
-`SUPER_BOARD_SKILLS_CATALOG`. Catalog entries name exact paths, host and
+inventory. Launchers accept `DROVER_SKILLS_HOME` and
+`DROVER_SKILLS_CATALOG`. Catalog entries name exact paths, host and
 user/project scope, with project_root for project entries. They grant no
 fallback or mutation authority. Read-only checks and dispatch install nothing.
 Explicit onboard `fix` retains helper repair and re-resolves files afterward.

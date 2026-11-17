@@ -148,7 +148,7 @@ is "rejects a missing section"   66 "$(code --title T --body-file "$WORK/no-evid
 has "names the missing section"  "$(cat "$WORK/err")" "Evidence"
 is "rejects <placeholder>"       66 "$(code --title T --body-file "$WORK/placeholder.md")"
 is "rejects TBD"                 66 "$(code --title T --body-file "$WORK/tbd.md")"
-is "escape hatch files it anyway" 0 "$(SUPER_QA_ALLOW_WEAK_BODY=1 code --title T --body-file "$WORK/tbd.md")"
+is "escape hatch files it anyway" 0 "$(DROVER_QA_ALLOW_WEAK_BODY=1 code --title T --body-file "$WORK/tbd.md")"
 is "rejects AC without a checklist" 66 "$(code --title T --body-file "$WORK/no-checklist.md")"
 has "says why"                      "$(cat "$WORK/err")" "checklist"
 is "rejects Context without lettered steps" 66 "$(code --title T --body-file "$WORK/no-steps.md")"
@@ -187,11 +187,11 @@ is "same finding, later iter → same key" "$FP3" "$FP9"
 
 echo "── project resolution"
 is "halts when the QA project is absent" 70 "$(PROJECTS="Some_Other_Board" code "${BASE[@]}")"
-has "tells the operator what to do" "$(cat "$WORK/err")" "create one, or set SUPER_QA_PROJECT_TITLE"
-OUT=$(PROJECTS="My_QA_Board" SUPER_QA_PROJECT_TITLE="My QA Board" run "${BASE[@]}")
-is "honours SUPER_QA_PROJECT_TITLE" "77" "$OUT"
-OUT=$(STATUS_OPTS="Bug Triage" SUPER_QA_TARGET_OPTION_NAME="Triage" run "${BASE[@]}")
-has "honours SUPER_QA_TARGET_OPTION_NAME" "$(cat "$GH_LOG")" "opt_Triage"
+has "tells the operator what to do" "$(cat "$WORK/err")" "create one, or set DROVER_QA_PROJECT_TITLE"
+OUT=$(PROJECTS="My_QA_Board" DROVER_QA_PROJECT_TITLE="My QA Board" run "${BASE[@]}")
+is "honours DROVER_QA_PROJECT_TITLE" "77" "$OUT"
+OUT=$(STATUS_OPTS="Bug Triage" DROVER_QA_TARGET_OPTION_NAME="Triage" run "${BASE[@]}")
+has "honours DROVER_QA_TARGET_OPTION_NAME" "$(cat "$GH_LOG")" "opt_Triage"
 
 echo "── dedupe"
 OUT=$(DEDUPE_HIT="55" run "${BASE[@]}" --fingerprint "imports|tc-1|silent-drop" --iter 4)

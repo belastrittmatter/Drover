@@ -5,7 +5,7 @@ hook JSON on stdin, prints a decision only when it blocks, and exits 0 on its ow
 so a broken guard never stops unrelated work. All of the below are on by default except the
 protected-push guard (opt-in).
 
-- `guard-worktree-path.py` — PreToolUse `Bash`: denies `git worktree add|move` whose target resolves outside `<repo>/.claude/worktrees/` (honours `cd X &&`, `git -C X`).
+- `guard-worktree-path.py` — PreToolUse `Bash`: denies `git worktree add|move` whose target resolves outside `<repo>/.drover/worktrees/` and `<repo>/.claude/worktrees/` (honours `cd X &&`, `git -C X`).
 - `guard-secrets.py` — PreToolUse `Bash|Read|Grep`: denies reading or piping dotenv files, SSH keys, `.npmrc`, `credentials(.json)`, service-account JSON and `.pem`; `.env.example` stays readable. One plain call to `drover-env-check.sh KEY…` is allowed: it prints present / empty / missing per key and never a value (no pipe, chain or redirect may ride along).
 - `guard-key-literals.py` — PreToolUse `Edit|MultiEdit|Write|NotebookEdit|Bash`: denies writing a live-looking API key into a file; PostToolUse `Edit|MultiEdit|Write|NotebookEdit`: flags one already on disk. Reports line numbers, never the value.
 - `guard-delete-outside.py` — PreToolUse `Bash`: denies `rm`, `rmdir`, `unlink`, `find … -delete` / `-exec rm` and `git clean` whose target resolves outside `$CLAUDE_PROJECT_DIR`, and always `/` or `~` itself (honours `cd X &&`, `git -C X`, `~`, `$HOME`). Inside `/tmp`, `/private/tmp`, `/var/folders` and `$TMPDIR` stays allowed. A path whose value is only known at run time (`$(…)`, a variable set earlier in the same command) is allowed.
@@ -82,7 +82,7 @@ project and merges the block below (kept in `settings-snippet.json`) into
 ## Opt-in: block pushes to the base branch
 
 `guard-protected-push.py` — PreToolUse `Bash`: denies a `git push` that would update or delete
-`main`, `master`, any `base_branch` in `.claude/super-board/configs/*.json`, or a name in
+`main`, `master`, any `base_branch` in `.claude/drover/configs/*.json`, or a name in
 `SB_PROTECTED_BRANCHES` (comma-separated). That covers force pushes (`-f`, `--force`,
 `--force-with-lease`, `+ref`), explicit refspecs (`feat:main`, `HEAD:refs/heads/main`), `--delete`,
 `--all` / `--mirror`, and a bare `git push` while the base is checked out. Force pushes to feature

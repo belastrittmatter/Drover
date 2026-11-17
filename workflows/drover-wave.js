@@ -12,7 +12,7 @@ export const meta = {
 }
 
 // args = {
-//   configPath: '.claude/super-board/configs/<slug>.json',
+//   configPath: '.claude/drover/configs/<slug>.json',
 //   cards: [{ number, status, title, lane, labels }],  // output of drover-wave-plan.sh
 //     lane: 'build' | 'qa' | 'review' — a Ready card labelled `qa` has lane 'qa'
 //     and skips the Builder; every other Ready card is built first (v3.0.0).
@@ -111,7 +111,7 @@ const LANE = {
 // last Reviewer report first (run.md → Reviewer step 3b). The lookup is one gh
 // call by marker, so the lane does it — this script never sees PR comments.
 const REVIEW_MEMORY = [
-  `Before reviewing, load prior_report: the newest PR comment containing "<!-- super-review:report -->" (run.md → Reviewer step 3b).`,
+  `Before reviewing, load prior_report: the newest PR comment containing "<!-- drover-review:report -->" (run.md → Reviewer step 3b).`,
   `None → first review, behave as usual. Found → round 1 marks each prior finding fixed / not fixed / no longer applies;`,
   `any not fixed → bounce again listing them. Edit that report comment in place (keep R-ids), never post a second one. Report the counts as priorFindings.`,
   // Independent pass (run.md → Reviewer step 3): hypotheses before the builder's account.
@@ -148,7 +148,7 @@ const lanePrompt = (lane, card) => [
   READ_FAILURE,
   `Run ${LANE[lane].skill} on issue #${card.number} ("${card.title}") for a super-board workflow wave.`,
   `Read .claude/skills/super-board/references/run.md → "${LANE[lane].section}" lifecycle and follow it EXACTLY:`,
-  `create your own worktree under .claude/worktrees/, work on the issue branch, post the required PR/issue comments,`,
+  `create your own worktree under .drover/worktrees/, work on the issue branch, post the required PR/issue comments,`,
   `move the project card yourself, clean up the worktree on exit. Config: ${input.configPath}.`,
   BOARD_IO(),
   `Commits, PR title, PR body blocks, comments: .claude/skills/super-board/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/drover-pr-body.sh.`,

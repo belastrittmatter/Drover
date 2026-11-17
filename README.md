@@ -140,7 +140,7 @@ Run automatically once installed. Python stdlib, JSON in, JSON out.
 
 | | |
 | --- | --- |
-| [guard-worktree-path](hooks/guard-worktree-path.py) | Blocks `git worktree add` outside `.claude/worktrees/` |
+| [guard-worktree-path](hooks/guard-worktree-path.py) | Blocks `git worktree add` outside `.drover/worktrees/` (and the harness's `.claude/worktrees/`) |
 | [guard-secrets](hooks/guard-secrets.py) | Blocks reading or piping dotenv files, SSH keys and credential files; key names via `drover-env-check.sh` |
 | [guard-key-literals](hooks/guard-key-literals.py) | Blocks a live-looking API key written into a file; flags one already there |
 | [guard-delete-outside](hooks/guard-delete-outside.py) | Blocks `rm`, `find -delete` and `git clean` aimed outside the project, `~` or `/` |
@@ -211,8 +211,8 @@ selected card is runnable. Read-only checks never install; explicit onboard
 repair rechecks files after installation.
 
 The CLI accepts `--home <fixture-home>` and `--catalog <active-skills.json>`.
-Launchers accept the same inventory through `SUPER_BOARD_SKILLS_HOME` and
-`SUPER_BOARD_SKILLS_CATALOG`; neither changes the actual host. Catalog shape:
+Launchers accept the same inventory through `DROVER_SKILLS_HOME` and
+`DROVER_SKILLS_CATALOG`; neither changes the actual host. Catalog shape:
 `{"host":"codex","skills":[{"name":"vendor:skill","path":"/exact/SKILL.md",
 "enabled":true,"scope":"project","project_root":"/exact/project"}]}`.
 User entries use `scope:"user"`. Restart explicitly after repairing missing

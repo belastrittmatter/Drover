@@ -62,8 +62,8 @@ for rule in ("Bash(python3 .claude/bin/drover-github-read.py:*)",
 
 check(re.search(r'claude -p "/super-board run"', section) is not None,
       "run-workflow.md must say whether claude -p \"/super-board run\" is supported")
-check(".claude/super-board/" in section and ".claude/worktrees/" in section,
-      "run-workflow.md must say how a headless run writes .claude/super-board/ and .claude/worktrees/")
+check(".claude/drover/" in section and ".drover/worktrees/" in section,
+      "run-workflow.md must say how a headless run writes .claude/drover/ and .drover/worktrees/")
 
 if failures:
     for f in failures:

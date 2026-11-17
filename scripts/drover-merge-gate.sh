@@ -162,7 +162,7 @@ if [ "${#VERIFY[@]}" -eq 0 ]; then
 fi
 python3 "$GITHUB_READ" --check
 
-LOCK_DIR="${REPO_PATH}/.claude/super-board/inflight/merge.lock"
+LOCK_DIR="${REPO_PATH}/.claude/drover/inflight/merge.lock"
 mkdir -p "$(dirname "$LOCK_DIR")"
 
 say() { echo "[merge-gate #${PR}] $*" >&2; }

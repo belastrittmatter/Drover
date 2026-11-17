@@ -80,7 +80,7 @@ python3 "$GITHUB_READ" --check || exit $?
 # --- dedupe -----------------------------------------------------------------
 # The fingerprint is stamped into the body as an HTML comment so it survives
 # edits to the prose and stays invisible on the rendered issue.
-STAMP="<!-- super-review-fingerprint: ${FINGERPRINT} -->"
+STAMP="<!-- drover-review-fingerprint: ${FINGERPRINT} -->"
 REPO_NAME="${REPO_FLAG[1]:-}"
 if [ -z "$REPO_NAME" ]; then
   REPO_NAME=$(python3 "$GITHUB_READ" --kind scalar -- repo view --json nameWithOwner --jq .nameWithOwner) || exit $?

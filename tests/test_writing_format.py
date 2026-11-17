@@ -179,7 +179,7 @@ def test_comment_examples_follow_the_header():
                 assert not any(COMMENT_HEADER.match(line) for line in lines), "author notes must not route as findings"
                 author_notes += 1
                 continue
-            lines = [l for l in lines if not l.startswith("<!-- super-review:report")]
+            lines = [l for l in lines if not l.startswith("<!-- drover-review:report")]
             if not lines or not re.match(r"^\[[a-z<]", lines[0]) or lines[0].startswith("[<"):
                 continue
             assert COMMENT_HEADER.match(lines[0]), f"bad comment header: {lines[0]}"

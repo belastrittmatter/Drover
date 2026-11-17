@@ -5,7 +5,7 @@ One GraphQL search through `gh api graphql`, paginated on the search cursor:
     is:pr is:merged merged:>=DATE repo:OWNER/REPO
 Each PR comes back with its conversation comments, reviews and review threads, the
 author kind (User / Bot) on each, and `superReview: true` on super-review reports
-(marker `<!-- super-review:report -->`). Read-only; the agent reads the JSON for
+(marker `<!-- drover-review:report -->`). Read-only; the agent reads the JSON for
 recurring problems, not this script.
 
     collect_prs.py list [--since 14d|YYYY-MM-DD] [--repo owner/name] [--max 200] [--config cfg.json]
@@ -22,7 +22,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import collect_common as cc  # noqa: E402
 
-MARKER = "<!-- super-review:report -->"
+MARKER = "<!-- drover-review:report -->"
 BODY_MAX = 4000
 
 QUERY = """

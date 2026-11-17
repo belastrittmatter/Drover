@@ -24,7 +24,7 @@ class WorktreePaths(unittest.TestCase):
                         GIT_COMMITTER_NAME="test", GIT_COMMITTER_EMAIL="test@example.com",
                         CLEANUP_WT_GH="/nonexistent")
         self.run_cmd("git", "init", "-q", "-b", "main")
-        (self.root / ".gitignore").write_text(".claude/worktrees/\n.worktrees/\n.planning/\n")
+        (self.root / ".gitignore").write_text(".drover/worktrees/\n.worktrees/\n.planning/\n")
         self.run_cmd("git", "add", ".gitignore")
         self.run_cmd("git", "commit", "-qm", "fixture")
         # The recovery lookup uses ls-remote; keep it on this local fixture.
@@ -48,8 +48,8 @@ class WorktreePaths(unittest.TestCase):
         helper_bin = self.root / '.claude/bin'; helper_bin.mkdir(parents=True)
         for name in ['drover-github-read.py', 'drover-skills-ready.py']:
             shutil.copy2(PACK / 'scripts' / name, helper_bin / name)
-        self.env['SUPER_BOARD_SKILLS_HOME'] = str(Path(self.tmp.name) / 'home')
-        Path(self.env['SUPER_BOARD_SKILLS_HOME']).mkdir()
+        self.env['DROVER_SKILLS_HOME'] = str(Path(self.tmp.name) / 'home')
+        Path(self.env['DROVER_SKILLS_HOME']).mkdir()
         self.env.update(PATH=str(bin_dir) + os.pathsep + self.env["PATH"], BASE_BRANCH="main",
                         REPO_DIR=str(self.root), WORKER_CWD=str(Path(self.tmp.name) / "worker-cwd"))
 
@@ -62,7 +62,7 @@ class WorktreePaths(unittest.TestCase):
         result = self.dispatch()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(Path(self.env["WORKER_CWD"]).read_text().strip(),
-                         str(self.root / ".claude/worktrees/issue-9"))
+                         str(self.root / ".drover/worktrees/issue-9"))
         self.assertFalse((self.root / ".worktrees").exists())
 
     def test_legacy_checkout_is_not_abandoned_or_clobbered(self):
@@ -74,7 +74,7 @@ class WorktreePaths(unittest.TestCase):
         self.assertEqual(result.returncode, 64, result.stdout + result.stderr)
         self.assertIn("legacy worktree", result.stderr)
         self.assertEqual((old / "unfinished.txt").read_text(), "keep this work")
-        self.assertFalse((self.root / ".claude/worktrees/issue-9").exists())
+        self.assertFalse((self.root / ".drover/worktrees/issue-9").exists())
         self.assertFalse(Path(self.env["WORKER_CWD"]).exists())
 
     def runner_helper(self, body):
@@ -91,8 +91,8 @@ class WorktreePaths(unittest.TestCase):
         self.assertEqual((old / "unfinished.txt").read_text(), "keep this work")
 
     def test_reclaim_uses_canonical_path_and_keeps_dirty_work(self):
-        clean = self.root / ".claude/worktrees/issue-7-build"
-        dirty = self.root / ".claude/worktrees/issue-8-build"
+        clean = self.root / ".drover/worktrees/issue-7-build"
+        dirty = self.root / ".drover/worktrees/issue-8-build"
         for n, path in ((7, clean), (8, dirty)):
             self.run_cmd("git", "worktree", "add", "-b", "issue-" + str(n), str(path), "main")
         (dirty / "unfinished.txt").write_text("keep this work")
@@ -112,17 +112,17 @@ reclaim_stranded_building
 
     def test_stale_scan_never_deletes_unregistered_or_unrelated_folders(self):
         for name in ("issue-7-build", "another-agent"):
-            path = self.root / ".claude/worktrees" / name
+            path = self.root / ".drover/worktrees" / name
             path.mkdir(parents=True)
             (path / "unfinished.txt").write_text("keep this work")
         result = self.runner_helper("cleanup_stale_worktrees")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         for name in ("issue-7-build", "another-agent"):
-            self.assertEqual((self.root / ".claude/worktrees" / name / "unfinished.txt").read_text(),
+            self.assertEqual((self.root / ".drover/worktrees" / name / "unfinished.txt").read_text(),
                              "keep this work")
 
     def test_stale_scan_keeps_detached_commits(self):
-        path = self.root / ".claude/worktrees/issue-7-build"
+        path = self.root / ".drover/worktrees/issue-7-build"
         self.run_cmd("git", "worktree", "add", "--detach", str(path), "main")
         self.run_cmd("git", "commit", "--allow-empty", "-qm", "unreferenced work", cwd=path)
         result = self.runner_helper("cleanup_stale_worktrees")
@@ -131,7 +131,7 @@ reclaim_stranded_building
                          "unreferenced work")
 
     def test_reclaim_keeps_detached_commits_and_building_status(self):
-        path = self.root / ".claude/worktrees/issue-7-build"
+        path = self.root / ".drover/worktrees/issue-7-build"
         self.run_cmd("git", "worktree", "add", "--detach", str(path), "main")
         self.run_cmd("git", "commit", "--allow-empty", "-qm", "unreferenced work", cwd=path)
         result = self.runner_helper(r'''

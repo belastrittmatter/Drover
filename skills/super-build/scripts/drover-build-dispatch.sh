@@ -8,7 +8,7 @@
 #          SKILL_DIR   (optional) — defaults to the dir this script lives in's parent
 #          MAX_TURNS   (optional) — default 250
 #   - Side effects:
-#       * git worktree add -b loop/issue-N .claude/worktrees/issue-N BASE_BRANCH
+#       * git worktree add -b loop/issue-N .drover/worktrees/issue-N BASE_BRANCH
 #       * runs `claude -p` inside that worktree with the composed prompt
 #       * captures stdout+stderr to .planning/super-build-logs/issue-N.log
 #   - Exit codes:
@@ -72,7 +72,7 @@ if ! git rev-parse --verify "$BASE_BRANCH" >/dev/null 2>&1; then
   fi
 fi
 
-WORKTREE_DIR=".claude/worktrees/issue-$N"
+WORKTREE_DIR=".drover/worktrees/issue-$N"
 WORKER_BRANCH="loop/issue-$N"
 LOG_DIR="$REPO_DIR/.planning/super-build-logs"
 LOG_FILE="$LOG_DIR/issue-$N.log"

@@ -54,9 +54,9 @@ This board is the durable, machine-readable state for the loop. `docs/super-qa/q
 
 Resolution order (used by `scripts/drover-qa-file-bug.sh` and the orchestrator):
 
-1. If `SUPER_QA_PROJECT_TITLE` is set, query `gh project list --owner $SUPER_QA_PROJECT_OWNER --format json` and pick the project whose title matches (case-insensitive).
+1. If `DROVER_QA_PROJECT_TITLE` is set, query `gh project list --owner $DROVER_QA_PROJECT_OWNER --format json` and pick the project whose title matches (case-insensitive).
 2. Otherwise default to title `Super Ultimate QA`.
-3. Owner defaults to `$(gh repo view --json owner -q .owner.login)` or `SUPER_QA_PROJECT_OWNER` if set.
+3. Owner defaults to `$(gh repo view --json owner -q .owner.login)` or `DROVER_QA_PROJECT_OWNER` if set.
 
 If no matching project exists, the loop halts with a one-line error and instructs the operator to create one. Do not silently fall back to the repo's primary project — column semantics differ.
 
@@ -66,7 +66,7 @@ When the worker finds a red spec, it calls `scripts/drover-qa-file-bug.sh`. The 
 
 - Creates the issue with `source:qa` label and full evidence body.
 - Adds the issue to the resolved **Super Ultimate QA** project.
-- Sets the Status field to `Bug` (override with `SUPER_QA_TARGET_OPTION_NAME`).
+- Sets the Status field to `Bug` (override with `DROVER_QA_TARGET_OPTION_NAME`).
 
 A `Flaky` retry-only finding goes to `Flaky`; out-of-scope routes go to `Skip`. The same issue may also live on a repo-level project for normal triage — Status on the QA project is the loop state; status elsewhere is independent.
 
@@ -180,7 +180,7 @@ Examples:
 - QA category when relevant: `qa:functional`, `qa:visual`, `qa:network`, `qa:console`, `qa:i18n`, `qa:a11y`, `qa:data`, `qa:testability`.
 - Suggested skill owner when helpful: `skill:super-build`, `skill:super-qa`, `skill:ui-refine-loop`, or `skill:super-review`. `skill:ui-refine-loop` marks a UI ticket for a human to run `/ui-refine-loop` on; the board never triggers it.
 
-The script adds the issue to the resolved `Super Ultimate QA` project and moves it into the `Bug` column (override with `SUPER_QA_TARGET_OPTION_NAME`) so a human (or `/super-build` with `BUILD_LOOP_SOURCE_COLUMN=Bug`) can pick it up immediately. The repo's standalone feature project is not touched by this flow.
+The script adds the issue to the resolved `Super Ultimate QA` project and moves it into the `Bug` column (override with `DROVER_QA_TARGET_OPTION_NAME`) so a human (or `/super-build` with `BUILD_LOOP_SOURCE_COLUMN=Bug`) can pick it up immediately. The repo's standalone feature project is not touched by this flow.
 
 The `iteration-N.md` Section 3 is the per-iter audit (with `gh_issue: <N>` back-references); the GH issue is the durable tracker. The fix-commit message includes `(closes #<N>)` so the issue auto-closes on merge.
 
@@ -232,12 +232,12 @@ If a screenshot/network/console artifact does not exist, explicitly write `not c
 
 ### Filing guardrails
 
-`drover-qa-file-bug.sh` validates issue bodies before filing. It must reject weak tickets that are missing required sections or still contain placeholders like `TBD`, `<...>`, or `TODO:`. Do not bypass this with `SUPER_QA_ALLOW_WEAK_BODY=1` during normal autonomous runs. `--check-body` runs only these checks and exits (0, or the refusal code) without calling `gh`; super-collect's dry run uses it.
+`drover-qa-file-bug.sh` validates issue bodies before filing. It must reject weak tickets that are missing required sections or still contain placeholders like `TBD`, `<...>`, or `TODO:`. Do not bypass this with `DROVER_QA_ALLOW_WEAK_BODY=1` during normal autonomous runs. `--check-body` runs only these checks and exits (0, or the refusal code) without calling `gh`; super-collect's dry run uses it.
 
 Every filed issue must include:
 
 - `## Board summary` near the top for quick project-card context.
-- A hidden `super-qa-meta` block with route, spec, iteration, area, category, priority, type, and `fingerprint`.
+- A hidden `drover-qa-meta` block with route, spec, iteration, area, category, priority, type, and `fingerprint`.
 - A deterministic fingerprint. Use a meaningful key when known, such as `settings-users|add-user|no-op`; otherwise the script derives one from kind/route/category/title.
 
 Dedupe policy: before creating a new issue, the script searches open `source:qa` issues for the fingerprint. If a match exists, it comments with the new evidence and returns the existing issue number instead of creating a duplicate Ready card.
@@ -271,7 +271,7 @@ Per-spec forensics captured by `e2e/lib/report-fixture.ts`:
 The fixture (`e2e/lib/report-fixture.ts`) **already captures** console
 errors, page errors, failed requests, network summary, and Sentry events,
 plus HAR via `recordHar`. Disk writes are gated behind
-`SUPER_QA_FORENSICS=1`; set it in every worker's environment. Fixture
+`DROVER_QA_FORENSICS=1`; set it in every worker's environment. Fixture
 exposes everything via `report.forensics.*` (e.g.
 `report.forensics.consoleErrors`).
 
@@ -300,7 +300,7 @@ Report once: `🐛 Super QA starting — N iterations`.
 
 Launch one sub-agent (Agent tool) in the repo root, no worktree, with
 prompt = `references/iteration-preamble.md` + a per-iteration footer (iter
-num, base SHA, mandatory final-commit format) and `SUPER_QA_FORENSICS=1`.
+num, base SHA, mandatory final-commit format) and `DROVER_QA_FORENSICS=1`.
 When it returns, classify the iteration:
 - `0` iter complete — a `🧪 [test] super-qa: iter N` commit is on the current branch.
 - `2` worker failed — it errored and left no done or WIP marker.
@@ -562,7 +562,7 @@ The worker (per `references/iteration-preamble.md`) must load and follow:
 - **Standalone `/super-build`** keeps reading `Ready` from its configured feature project. Untouched by `/super-qa`.
 - **`Bug` cards reach a builder** when someone moves them to `Ready`, or when `/super-build` runs with `BUILD_LOOP_SOURCE_COLUMN=Bug` against this board. Builds go to `QA` as PRs; nothing moves to `Done` without the Reviewer's merge gate.
 
-If you intentionally want a single board for both lanes, set `BUILD_LOOP_PROJECT=$SUPER_QA_PROJECT_NUMBER` and `BUILD_LOOP_SOURCE_COLUMN=Bug`. Don't do this by accident — the column semantics differ.
+If you intentionally want a single board for both lanes, set `BUILD_LOOP_PROJECT=$DROVER_QA_PROJECT_NUMBER` and `BUILD_LOOP_SOURCE_COLUMN=Bug`. Don't do this by accident — the column semantics differ.
 
 ## Test target & safety rails
 
@@ -639,7 +639,7 @@ shipped code.
 
 ## super-board integration
 
-When invoked by super-board (env `SUPER_BOARD_RUN=1` or invocation contains "super-board run"):
+When invoked by super-board (env `DROVER_RUN=1` or invocation contains "super-board run"):
 
 - **GitHub budget** — every "move card" is `.claude/bin/drover-card.sh --config <cfg> move <N> <Status>` (1 GraphQL point; `gh project item-list` / `field-list` cost ~100–200). Comments, labels and PR reads go over REST; [rate-limit-etiquette.md](../super-board/references/rate-limit-etiquette.md) → "Price list" has the calls.
 
@@ -649,7 +649,7 @@ When invoked by super-board (env `SUPER_BOARD_RUN=1` or invocation contains "sup
 - After pushing tests, evidence or fixes to a PR, refresh [PR author notes](../super-board/references/pr-author-notes.md) before the handoff. Keep file summaries current and explain critical changed sections on the PR.
 
 ### Card types
-- **Built card (`feature`, `bug`, no label):** worktree at `.claude/worktrees/issue-<N>-qa/` checked out at Builder's branch tip.
+- **Built card (`feature`, `bug`, no label):** worktree at `.drover/worktrees/issue-<N>-qa/` checked out at Builder's branch tip.
 - **`qa` card (skipped Building):** move it Ready → QA yourself, create `issue-<N>-<slug>` from the base branch, test what is already there (run.md → "qa cards").
 - **A live URL with no repo** is not a board card: `/super-qa <url>` runs standalone.
 

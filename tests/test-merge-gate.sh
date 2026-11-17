@@ -21,10 +21,10 @@ setup() {  # $1 = verify_commands JSON array
   printf '#!/usr/bin/env bash\nexit 1\n' > "$TMP/bin/gh"
   chmod +x "$TMP/bin/gh"
   export PATH="$TMP/bin:$PATH"
-  mkdir -p "$TMP/.claude/super-board/inflight"
+  mkdir -p "$TMP/.claude/drover/inflight"
   printf '{"base_branch":"staging","repo":{"path":"%s","remote":"https://github.com/x/y.git"},"verify_commands":%s}' \
     "$TMP" "${1:-[\"git diff --check\"]}" > "$TMP/c.json"
-  LOCK="$TMP/.claude/super-board/inflight/merge.lock"
+  LOCK="$TMP/.claude/drover/inflight/merge.lock"
 }
 teardown() { rm -rf "$TMP"; }
 

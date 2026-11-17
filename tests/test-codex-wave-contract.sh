@@ -9,7 +9,7 @@ mkdir -p "$T/bin" "$T/repo" "$T/bare" "$T/home"
 git init -q "$T/repo"
 git init -q "$T/bare"
 python3 "$KIT/tests/fixtures/install_worker_skills.py" "$T/repo"
-export SUPER_BOARD_SKILLS_HOME="$T/home"
+export DROVER_SKILLS_HOME="$T/home"
 cat > "$T/bin/gh" <<'PYGH'
 #!/usr/bin/env python3
 import json,sys

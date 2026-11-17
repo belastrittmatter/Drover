@@ -19,14 +19,14 @@
 # gets one link per skill under skills/ and one link per file under bin/,
 # workflows/ and hooks/. Nothing that is not super-board's is touched. Where a
 # link cannot be made (Windows without symlink rights) the file is copied.
-# Settings and run state (.claude/settings.json, .claude/super-board/) stay put.
+# Settings and run state (.claude/settings.json, .claude/drover/) stay put.
 #
 # Output is grouped with emojis, one line per group of files (failures still name
-# the file). Environment: SUPER_BOARD_QUIET_NEXT=1 prints only the "🔧 installing"
+# the file). Environment: DROVER_QUIET_NEXT=1 prints only the "🔧 installing"
 # group, for a wrapper that prints its own header and summary around it.
 #
 # An older super-board already in the target (a different skills/super-board/VERSION,
-# or one with no VERSION) is recorded in .claude/super-board/upgrade.json
+# or one with no VERSION) is recorded in .claude/drover/upgrade.json
 # {from, to, added_skills}; onboard's 🔍 Checks finishes the upgrade and lists it.
 
 set -euo pipefail
@@ -73,7 +73,7 @@ for h in $(echo "$ASKED_HOSTS" | tr ',' ' '); do
   esac
 done
 for h in codex opencode; do [ ! -d "$TARGET/.$h" ] || add_host "$h"; done
-for h in $(python3 - "$TARGET/.claude/super-board/configs" <<'PY'
+for h in $(python3 - "$TARGET/.claude/drover/configs" <<'PY'
 import glob, json, os, sys
 for p in sorted(glob.glob(os.path.join(sys.argv[1], "*.json"))):
     try:
@@ -86,7 +86,7 @@ PY
 ); do add_host "$h"; done
 [ "$(bash "$REPO_ROOT/scripts/drover-host.sh" 2>/dev/null || true)" != codex ] || add_host codex
 
-QUIET="${SUPER_BOARD_QUIET_NEXT:-}"
+QUIET="${DROVER_QUIET_NEXT:-}"
 PACK_VERSION="$(tr -d '[:space:]' < "$REPO_ROOT/VERSION" 2>/dev/null || echo '?')"
 SHARED="$TARGET/.agents"
 
@@ -309,8 +309,8 @@ fi
 
 # Upgrade record for onboard's 🔍 Checks (it migrates config, labels, columns).
 if [ -n "$PREV_VERSION" ] && [ "$PREV_VERSION" != "$PACK_VERSION" ]; then
-  mkdir -p "$TARGET/.claude/super-board"
-  python3 - "$TARGET/.claude/super-board/upgrade.json" "$PREV_VERSION" "$PACK_VERSION" $ADDED_SKILLS <<'PY'
+  mkdir -p "$TARGET/.claude/drover"
+  python3 - "$TARGET/.claude/drover/upgrade.json" "$PREV_VERSION" "$PACK_VERSION" $ADDED_SKILLS <<'PY'
 import json, sys, time
 path, frm, to, added = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4:]
 try:

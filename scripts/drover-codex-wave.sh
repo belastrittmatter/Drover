@@ -75,8 +75,8 @@ try:
     resolver = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(resolver)
     resolver.hydrate(cards, root)
-    skills = resolver.report(root, 'codex', cards, home=os.environ.get('SUPER_BOARD_SKILLS_HOME'),
-                             catalog=os.environ.get('SUPER_BOARD_SKILLS_CATALOG'))
+    skills = resolver.report(root, 'codex', cards, home=os.environ.get('DROVER_SKILLS_HOME'),
+                             catalog=os.environ.get('DROVER_SKILLS_CATALOG'))
 except SystemExit as error:
     code, detail = error.code, 'required GitHub reads halted while hydrating skills; preserve claims and worktrees'
 except (OSError, ValueError, TypeError, KeyError) as error:
@@ -96,8 +96,8 @@ skills_halted = threading.Event()
 halted = threading.Event()
 mutex = threading.RLock()
 active = set()
-inflight = root / '.claude/super-board/inflight'
-marker = root / '.claude/super-board/codex-wave.pid'
+inflight = root / '.claude/drover/inflight'
+marker = root / '.claude/drover/codex-wave.pid'
 inflight.mkdir(parents=True, exist_ok=True)
 owner = str(os.getpid())
 
@@ -193,7 +193,7 @@ def run_card(card):
                 history.append(dict(lane='none', status='halted', column=current['status'], detail='run halted; preserve claims and worktrees'))
                 break
             boundary = resolver.report(root, 'codex', [current], lane=lane,
-                                       home=os.environ.get('SUPER_BOARD_SKILLS_HOME'), catalog=os.environ.get('SUPER_BOARD_SKILLS_CATALOG'))
+                                       home=os.environ.get('DROVER_SKILLS_HOME'), catalog=os.environ.get('DROVER_SKILLS_CATALOG'))
             if not boundary['ready']:
                 skills_halted.set()
                 halted.set()

@@ -35,7 +35,7 @@ access. No universal scheduler service is bundled.
 
 Collectors serialize by repository identity on one machine. They share an OS lock
 (flock on POSIX, msvcrt on Windows, where the filer runs as a `bash` child under a
-per-hold token) in project-local `.claude/super-board/collect/`, resolved through
+per-hold token) in project-local `.claude/drover/collect/`, resolved through
 the existing GitHub halt location across worktrees. `SB_COLLECT_STATE_DIR` can
 select another dedicated shared ignored directory. The helper creates a
 self-ignoring `.gitignore` there, including after an app install. Receipts contain

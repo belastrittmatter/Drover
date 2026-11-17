@@ -41,7 +41,8 @@ import sys
 import time
 
 KEEP, REMOVE, REVIEW = "KEEP", "REMOVE", "REVIEW"
-ALLOWED_DIR = os.path.join(".claude", "worktrees")
+# Card worktrees live in .drover/worktrees; .claude/worktrees holds the harness's own.
+ALLOWED_DIRS = (os.path.join(".drover", "worktrees"), os.path.join(".claude", "worktrees"))
 FRESH_SECS = 24 * 3600
 ALWAYS_PROTECTED = {"main", "master", "HEAD"}
 EXTRA_BASES = ["staging", "develop", "dev"]
@@ -226,7 +227,7 @@ def worktree_facts(ctx, wt):
         "locked": wt["locked"],
         "dirty": True if status is None else bool(status),
         "fresh": fresh,
-        "stray": not path.startswith(os.path.join(ctx["root"], ALLOWED_DIR) + os.sep),
+        "stray": not any(path.startswith(os.path.join(ctx["root"], d) + os.sep) for d in ALLOWED_DIRS),
     }
 
 
@@ -259,7 +260,7 @@ def classify_local(f, protected, force=False, auto=False):
         return {"bucket": REMOVE, "reason": "merged: " + f["merged"], "remove_worktree": bool(wt),
                 "wip": False, "delete_branch": bool(f["branch"])}
     if wt and (wt["stray"] or force):
-        why = "outside .claude/worktrees/" if wt["stray"] else "unmerged, --force"
+        why = "outside .drover/worktrees/ and .claude/worktrees/" if wt["stray"] else "unmerged, --force"
         save = dirty or not f["branch"]  # a detached HEAD gets a branch so its commits stay reachable
         return {"bucket": REMOVE, "reason": "%s -- remove folder, keep branch%s" % (why, " (wip-commit first)" if dirty else ""),
                 "remove_worktree": True, "wip": save, "delete_branch": False}

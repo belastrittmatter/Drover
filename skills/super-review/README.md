@@ -19,7 +19,7 @@ The Reviewer: decides whether a PR is safe to merge, and merges it through the g
 ## Report format
 
 ```
-<!-- super-review:report -->
+<!-- drover-review:report -->
 [reviewer] [report] <✅ merge-ready | ❌ bounced | 🛑 blocked | 🙋 human-gated> · round <N>
 Did · ✅ Done · ❌ Not done · Next
 | ID | Owner | Class | Where | Finding | Status |

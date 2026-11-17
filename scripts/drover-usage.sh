@@ -38,7 +38,7 @@
 #   <status-line json> | drover-usage.sh record
 #   drover-usage.sh check [--config <cfg.json>] [--threshold 95] [--max-age 900]
 #
-# Snapshot: $SB_USAGE_FILE, default ~/.claude/super-board/usage.json (usage is
+# Snapshot: $SB_USAGE_FILE, default ~/.claude/drover/usage.json (usage is
 # per account, not per repo, so one file serves every board).
 #
 # check prints one JSON line:
@@ -47,7 +47,7 @@
 # Exit: 0 ok, 10 pause, 3 unknown, 64 usage error.
 set -euo pipefail
 
-FILE="${SB_USAGE_FILE:-$HOME/.claude/super-board/usage.json}"
+FILE="${SB_USAGE_FILE:-$HOME/.claude/drover/usage.json}"
 MODE="${1:-}"; [ $# -gt 0 ] && shift
 
 case "$MODE" in

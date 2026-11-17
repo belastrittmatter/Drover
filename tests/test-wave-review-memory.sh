@@ -31,7 +31,7 @@ const base = { configPath: 'c.json' }
     ...(label.startsWith('classify') ? { kind: 'feature', complexity: 'low' } : {}) })
   const a = await run({ ...base, cards: [{ number: 7, status: 'Ready', title: 't' }] }, ok)
   const rp = a.prompts['review:#7'] || fail('review lane did not run')
-  rp.includes('<!-- super-review:report -->') || fail('review prompt must name the report marker')
+  rp.includes('<!-- drover-review:report -->') || fail('review prompt must name the report marker')
   rp.includes('prior_report') || fail('review prompt must ask for prior_report')
   ;/fixed \/ not fixed \/ no longer applies/.test(rp) || fail('review prompt must name the three round-1 verdicts')
   ;/before the builder's PR summary/.test(rp) || fail('review prompt must put the independent pass before the builder summary')
@@ -41,7 +41,7 @@ const base = { configPath: 'c.json' }
   ;/fixed brief from super-review/.test(rp) || fail('review prompt must use the fixed truth-check brief')
   ;/reclass any Over-engineering Blocker to Should fix/.test(rp) || fail('review prompt must re-apply the Over-engineering rule after the truth-check')
   ;['build:#7', 'qa:#7'].forEach((l) => a.prompts[l].includes('ponytail-review') && fail(`${l} must not get the review pass`))
-  ;['build:#7', 'qa:#7'].forEach((l) => a.prompts[l].includes('super-review:report') && fail(`${l} must not get review memory`))
+  ;['build:#7', 'qa:#7'].forEach((l) => a.prompts[l].includes('drover-review:report') && fail(`${l} must not get review memory`))
   // 1b — ui-refine-loop is standalone: no lane prompt mentions it.
   ;['build:#7', 'qa:#7', 'review:#7'].forEach((l) => /ui-refine-loop|qa-hook/.test(a.prompts[l]) && fail(`${l} must not trigger ui-refine-loop`))
 

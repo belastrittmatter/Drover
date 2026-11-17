@@ -79,9 +79,10 @@ expect deny  guard-worktree-path.py "$(bash_cmd 'git worktree add ../proj-featur
 expect deny  guard-worktree-path.py "$(bash_cmd 'mkdir -p /tmp/wt && git worktree add /tmp/wt/x' "$REPO")" "absolute outside path"
 expect deny  guard-worktree-path.py "$(bash_cmd "git -C $REPO worktree add .worktrees/x" "/")"          "git -C into repo, wrong dir"
 expect deny  guard-worktree-path.py "$(bash_cmd 'git worktree add "$(mktemp -d)"' "$REPO")"             "unresolvable path"
-expect deny  guard-worktree-path.py "$(bash_cmd 'git worktree move .claude/worktrees/a ../a' "$REPO")"  "move out of the allowed dir"
-expect allow guard-worktree-path.py "$(bash_cmd 'git worktree add .claude/worktrees/x -b feat main' "$REPO")" "allowed dir"
-expect allow guard-worktree-path.py "$(bash_cmd "cd $REPO && git worktree add .claude/worktrees/y" "/")" "cd then allowed dir"
+expect deny  guard-worktree-path.py "$(bash_cmd 'git worktree move .drover/worktrees/a ../a' "$REPO")"  "move out of the allowed dir"
+expect allow guard-worktree-path.py "$(bash_cmd 'git worktree add .drover/worktrees/x -b feat main' "$REPO")" "allowed dir"
+expect allow guard-worktree-path.py "$(bash_cmd 'git worktree add .claude/worktrees/z -b feat2 main' "$REPO")" "harness worktree dir"
+expect allow guard-worktree-path.py "$(bash_cmd "cd $REPO && git worktree add .drover/worktrees/y" "/")" "cd then allowed dir"
 expect allow guard-worktree-path.py "$(bash_cmd 'git worktree list' "$REPO")"                          "list is not add"
 expect allow guard-worktree-path.py "$(bash_cmd 'echo "git worktree add ../x"' "$REPO")"               "quoted text is not a command"
 rm -rf "$REPO"
@@ -90,7 +91,7 @@ rm -rf "$REPO"
 REPO=$(mktemp -d); REPO=$(cd "$REPO" && pwd -P)
 git -C "$REPO" init -q -b main
 git -C "$REPO" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
-mkdir -p "$REPO/.claude/super-board/configs"; echo '{"base_branch":"staging"}' > "$REPO/.claude/super-board/configs/app.json"
+mkdir -p "$REPO/.claude/drover/configs"; echo '{"base_branch":"staging"}' > "$REPO/.claude/drover/configs/app.json"
 pp() { CLAUDE_PROJECT_DIR="$REPO" expect "$1" guard-protected-push.py "$(bash_cmd "$2" "${4:-$REPO}")" "$3"; }
 pp deny  'git push --force origin main'                 "force push to main"
 pp deny  'git push -f origin staging'                   "force push to config base_branch"

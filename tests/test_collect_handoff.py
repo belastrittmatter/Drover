@@ -55,7 +55,7 @@ class Handoff(unittest.TestCase):
 
     def run_cli(self, *args, expected=0):
         p = subprocess.run([sys.executable, str(CLI), *args], cwd=self.root, text=True, capture_output=True,
-                           env=dict(os.environ, SUPER_BOARD_SKILLS_HOME=str(self.home)))
+                           env=dict(os.environ, DROVER_SKILLS_HOME=str(self.home)))
         self.assertEqual(p.returncode, expected, p.stderr)
         return p
 

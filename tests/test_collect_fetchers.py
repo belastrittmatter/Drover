@@ -103,8 +103,8 @@ class Common(unittest.TestCase):
             self.assertEqual(cc.secret("MISSING"), "")
 
     def test_active_config_follows_pointer(self):
-        files = {".claude/super-board/active": "app\n",
-                 ".claude/super-board/configs/app.json": json.dumps({"collect": {"window_days": 30}})}
+        files = {".claude/drover/active": "app\n",
+                 ".claude/drover/configs/app.json": json.dumps({"collect": {"window_days": 30}})}
         with in_dir(files):
             cfg, path = cc.active_config()
             self.assertEqual(cc.window_days(cfg), 30)
@@ -318,7 +318,7 @@ class PRs(unittest.TestCase):
 
     def test_paginates_and_marks_super_review_and_bots(self):
         pages = [self.page([self.pr(1, [{"author": {"login": "sb[bot]", "__typename": "Bot"},
-                                         "body": "<!-- super-review:report -->\nR1 fixed"}])], True, "C1"),
+                                         "body": "<!-- drover-review:report -->\nR1 fixed"}])], True, "C1"),
                  self.page([self.pr(2), None], False)]
         calls = []
 

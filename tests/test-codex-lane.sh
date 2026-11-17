@@ -25,7 +25,7 @@ T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/bin" "$T/repo"
 git init -q "$T/repo"
 python3 "$KIT/tests/fixtures/install_worker_skills.py" "$T/repo"
-export SUPER_BOARD_SKILLS_HOME="$T/home"; mkdir -p "$SUPER_BOARD_SKILLS_HOME"
+export DROVER_SKILLS_HOME="$T/home"; mkdir -p "$DROVER_SKILLS_HOME"
 cat > "$T/bin/gh" <<'PYGH'
 #!/usr/bin/env python3
 import json,sys
@@ -196,7 +196,7 @@ cmp "$T/out" "$T/wave.json" || fail 'file and stdout wave result differ'
 jq -e '.halted == false and (.cards | length) == 4 and .cards[0].lanesRun == "build:advanced → qa:advanced → review:advanced" and .cards[1].lanesRun == "qa:advanced → review:advanced" and .cards[2].lastLane == "review" and .cards[3].column == "Done"' "$T/out" >/dev/null || fail 'wave routing/summary'
 [ "$(last_model)" = wave-model ] || fail 'wave propagates explicit model'
 jq -s -e 'all(.active == 1)' "$SB_CODEX_TEST_LOG" >/dev/null || fail 'max_workers=1 must serialize cards'
-[ ! -e .claude/super-board/codex-wave.pid ] && [ -z "$(ls -A .claude/super-board/inflight)" ] || fail 'completed wave leaves no PID/worker locks'
+[ ! -e .claude/drover/codex-wave.pid ] && [ -z "$(ls -A .claude/drover/inflight)" ] || fail 'completed wave leaves no PID/worker locks'
 : > "$SB_CODEX_TEST_LOG"
 SB_CODEX_TEST_STATUS=bounced wave --codex >"$T/out"
 jq -e '.cards[0].lanesRun == "build:bounced"' "$T/out" >/dev/null || fail 'non-advanced ends card chain'
@@ -210,16 +210,16 @@ jq -e '.halted and (.cards | length) == 4' "$T/out" >/dev/null || fail 'halt sum
 RC=0; SB_CODEX_TEST_EXIT=9 wave --codex >"$T/out" || RC=$?
 [ "$RC" -eq 9 ] && [ "$(wc -l < "$SB_CODEX_TEST_LOG" | tr -d ' ')" -eq 1 ] || fail 'readiness halt stops new Codex dispatch'
 jq -e '.halted and .cards[0].finalStatus == "halted" and (.cards[0].detail | contains("verification-readiness"))' "$T/out" >/dev/null || fail 'readiness is a setup halt, not failed/rebase'
-[ -f .claude/super-board/inflight/1 ] || fail 'readiness halt preserves its lane lock for recovery'
-[ ! -e .claude/super-board/codex-wave.pid ] || fail 'ended wave releases only its PID marker'
-rm .claude/super-board/inflight/1  # fixture recovery before unrelated concurrency tests
+[ -f .claude/drover/inflight/1 ] || fail 'readiness halt preserves its lane lock for recovery'
+[ ! -e .claude/drover/codex-wave.pid ] || fail 'ended wave releases only its PID marker'
+rm .claude/drover/inflight/1  # fixture recovery before unrelated concurrency tests
 
 # A normal Codex completion can also report gate exit 9 in its structured result.
 : > "$SB_CODEX_TEST_LOG"
 RC=0; SB_CODEX_TEST_STATUS=halted SB_CODEX_TEST_DETAIL='verification-readiness: checks missing' wave --codex >"$T/out" || RC=$?
 [ "$RC" -eq 9 ] && [ "$(wc -l < "$SB_CODEX_TEST_LOG" | tr -d ' ')" -eq 1 ] || fail 'structured readiness halt preserves code 9'
-[ -f .claude/super-board/inflight/1 ] || fail 'structured readiness halt preserves lane state'
-rm .claude/super-board/inflight/1
+[ -f .claude/drover/inflight/1 ] || fail 'structured readiness halt preserves lane state'
+rm .claude/drover/inflight/1
 
 # Two card chains run together, but a cap of 1 above was serial.
 echo '{"max_workers":2,"verify_commands":["git diff --check"]}' > "$T/config.json"
@@ -234,11 +234,11 @@ PY
 
 # If the numeric lock cannot be written, startup fails as a card result and
 # reaps the already-created launcher rather than losing the whole wave summary.
-mkdir .claude/super-board/inflight/1
+mkdir .claude/drover/inflight/1
 CARDS='[{"number":1,"status":"Review"}]'
 wave --codex >"$T/out"
 jq -e '.cards[0].finalStatus == "failed" and (.cards[0].detail | contains("could not start"))' "$T/out" >/dev/null || fail 'startup failure needs structured result'
-rmdir .claude/super-board/inflight/1
+rmdir .claude/drover/inflight/1
 
 # TERM reaps the Codex process group and its descendants before lock cleanup.
 CARDS='[{"number":1,"status":"Review"}]'
@@ -246,11 +246,11 @@ SB_CODEX_TEST_SLEEP=1 SB_CODEX_TEST_PID="$T/descendant.pid" wave --codex >"$T/ou
 JOB=$!
 for _ in {1..100}; do [ -s "$T/descendant.pid" ] && break; sleep 0.05; done
 [ -s "$T/descendant.pid" ] || fail 'stub did not start'
-WAVE_PID=$(cat .claude/super-board/codex-wave.pid)
+WAVE_PID=$(cat .claude/drover/codex-wave.pid)
 kill -TERM "$WAVE_PID"
 RC=0; wait "$JOB" || RC=$?
 [ "$RC" -eq 79 ] || fail 'interrupted wave must halt'
 DESCENDANT=$(cat "$T/descendant.pid")
 ! kill -0 "$DESCENDANT" 2>/dev/null || fail 'descendant survived wave cancellation'
-[ ! -e .claude/super-board/codex-wave.pid ] && [ -z "$(ls -A .claude/super-board/inflight)" ] || fail 'interrupted wave leaves no live locks'
+[ ! -e .claude/drover/codex-wave.pid ] && [ -z "$(ls -A .claude/drover/inflight)" ] || fail 'interrupted wave leaves no live locks'
 echo "PASS: test-codex-lane.sh [$SB_LANE_ENTRY] (model/ladders/router/review/sandbox/results/wave/halt/cancellation)"

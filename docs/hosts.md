@@ -15,7 +15,7 @@ Every host also needs `gh`, `jq`, bash 3.2+ and Python 3.9+.
 
 `drover-host.sh [--config <config.json>]` prints one value. First match wins:
 
-1. `SUPER_BOARD_HOST=claude|codex|opencode`, the manual override. Any other value exits 64.
+1. `DROVER_HOST=claude|codex|opencode`, the manual override. Any other value exits 64.
 2. `CODEX_THREAD_ID` or `CODEX_SESSION_ID` → `codex`.
 3. `OPENCODE=1` → `opencode`. Checked before `CLAUDECODE`, which leaks into an OpenCode
    session started from Claude Code. `AGENT=1` is ignored: other tools set it too.
@@ -27,7 +27,7 @@ Every host also needs `gh`, `jq`, bash 3.2+ and Python 3.9+.
 A live env sign beats the saved config, so a Codex lane started from a Claude-configured
 board still answers `codex`.
 
-Onboard always writes `host` into `.claude/super-board/configs/<slug>.json`.
+Onboard always writes `host` into `.claude/drover/configs/<slug>.json`.
 `drover-setup.py fix` adds a missing one from `--host`; `check` flags any other value.
 
 ## Evidence

@@ -85,7 +85,7 @@ REMOTE=$(jq -r '.repo.remote // empty' "$CONFIG")
 REPO_FLAG=()
 [ -z "$REMOTE" ] || REPO_FLAG=(-R "$(echo "$REMOTE" | sed -E 's#(git@github\.com:|https://github\.com/)##; s#\.git$##')")
 
-BIN="${SUPER_BOARD_BIN:-}"
+BIN="${DROVER_BIN:-}"
 if [ -z "$BIN" ]; then
   # Installed: .claude/skills/super-collect/scripts → .claude/bin. Pack: skills/… → scripts/.
   ROOT3=$(cd "$(dirname "$0")/../../.." 2>/dev/null && pwd)
@@ -93,7 +93,7 @@ if [ -z "$BIN" ]; then
     [ -x "$d/drover-qa-file-bug.sh" ] && { BIN="$d"; break; }
   done
 fi
-[ -n "$BIN" ] || die "cannot find drover-qa-file-bug.sh — set SUPER_BOARD_BIN or run install.sh" 70
+[ -n "$BIN" ] || die "cannot find drover-qa-file-bug.sh — set DROVER_BIN or run install.sh" 70
 
 # Router-owned duplicate/adopt writes share the same halt as the child filers.
 GITHUB_READ="$BIN/drover-github-read.py"
@@ -239,8 +239,8 @@ trap 'rm -f "$BODY_TMP"' EXIT
   if [ -n "$CLOSED_HIT" ]; then
     echo; echo "> Recurrence: this fingerprint was last filed as #${CLOSED_HIT}, which is closed."
   fi
-  echo; echo "<!-- super-collect-fingerprint: ${FP} -->"
-  echo "<!-- super-collect-source: ${SOURCE} -->"
+  echo; echo "<!-- drover-collect-fingerprint: ${FP} -->"
+  echo "<!-- drover-collect-source: ${SOURCE} -->"
 } > "$BODY_TMP"
 
 ERR=$(mktemp)
@@ -250,8 +250,8 @@ case "$TYPE" in
       --body-file "$BODY_TMP" --fingerprint "$FP" --column "$HOLD" ${AREA:+--area "$AREA"} 2>"$ERR"); RC=$? ;;
   *)
     case "$TYPE" in bug) KIND=bug; WEAK=0 ;; feature) KIND=feature; WEAK=1 ;; fix) KIND=tech-debt; WEAK=1 ;; esac
-    OUT=$(SUPER_QA_PROJECT_OWNER="$OWNER" SUPER_QA_PROJECT_TITLE="$PTITLE" \
-      SUPER_QA_TARGET_OPTION_NAME="$HOLD" SUPER_QA_ALLOW_WEAK_BODY="$WEAK" SUPER_QA_REPO="$REPO_NAME" \
+    OUT=$(DROVER_QA_PROJECT_OWNER="$OWNER" DROVER_QA_PROJECT_TITLE="$PTITLE" \
+      DROVER_QA_TARGET_OPTION_NAME="$HOLD" DROVER_QA_ALLOW_WEAK_BODY="$WEAK" DROVER_QA_REPO="$REPO_NAME" \
       "$BIN/drover-qa-file-bug.sh" --title "$TITLE" --body-file "$BODY_TMP" --kind "$KIND" \
       --priority "$PRIORITY" --fingerprint "$FP" ${AREA:+--area "$AREA"} 2>"$ERR"); RC=$? ;;
 esac

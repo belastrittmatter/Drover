@@ -206,7 +206,7 @@ For every spec run, the report-fixture must capture and persist:
 
 The fixture **already captures** all of the above via
 `e2e/lib/report-fixture.ts`. Disk writes are gated behind
-`SUPER_QA_FORENSICS=1`, which the orchestrator sets for every iter. The Sentry probe needs `SENTRY_AUTH_TOKEN`; if missing, it
+`DROVER_QA_FORENSICS=1`, which the orchestrator sets for every iter. The Sentry probe needs `SENTRY_AUTH_TOKEN`; if missing, it
 logs `sentryProbeSkippedReason` and continues.
 
 **API:** access via `report.forensics.{consoleErrors, pageErrors,
@@ -586,7 +586,7 @@ items that match these rules — and **only** these:
 
 Bugs are tracked in **GitHub Issues, in the `Bug` column of the resolved
 **Super Ultimate QA** project** (override the column with
-`SUPER_QA_TARGET_OPTION_NAME`),
+`DROVER_QA_TARGET_OPTION_NAME`),
 not in markdown files. The `iteration-N.md` bug section is the per-iter audit
 trail; the GH issue is the persistent tracker that you, the human, and any
 future `/super-build` worker can pick up.

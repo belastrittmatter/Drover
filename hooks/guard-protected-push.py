@@ -5,7 +5,7 @@ Opt-in. `super-board onboard` asks once ("Block direct/force pushes to main?") a
 `install.sh --protect-main` wires it. Lanes push feature branches and merge through
 `drover-merge-gate.sh` (`gh pr merge`), so nothing in the loop needs to push a base.
 
-Protected: main, master, every `base_branch` in .claude/super-board/configs/*.json, and
+Protected: main, master, every `base_branch` in .claude/drover/configs/*.json, and
 any name in SB_PROTECTED_BRANCHES (comma-separated). A `git push` is denied when it would
 update or delete one of them: an explicit refspec (`feat:main`, `+main`, `HEAD:refs/heads/main`,
 `--delete main`), `--all` / `--mirror`, or a bare `git push` / `git push origin HEAD` while the
@@ -132,7 +132,7 @@ def current_branch(d):
 
 def protected_branches(project_dir):
     names = {"main", "master"}
-    for p in glob.glob(os.path.join(project_dir, ".claude", "super-board", "configs", "*.json")):
+    for p in glob.glob(os.path.join(project_dir, ".claude", "drover", "configs", "*.json")):
         try:
             base = json.load(open(p)).get("base_branch")
             if isinstance(base, str) and base:

@@ -2,7 +2,7 @@
 # drover-stop.sh — graceful shutdown of an in-flight super-board run.
 #
 # What it does:
-#   1. Find every in-flight worker (lock files under .claude/super-board/inflight/).
+#   1. Find every in-flight worker (lock files under .claude/drover/inflight/).
 #      Stop any Codex wave and its lane process groups before comments/releases.
 #   2. For each one, post a "stopped mid-flight" comment on the issue AND its PR
 #      (with last commit, lane, and resume hint) — so context survives the kill.
@@ -29,7 +29,7 @@
 #
 # Exit codes:
 #   0  clean stop (or nothing to stop)
-#   64 missing arg + no .claude/super-board/active
+#   64 missing arg + no .claude/drover/active
 #   66 config not found
 
 set -euo pipefail
@@ -37,15 +37,15 @@ set -euo pipefail
 # ───────────────────────────── args + paths ─────────────────────────────
 CONFIG_SLUG="${1:-}"
 if [ -z "$CONFIG_SLUG" ]; then
-  if [ -f .claude/super-board/active ]; then
-    CONFIG_SLUG=$(cat .claude/super-board/active)
+  if [ -f .claude/drover/active ]; then
+    CONFIG_SLUG=$(cat .claude/drover/active)
   else
-    echo "usage: $0 <config-slug>  (or set .claude/super-board/active)" >&2
+    echo "usage: $0 <config-slug>  (or set .claude/drover/active)" >&2
     exit 64
   fi
 fi
 
-CONFIG_PATH=".claude/super-board/configs/${CONFIG_SLUG}.json"
+CONFIG_PATH=".claude/drover/configs/${CONFIG_SLUG}.json"
 if [ ! -f "$CONFIG_PATH" ]; then
   echo "config not found: $CONFIG_PATH" >&2
   exit 66
@@ -53,7 +53,7 @@ fi
 
 # ───────────────────────────── config read ─────────────────────────────
 BOT_LOGIN=$(jq -r '.notifications.bot_identity // .bot_identity // ""' "$CONFIG_PATH")
-INFLIGHT_DIR=".claude/super-board/inflight"
+INFLIGHT_DIR=".claude/drover/inflight"
 RUN_DATE=$(date +%Y-%m-%d)
 RUN_MANIFEST="docs/drover/runs/${RUN_DATE}-${CONFIG_SLUG}.md"
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -166,7 +166,7 @@ fi
 
 DISPATCHER_PIDS=$(pgrep -f 'drover-run\.sh' 2>/dev/null || true)
 ORPHAN_WORKERS=$(pgrep -f 'claude -p .*super-board' 2>/dev/null || true)
-CODEX_WAVE_MARKER=".claude/super-board/codex-wave.pid"
+CODEX_WAVE_MARKER=".claude/drover/codex-wave.pid"
 CODEX_WAVE_PID=""
 if [ -f "$CODEX_WAVE_MARKER" ]; then
   CODEX_WAVE_PID=$(cat "$CODEX_WAVE_MARKER")

@@ -370,11 +370,11 @@ label: `[builder] [blocker] uses new Date() — replace with clock.now()`. Owner
 `qa`, `reviewer`.
 
 **Reviewer report** — ONE comment per PR, edited in place every round (find it by the
-`<!-- super-review:report -->` marker, PATCH it; post a new one only on the first round).
+`<!-- drover-review:report -->` marker, PATCH it; post a new one only on the first round).
 R-ids never change; a new finding takes the next free id.
 
 ```
-<!-- super-review:report -->
+<!-- drover-review:report -->
 [reviewer] [report] ❌ bounced · round 2
 Did: re-checked R1–R2, fresh pass skipped (R2 open)
 ✅ Done: R1 fixed `src/cart.py:12`

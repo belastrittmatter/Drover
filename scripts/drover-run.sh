@@ -6,7 +6,7 @@
 #
 # Anti-zombie controls (added 2026-05-22 after #381 worker-storm incident):
 #   1. Orphan scan on startup — refuses to start if super-board claude workers already running.
-#   2. Issue-level lock files in .claude/super-board/inflight/<N> — survives runner restart.
+#   2. Issue-level lock files in .claude/drover/inflight/<N> — survives runner restart.
 #   3. Atomic GitHub assignee claim BEFORE spawning worker (closes 10-30s claude -p cold-start race).
 #   4. Rate-limit guard — sleeps until reset when GraphQL remaining < 200.
 #   5. Per-tick project-items cache — one gh call per tick, not per column lookup.
@@ -49,16 +49,16 @@ if [ "${SB_LIB_ONLY:-0}" = "1" ]; then
   CONFIG_SLUG="${CONFIG_SLUG:-lib}"
   CONFIG_PATH="${CONFIG_PATH:-/dev/null}"
 elif [ -z "$CONFIG_SLUG" ]; then
-  if [ -f .claude/super-board/active ]; then
-    CONFIG_SLUG=$(cat .claude/super-board/active)
+  if [ -f .claude/drover/active ]; then
+    CONFIG_SLUG=$(cat .claude/drover/active)
   else
-    echo "usage: $0 <config-slug>  (or set .claude/super-board/active)" >&2
+    echo "usage: $0 <config-slug>  (or set .claude/drover/active)" >&2
     exit 64
   fi
 fi
 
 if [ "${SB_LIB_ONLY:-0}" != "1" ]; then
-CONFIG_PATH=".claude/super-board/configs/${CONFIG_SLUG}.json"
+CONFIG_PATH=".claude/drover/configs/${CONFIG_SLUG}.json"
 if [ ! -f "$CONFIG_PATH" ]; then
   echo "config not found: $CONFIG_PATH" >&2
   exit 66
@@ -104,8 +104,8 @@ RUN_MANIFEST="docs/drover/runs/${RUN_DATE}-${CONFIG_SLUG}.md"
 # Per-worker logs (issue #13). Workers used to be spawned with >/dev/null, so the run
 # log could never show what a worker was doing during a 13-minute silence.
 WORKER_LOG_DIR="docs/drover/runs/${RUN_DATE}-${CONFIG_SLUG}-workers"
-INFLIGHT_DIR=".claude/super-board/inflight"
-mkdir -p "docs/drover/runs" "$WORKER_LOG_DIR" .claude/worktrees "$INFLIGHT_DIR"
+INFLIGHT_DIR=".claude/drover/inflight"
+mkdir -p "docs/drover/runs" "$WORKER_LOG_DIR" .drover/worktrees "$INFLIGHT_DIR"
 fi  # end non-lib-only setup
 
 # Defaults so the helpers below are safe to source under `set -u` in lib-only mode.
@@ -497,7 +497,7 @@ check_legacy_worktrees() {
   for wt in .worktrees/issue-*; do
     [ -e "$wt" ] || continue
     log "🛑 legacy worktree $wt exists — stop its worker and inspect/preserve its edits"
-    log "    Move it with git worktree move to .claude/worktrees/ before resuming."
+    log "    Move it with git worktree move to .drover/worktrees/ before resuming."
     return 73
   done
   return 0
@@ -507,7 +507,7 @@ cleanup_stale_worktrees() {
   # This directory also holds Claude's unrelated worktrees. Only board names
   # belong to this sweep, and a failed Git removal must never become rm -rf.
   local wt branch
-  for wt in .claude/worktrees/issue-*; do
+  for wt in .drover/worktrees/issue-*; do
     [ -d "$wt" ] || continue
     [[ "${wt##*/}" =~ ^issue-[0-9]+(-(build|qa|review))?$ ]] || continue
     branch=$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
@@ -536,7 +536,7 @@ reclaim_stranded_building() {
     [ -n "$issue" ] || continue
     issue_locked "$issue" && continue
     branch=$(git ls-remote --heads origin "issue-${issue}-*" 2>/dev/null | head -1 | sed 's#.*refs/heads/##')
-    wt=".claude/worktrees/issue-${issue}-build"
+    wt=".drover/worktrees/issue-${issue}-build"
     if [ -d "$wt" ]; then
       wt_branch=$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
       if [ -z "$wt_branch" ] || ! git worktree remove "$wt" 2>/dev/null; then
@@ -605,7 +605,7 @@ if [ "$ORPHANS" -gt 0 ]; then
 fi
 
 # Workflow-backend mutual exclusion (see references/run-workflow.md §Preconditions).
-WAVE_LOCK=".claude/super-board/inflight/workflow-wave.lock"
+WAVE_LOCK=".claude/drover/inflight/workflow-wave.lock"
 if [ -f "$WAVE_LOCK" ]; then
   log "🛑 refusing to start: workflow-backend wave in flight ($WAVE_LOCK exists)."
   log "    If no wave is actually running, remove the stale lock: rm $WAVE_LOCK"

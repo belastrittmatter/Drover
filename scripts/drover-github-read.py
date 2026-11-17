@@ -65,11 +65,11 @@ def halt_path():
     result = subprocess.run(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'],
                             capture_output=True, text=True, timeout=5, cwd=cwd)
     if result.returncode != 0:
-        return cwd / '.claude/super-board/github-halt.json'
-    # One repo, every worktree: <main checkout>/.claude/super-board/ when the common
+        return cwd / '.claude/drover/github-halt.json'
+    # One repo, every worktree: <main checkout>/.claude/drover/ when the common
     # dir is <root>/.git; a submodule's (.git/modules/<path>) is not, so keep it inside.
     common = Path(result.stdout.strip())
-    state = common.parent / '.claude/super-board' if common.name == '.git' else common / 'super-board'
+    state = common.parent / '.claude/drover' if common.name == '.git' else common / 'drover'
     return state / 'github-halt.json'
 
 

@@ -42,7 +42,7 @@ class VerificationReadiness(unittest.TestCase):
                 subprocess.run(["git", "init", "-q", str(root)], check=True)
                 config = root / "config.json"
                 config.write_text(json.dumps({"verify_commands": []}))
-                lock = root / ".claude/super-board/inflight/1"
+                lock = root / ".claude/drover/inflight/1"
                 lock.parent.mkdir(parents=True)
                 lock.write_text("owned state")
                 binary = root / "bin/codex"
@@ -63,12 +63,12 @@ class VerificationReadiness(unittest.TestCase):
                                 else json.loads(result.stdout)["halted"])
                 self.assertEqual(lock.read_text(), "owned state")
                 self.assertFalse((root / "called").exists())
-                self.assertFalse((root / ".claude/super-board/codex-wave.pid").exists())
+                self.assertFalse((root / ".claude/drover/codex-wave.pid").exists())
 
     def test_setup_reports_configuration_error_without_inventing_checks(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
-            cfg = root / ".claude/super-board/configs/app.json"
+            cfg = root / ".claude/drover/configs/app.json"
             cfg.parent.mkdir(parents=True)
             cfg.write_text(json.dumps({"verify_commands": [" "]}))
             command = ["python3", str(ROOT / "scripts/drover-setup.py"),
@@ -84,14 +84,14 @@ class VerificationReadiness(unittest.TestCase):
     def test_legacy_run_stops_before_creating_run_state(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
-            cfg = root / ".claude/super-board/configs/app.json"
+            cfg = root / ".claude/drover/configs/app.json"
             cfg.parent.mkdir(parents=True)
             cfg.write_text(json.dumps({"worker_backend": "claude-p", "verify_commands": []}))
             result = subprocess.run(["bash", str(ROOT / "scripts/drover-run.sh"), "app"],
                                     cwd=root, capture_output=True, text=True)
             self.assertEqual(result.returncode, 9, result.stderr)
             self.assertFalse((root / "docs").exists())
-            self.assertFalse((root / ".claude/super-board/inflight").exists())
+            self.assertFalse((root / ".claude/drover/inflight").exists())
 
 
 if __name__ == "__main__":

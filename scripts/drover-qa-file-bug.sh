@@ -7,7 +7,7 @@
 # human can triage the whole stream with `gh issue list -l source:qa`.
 #
 # The division of labour: the agent writes evidence, this script writes
-# machinery. It prepends `## Board summary`, appends the hidden `super-qa-meta`
+# machinery. It prepends `## Board summary`, appends the hidden `drover-qa-meta`
 # block, derives a fingerprint when none is given, and refuses bodies that would
 # leave a future headless session re-discovering the bug from scratch: the body
 # needs Problem · Context (lettered steps under Where) · Evidence (the folded
@@ -27,12 +27,12 @@
 #        the board never triggers it)
 #
 # Project resolution (per super-qa/SKILL.md → "Project resolution"):
-#   owner  $SUPER_QA_PROJECT_OWNER, else the current repo's owner
-#   title  $SUPER_QA_PROJECT_TITLE, else "Super Ultimate QA"
+#   owner  $DROVER_QA_PROJECT_OWNER, else the current repo's owner
+#   title  $DROVER_QA_PROJECT_TITLE, else "Super Ultimate QA"
 # Never falls back to the repo's primary project — column semantics differ.
 #
-# Column: "Bug", override with $SUPER_QA_TARGET_OPTION_NAME.
-# Body checks bypass: SUPER_QA_ALLOW_WEAK_BODY=1 (not during autonomous runs).
+# Column: "Bug", override with $DROVER_QA_TARGET_OPTION_NAME.
+# Body checks bypass: DROVER_QA_ALLOW_WEAK_BODY=1 (not during autonomous runs).
 #
 # Stdout: the issue number — new, or the existing one on a fingerprint hit.
 # Exits:  0 ok · 64 bad args · 66 unreadable/weak body · 70 GH API failure
@@ -96,7 +96,7 @@ section() {
     on { print }'
 }
 
-if [ "${SUPER_QA_ALLOW_WEAK_BODY:-0}" != "1" ]; then
+if [ "${DROVER_QA_ALLOW_WEAK_BODY:-0}" != "1" ]; then
   MISSING=""
   for s in "Problem" "Context" "Evidence" "Fix" "Acceptance Criteria" "Risk"; do
     grep -qiE "^#{1,3}[[:space:]]+${s}[[:space:]]*$" <<<"$BODY_RAW" || MISSING="${MISSING}${MISSING:+, }${s}"
@@ -132,7 +132,7 @@ if [ "${SUPER_QA_ALLOW_WEAK_BODY:-0}" != "1" ]; then
   # Template placeholders read like prose in angle brackets; real inline HTML is
   # a short known tag. Anything else with a space or a colon inside is a leftover.
   grep -qE '<[a-zA-Z][^>]*[[:space:]:][^>]*>' <<<"$PROSE" && LEFTOVER="${LEFTOVER}${LEFTOVER:+ and }<placeholder>"
-  [ -z "$LEFTOVER" ] || die "body still contains unfilled placeholders (${LEFTOVER}) — fill them or set SUPER_QA_ALLOW_WEAK_BODY=1" 66
+  [ -z "$LEFTOVER" ] || die "body still contains unfilled placeholders (${LEFTOVER}) — fill them or set DROVER_QA_ALLOW_WEAK_BODY=1" 66
 fi
 [ "$CHECK_ONLY" -eq 0 ] || exit 0
 
@@ -148,22 +148,22 @@ GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/drover-github-read.py
 python3 "$GITHUB_READ" --check || exit $?
 
 # --- project resolution -----------------------------------------------------
-OWNER="${SUPER_QA_PROJECT_OWNER:-}"
+OWNER="${DROVER_QA_PROJECT_OWNER:-}"
 if [ -z "$OWNER" ]; then
   OWNER=$(python3 "$GITHUB_READ" --kind scalar -- repo view --json owner -q .owner.login) || exit $?
 fi
-PROJECT_TITLE="${SUPER_QA_PROJECT_TITLE:-Super Ultimate QA}"
-TARGET_COLUMN="${SUPER_QA_TARGET_OPTION_NAME:-Bug}"
+PROJECT_TITLE="${DROVER_QA_PROJECT_TITLE:-Super Ultimate QA}"
+TARGET_COLUMN="${DROVER_QA_TARGET_OPTION_NAME:-Bug}"
 
 PROJECT_LIST=$(python3 "$GITHUB_READ" --kind projects -- project list --owner "$OWNER" --format json) || exit $?
 NUMBER=$(echo "$PROJECT_LIST" | jq -r --arg t "$PROJECT_TITLE" \
   '[.projects[] | select((.title // "" | ascii_downcase) == ($t | ascii_downcase))] | first | .number // empty')
 # Do NOT silently fall back to the repo's primary project — its columns mean
 # different things, and QA cards would enter a lane that never expects them.
-[ -n "$NUMBER" ] || die "no project titled '${PROJECT_TITLE}' under ${OWNER} — create one, or set SUPER_QA_PROJECT_TITLE" 70
+[ -n "$NUMBER" ] || die "no project titled '${PROJECT_TITLE}' under ${OWNER} — create one, or set DROVER_QA_PROJECT_TITLE" 70
 
 # --- dedupe -----------------------------------------------------------------
-REPO_NAME="${SUPER_QA_REPO:-}"
+REPO_NAME="${DROVER_QA_REPO:-}"
 if [ -z "$REPO_NAME" ]; then
   REPO_NAME=$(python3 "$GITHUB_READ" --kind scalar -- repo view --json nameWithOwner --jq .nameWithOwner) || exit $?
 fi
@@ -220,7 +220,7 @@ trap 'rm -f "$BODY_TMP"' EXIT
   fi
 
   echo
-  echo "<!-- super-qa-meta"
+  echo "<!-- drover-qa-meta"
   echo "route: ${ROUTE:-none}"
   echo "spec: ${SPEC:-none}"
   echo "iteration: ${ITER:-none}"

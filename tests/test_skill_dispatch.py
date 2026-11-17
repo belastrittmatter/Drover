@@ -22,7 +22,7 @@ class Dispatch(unittest.TestCase):
         self.root, self.home, self.bin = [self.base / name for name in ['repo','home','bin']]
         for path in [self.root,self.home,self.bin]: path.mkdir()
         self.env = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.environ['PATH'],
-                        SUPER_BOARD_SKILLS_HOME=str(self.home), SB_GITHUB_RETRY_DELAY='0',
+                        DROVER_SKILLS_HOME=str(self.home), SB_GITHUB_RETRY_DELAY='0',
                         SB_GITHUB_HALT_FILE=str(self.base / 'halt.json'), CALL_LOG=str(self.base / 'calls.jsonl'))
         subprocess.run(['git','init','-q',str(self.root)], check=True)
         self.config = self.base / 'config.json'
@@ -53,12 +53,12 @@ output.write_text(json.dumps(result))
 ''')
         self.tool('claude', "import json,os\nwith open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps({'tool':'claude'})+'\\n')\n")
         self.tool('npx', "import json,os,sys\nwith open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps({'tool':'npx','args':sys.argv[1:]})+'\\n')\n")
-        self.state = self.root / '.claude/super-board'
+        self.state = self.root / '.claude/drover'
         (self.state / 'inflight').mkdir(parents=True)
         (self.state / 'inflight/99').write_text('PID=99999\nLANE=review\n')
         (self.state / 'approval.json').write_text('{"human":"existing"}')
-        (self.root / '.claude/worktrees/preserved').mkdir(parents=True)
-        (self.root / '.claude/worktrees/preserved/user.txt').write_text('existing work')
+        (self.root / '.drover/worktrees/preserved').mkdir(parents=True)
+        (self.root / '.drover/worktrees/preserved/user.txt').write_text('existing work')
 
     def tool(self,name,source):
         compile(source, name, 'exec')
@@ -79,7 +79,7 @@ output.write_text(json.dumps(result))
     def preserved(self):
         self.assertEqual((self.state/'inflight/99').read_text(),'PID=99999\nLANE=review\n')
         self.assertEqual((self.state/'approval.json').read_text(),'{"human":"existing"}')
-        self.assertEqual((self.root/'.claude/worktrees/preserved/user.txt').read_text(),'existing work')
+        self.assertEqual((self.root/'.drover/worktrees/preserved/user.txt').read_text(),'existing work')
         self.assertFalse((self.state/'codex-wave.pid').exists())
 
     def test_missing_all_remaining_chains_halt_before_router_or_marker(self):
@@ -133,7 +133,7 @@ output.write_text(json.dumps(result))
 source "$1/scripts/drover-run.sh"
 BOT_LOGIN=bot
 PROJECT_ITEMS_JSON='{"items":[{"status":"Ready","content":{"number":1},"labels":["docs"]}]}'
-INFLIGHT_DIR=.claude/super-board/inflight
+INFLIGHT_DIR=.claude/drover/inflight
 WORKER_LOG_DIR="$PWD"
 dispatch_lane build 1
 '''
@@ -152,7 +152,7 @@ dispatch_lane build 1
         result=subprocess.run(['bash',str(KIT/'skills/super-build/scripts/drover-build-dispatch.sh'),'1'],cwd=self.root,env=self.env,text=True,capture_output=True)
         self.assertEqual(result.returncode,10,result.stderr)
         self.assertFalse((self.root/'.planning/super-build-logs').exists())
-        self.assertFalse((self.root/'.claude/worktrees/issue-1').exists())
+        self.assertFalse((self.root/'.drover/worktrees/issue-1').exists())
         self.assertTrue(all(c['tool']=='gh' and c['args'][:2]==['issue','view'] for c in self.calls()))
         self.preserved()
 

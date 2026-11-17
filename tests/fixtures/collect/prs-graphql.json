@@ -3,9 +3,9 @@
   "mergedAt": "{{ago:12d}}", "author": {"login": "dana", "__typename": "User"},
   "comments": {"nodes": [
    {"author": {"login": "super-board-bot", "__typename": "Bot"}, "createdAt": "{{ago:13d}}",
-    "body": "<!-- super-review:report -->\nReviewer — bounced\nRound: 1\nFindings:\n  • R1 [builder] src/reports/monthly.ts:42 — groups rows with `new Date(row.date).getMonth()`; `row.date` is a date-only string (`2026-09-01`), parsed as UTC midnight, so west of UTC the 1st lands in the previous month (AC 2)\nNext: Ready"},
+    "body": "<!-- drover-review:report -->\nReviewer — bounced\nRound: 1\nFindings:\n  • R1 [builder] src/reports/monthly.ts:42 — groups rows with `new Date(row.date).getMonth()`; `row.date` is a date-only string (`2026-09-01`), parsed as UTC midnight, so west of UTC the 1st lands in the previous month (AC 2)\nNext: Ready"},
    {"author": {"login": "super-board-bot", "__typename": "Bot"}, "createdAt": "{{ago:12d}}",
-    "body": "<!-- super-review:report -->\nReviewer — merge-ready\nRound: 2\nPrior findings:\n  • R1 fixed — src/reports/monthly.ts:42 now uses getUTCMonth()\nNext: Done"}]},
+    "body": "<!-- drover-review:report -->\nReviewer — merge-ready\nRound: 2\nPrior findings:\n  • R1 fixed — src/reports/monthly.ts:42 now uses getUTCMonth()\nNext: Done"}]},
   "reviews": {"nodes": [{"author": {"login": "eric", "__typename": "User"}, "state": "APPROVED", "body": "LGTM after the UTC fix."}]},
   "reviewThreads": {"nodes": [
    {"path": "src/reports/monthly.ts", "isResolved": true, "comments": {"nodes": [
@@ -15,9 +15,9 @@
   "mergedAt": "{{ago:6d}}", "author": {"login": "sam", "__typename": "User"},
   "comments": {"nodes": [
    {"author": {"login": "super-board-bot", "__typename": "Bot"}, "createdAt": "{{ago:7d}}",
-    "body": "<!-- super-review:report -->\nReviewer — bounced\nRound: 1\nFindings:\n  • R1 [builder] src/budgets/alerts.ts:18 — `new Date(budget.month + '-01').getMonth()` puts the 1st in the prior month for users west of UTC; the alert fires for the wrong month (AC 1)\nNext: Ready"},
+    "body": "<!-- drover-review:report -->\nReviewer — bounced\nRound: 1\nFindings:\n  • R1 [builder] src/budgets/alerts.ts:18 — `new Date(budget.month + '-01').getMonth()` puts the 1st in the prior month for users west of UTC; the alert fires for the wrong month (AC 1)\nNext: Ready"},
    {"author": {"login": "super-board-bot", "__typename": "Bot"}, "createdAt": "{{ago:6d}}",
-    "body": "<!-- super-review:report -->\nReviewer — merge-ready\nRound: 2\nPrior findings:\n  • R1 fixed — src/budgets/alerts.ts:18 parses with Date.UTC\nNext: Done"}]},
+    "body": "<!-- drover-review:report -->\nReviewer — merge-ready\nRound: 2\nPrior findings:\n  • R1 fixed — src/budgets/alerts.ts:18 parses with Date.UTC\nNext: Done"}]},
   "reviews": {"nodes": [{"author": {"login": "coderabbitai", "__typename": "Bot"}, "state": "COMMENTED",
     "body": "Date-only ISO strings are parsed as UTC but read back with local getters in two places in this PR. Consider a shared `parseDateOnly()` helper."}]},
   "reviewThreads": {"nodes": [
@@ -28,7 +28,7 @@
   "mergedAt": "{{ago:3d}}", "author": {"login": "dana", "__typename": "User"},
   "comments": {"nodes": [
    {"author": {"login": "super-board-bot", "__typename": "Bot"}, "createdAt": "{{ago:3d}}",
-    "body": "<!-- super-review:report -->\nReviewer — merge-ready\nRound: 1\nFindings: none\nNext: Done"}]},
+    "body": "<!-- drover-review:report -->\nReviewer — merge-ready\nRound: 1\nFindings: none\nNext: Done"}]},
   "reviews": {"nodes": [{"author": {"login": "eric", "__typename": "User"}, "state": "APPROVED", "body": "nit: 'Recieve' -> 'Receive' in the toggle label. Otherwise good."}]},
   "reviewThreads": {"nodes": [
    {"path": "src/settings/NotificationForm.tsx", "isResolved": true, "comments": {"nodes": [

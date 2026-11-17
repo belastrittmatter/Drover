@@ -76,7 +76,7 @@ esac
 STUB
 chmod +x "$WORK/gh"
 export PATH="$WORK:$PATH" GH_LOG="$WORK/gh.log" BODY_LOG="$WORK/body.filed" COMMENT_LOG="$WORK/comment.body"
-export SUPER_BOARD_BIN="$REPO_ROOT/scripts"
+export DROVER_BIN="$REPO_ROOT/scripts"
 
 run() { : > "$GH_LOG"; : > "$BODY_LOG"; : > "$COMMENT_LOG"; "$SCRIPT" --config "$WORK/config.json" "$@" 2>"$WORK/err"; }
 code() { run "$@" >/dev/null; echo $?; }
@@ -95,7 +95,7 @@ for args in BUG GAP FIX; do
 done
 
 echo "── dedupe: open hit → 'Seen again' comment, never a second card"
-OPEN='[{"number":301,"state":"OPEN","body":"…\n<!-- super-collect-fingerprint: err|sentry|4411 -->"}]'
+OPEN='[{"number":301,"state":"OPEN","body":"…\n<!-- drover-collect-fingerprint: err|sentry|4411 -->"}]'
 is  "dry-run plans a duplicate" "duplicate|#301|bug|Checkout crashes when the last item is removed" "$(STUB_HITS="$OPEN" run "${BUG[@]}")"
 OUT=$(STUB_HITS="$OPEN" run "${BUG[@]}" --yes)
 is  "--yes returns the existing issue" "301" "$OUT"
@@ -110,11 +110,11 @@ has "dedupe paginates repo-wide all-state history" "$(cat "$GH_LOG")" "states:[O
 has "history read requests complete pages" "$(cat "$GH_LOG")" "--paginate --slurp"
 
 echo "── dedupe: closed-only hit → recurrence, filed again naming the closed issue"
-CLOSED='[{"number":88,"state":"CLOSED","body":"<!-- super-collect-fingerprint: prs|dates|date-only-local-getters -->"}]'
+CLOSED='[{"number":88,"state":"CLOSED","body":"<!-- drover-collect-fingerprint: prs|dates|date-only-local-getters -->"}]'
 is  "dry-run plans a recurrence" "recurrence|#88|fix|Date-only strings read with local getters|Backlog" "$(STUB_HITS="$CLOSED" run "${FIX[@]}")"
 is  "--yes files a new issue" "412" "$(STUB_HITS="$CLOSED" run "${FIX[@]}" --yes)"
 has "body names the closed issue" "$(cat "$BODY_LOG")" "> Recurrence: this fingerprint was last filed as #88, which is closed."
-has "body keeps the same fingerprint" "$(cat "$BODY_LOG")" "<!-- super-collect-fingerprint: prs|dates|date-only-local-getters -->"
+has "body keeps the same fingerprint" "$(cat "$BODY_LOG")" "<!-- drover-collect-fingerprint: prs|dates|date-only-local-getters -->"
 lacks "no comment on the closed issue" "$(cat "$GH_LOG")" "issue comment"
 
 echo "── ticket format: Problem · Context · Fix · Acceptance Criteria · Risk"
@@ -159,8 +159,8 @@ has "routes via the QA filer as a feature" "$(cat "$GH_LOG")" "--label feature"
 has "labels analytics"        "$(cat "$GH_LOG")" "--add-label analytics"
 has "labels collect:posthog"  "$(cat "$GH_LOG")" "--add-label collect:posthog"
 has "labels source:collect"   "$(cat "$GH_LOG")" "--add-label source:collect"
-has "stamps gap fingerprint"  "$(cat "$BODY_LOG")" "<!-- super-collect-fingerprint: gap|receipt-upload -->"
-has "stamps the source"       "$(cat "$BODY_LOG")" "<!-- super-collect-source: posthog -->"
+has "stamps gap fingerprint"  "$(cat "$BODY_LOG")" "<!-- drover-collect-fingerprint: gap|receipt-upload -->"
+has "stamps the source"       "$(cat "$BODY_LOG")" "<!-- drover-collect-source: posthog -->"
 has "lands in Backlog"        "$(cat "$GH_LOG")" "opt_Backlog"
 lacks "never Ready"           "$(cat "$GH_LOG")" "opt_Ready"
 is  "gap| needs a workflow key" 64 "$(code --type feature --source posthog --title T --body-file "$TICKETS/feature-gap-receipt-upload.md" --fingerprint "gap|")"
@@ -173,7 +173,7 @@ has "files as tech-debt" "$(cat "$GH_LOG")" "--label tech-debt"
 has "labels collect:prs" "$(cat "$GH_LOG")" "--add-label collect:prs"
 
 echo "── dedupe matches the fingerprint exactly"
-PREFIX='[{"number":301,"state":"OPEN","body":"<!-- super-collect-fingerprint: err|sentry|4411 -->"}]'
+PREFIX='[{"number":301,"state":"OPEN","body":"<!-- drover-collect-fingerprint: err|sentry|4411 -->"}]'
 is  "Sentry 441 is not a duplicate of Sentry 4411" \
   "would-file" "$(STUB_HITS="$PREFIX" run --type bug --source sentry --title T --body-file "$TICKETS/bug-sentry-4411.md" --fingerprint "err|sentry|441" | cut -d'|' -f1)"
 

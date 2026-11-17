@@ -356,7 +356,7 @@ They also apply if you need to hand-render via the model-render fallback when
 the script is missing.
 
 - **Active config resolution:** load
-  `.claude/super-board/configs/<slug>.json` for the resolved project slug.
+  `.claude/drover/configs/<slug>.json` for the resolved project slug.
   Header fields come straight from the JSON.
 - **Claim assignee resolution:** the in-flight worker scan must match the
   identity recorded in the config under `notifications.bot_identity`. This may

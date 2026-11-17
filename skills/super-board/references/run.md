@@ -59,8 +59,8 @@ Progress: ✅ onboard  →  ✅ lint  →  🤖 run (you are here)
 | `pre-flight.md` all items `[✓]` | Halt: "Pre-flight incomplete — fix these: [list]." |
 | No issues missing ACs in active columns | Halt: "N issues need clarification. Run `super-board lint`." |
 | Clean git working tree on base branch | Halt: "Working tree dirty. Stash or commit before running." |
-| Legacy worktrees | If `.worktrees/issue-*` exists, halt before dispatch. Stop its worker, inspect/preserve edits, then `git worktree move` it to the matching `.claude/worktrees/` path. Never delete it as part of an upgrade. |
-| Stale worktree scan | Scan only `.claude/worktrees/issue-<N>` and `issue-<N>-build/qa/review`. If its named branch is gone, use `git worktree remove` without force. Keep detached, dirty, locked, unregistered, or unrelated folders; log failures for inspection. A missing board label alone is not permission to delete work. |
+| Legacy worktrees | If `.worktrees/issue-*` exists, halt before dispatch. Stop its worker, inspect/preserve edits, then `git worktree move` it to the matching `.drover/worktrees/` path. Never delete it as part of an upgrade. |
+| Stale worktree scan | Scan only `.drover/worktrees/issue-<N>` and `issue-<N>-build/qa/review`. If its named branch is gone, use `git worktree remove` without force. Keep detached, dirty, locked, unregistered, or unrelated folders; log failures for inspection. A missing board label alone is not permission to delete work. |
 | Production-merge guard | If `base_branch == "main"` AND `human_approves_merge == false` AND `merge_policy.default != "human"` AND `merge_policy.allow_auto_on_production != true` AND production-detection signals fire (see onboard → base branch), halt with: `🛡 Refusing to start: would auto-merge to production main. Set merge_policy.default: "human", switch base_branch to staging, or re-run super-board onboard to opt in explicitly.` |
 | Orphan-worker scan (added 2026-05-22 after #381 worker storm) | `pgrep -f 'claude -p .*super-board run'` must return zero. If any super-board worker is already alive from a prior crashed run, halt with: `🛑 ${N} super-board workers already running. Stop them first: pkill -f 'claude -p .*super-board run'`. The dispatcher must never run while orphan workers exist — they will collide on assignee claims and produce duplicate PRs. |
 | Database reach | Run every `migrations.checks[env]` for an env in `allowed_envs` (read-only, e.g. `supabase migration list --db-url …`). On failure halt with its error: "Migrate URL for <env> does not connect — fix it before a wave builds work the gate cannot land." |
@@ -85,17 +85,17 @@ reads the label of the top Ready card the same way (`card_lane`).
 ```
 Builder:   Ready → Building → QA
            worker   = super-build skill
-           worktree = .claude/worktrees/issue-<N>-build/
+           worktree = .drover/worktrees/issue-<N>-build/
            branch   = issue-<N>-<slug>  (created here, persists across lanes)
 
 Tester:    QA → Review            (a `qa` card: Ready → QA → Review)
            worker   = super-qa skill (issue-scoped mode)
-           worktree = .claude/worktrees/issue-<N>-qa/
+           worktree = .drover/worktrees/issue-<N>-qa/
            branch   = same issue-<N>-<slug>  (a `qa` card: the Tester creates it)
 
 Reviewer:  Review → Done
            worker   = super-review skill
-           worktree = .claude/worktrees/issue-<N>-review/
+           worktree = .drover/worktrees/issue-<N>-review/
            branch   = same issue-<N>-<slug>  (squash-merged on approval)
 ```
 
@@ -296,7 +296,7 @@ column), never built unchecked. `qa` cards are not pre-flighted: nothing is buil
 
 0. Legacy backend only: run the Builder pre-flight above in a sub-agent. Anything but `proceed`
    (or a conflict-note `sequence`) → do what its row says, release the claim, exit.
-1. Create worktree `.claude/worktrees/issue-<N>-build/` off `config.base_branch`.
+1. Create worktree `.drover/worktrees/issue-<N>-build/` off `config.base_branch`.
 2. Create branch `issue-<N>-<slug>` from `config.base_branch` — unless one already exists
    (the card came back from Building after a stopped run): then check it out, keep its
    commits and open PR, and continue from where it stopped.
@@ -320,14 +320,14 @@ column), never built unchecked. `qa` cards are not pre-flighted: nothing is buil
 2. Read PR review threads on this branch's PR; filter `[builder]` prefix.
 3. For each unresolved `[builder]` thread: read file:line + suggested fix, apply, resolve thread via graphql mutation.
 4. Address any new failure feedback from Tester's latest `❌` comment.
-   (A Reviewer bounce reaches you as those same `[builder]` threads, listed in the latest `<!-- super-review:report -->` comment. A finding the Reviewer re-opened as `not fixed` was resolved without a fix last time — fix the code, not just the thread.)
+   (A Reviewer bounce reaches you as those same `[builder]` threads, listed in the latest `<!-- drover-review:report -->` comment. A finding the Reviewer re-opened as `not fixed` was resolved without a fix last time — fix the code, not just the thread.)
 5. Commit + push to same branch.
 6. Verify ALL `[builder]` threads are resolved. If not, return to step 3.
 7. Refresh [PR author notes](pr-author-notes.md), rewrite `status`, `solution`, `history` blocks; post `[builder] [report]` PR + issue comments. Move Building → QA. Clean up worktree.
 
 ### Tester (first pass — repo-backed)
 
-1. Pull latest of base; checkout `issue-<N>-<slug>` into worktree `.claude/worktrees/issue-<N>-qa/`.
+1. Pull latest of base; checkout `issue-<N>-<slug>` into worktree `.drover/worktrees/issue-<N>-qa/`.
    A `qa` card has no branch yet: move it Ready → QA, then create the branch from the base.
 2. `target.url` set → health-check it first. Unhealthy → Block.
 3. Read issue + PR + Builder's handoff comment.
@@ -375,7 +375,7 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
 
 ### Reviewer
 
-1. Worktree `.claude/worktrees/issue-<N>-review/` from current state of `issue-<N>-<slug>`.
+1. Worktree `.drover/worktrees/issue-<N>-review/` from current state of `issue-<N>-<slug>`.
 2. **Gate 1** — scan PR threads and their replies. [PR author notes](pr-author-notes.md)
    alone are explanations, not findings. Human questions or change requests in those
    threads still follow the normal review/blocking flow; the marker exempts no replies.
@@ -389,7 +389,7 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
 3b. **Prior-report check (review remembers — added 2.5.0).** Load the last Reviewer report on this PR as `prior_report`. One call:
    ```
    gh pr view <PR> --json comments \
-     --jq '[.comments[] | select(.body | contains("<!-- super-review:report -->"))] | last | {url, body} // {}'
+     --jq '[.comments[] | select(.body | contains("<!-- drover-review:report -->"))] | last | {url, body} // {}'
    ```
    - Empty → first review of this card. Skip to step 4; behave exactly as before.
    - Non-empty → the card was bounced and rebuilt. **Round 1** walks every finding in `prior_report` and marks each one `fixed` / `not fixed` / `no longer applies` (code it pointed at is gone or the AC changed), citing the file:line that proves it. A resolved thread is not proof — check the code.
@@ -421,7 +421,7 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
 8. Write the **Reviewer report** on every exit from step 3b on — bounce, block, human gate, merge (a Gate 1 thread bounce reviews nothing and writes none). It is ONE comment per PR, **edited in place** each round: find it by the marker (step 3b's lookup, plus `.url` — the number after `#issuecomment-` is its id) and `gh api -X PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`; post a new comment only when none exists. It is what step 3b reads next time, so the first line is the stable marker and every finding keeps its id (writing-standard.md § 4):
 
    ```
-   <!-- super-review:report -->
+   <!-- drover-review:report -->
    [reviewer] [report] ❌ bounced · round 2
    Did: checked R1–R2 against the code; fresh pass skipped (R2 open)
    ✅ Done: R1 fixed `src/api/stream.ts:54`
@@ -631,7 +631,7 @@ Worker-side assignee claim alone is **not sufficient** — `claude -p` cold-star
 The dispatcher MUST also:
 
 1. **Claim BEFORE spawning the worker** — `try_claim_assignee` runs in the dispatcher and only proceeds to `nohup claude -p` if it wins the assignee write. Closes the cold-start race.
-2. **Write a local in-flight lock** — `.claude/super-board/inflight/<issue-N>` contains the worker PID. `top_card_in_column` skips any issue with a live lock even if the assignee write hasn't propagated yet.
+2. **Write a local in-flight lock** — `.claude/drover/inflight/<issue-N>` contains the worker PID. `top_card_in_column` skips any issue with a live lock even if the assignee write hasn't propagated yet.
 3. **Cap one worker per lane** — track `BUILD_PID` / `QA_PID` / `REVIEW_PID`; do not dispatch to a lane whose prior PID is still alive.
 4. **Reap stale locks each tick** — `reap_finished_locks` removes any lock whose PID no longer exists.
 5. **Orphan-scan on startup** — refuse to start if any `claude -p .*super-board run` worker is already running from a prior crashed dispatcher.

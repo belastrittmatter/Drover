@@ -123,7 +123,7 @@ STUB
 chmod +x "$WORK/gh"
 export PATH="$WORK:$PATH" GH_LOG="$WORK/gh.log" BODY_LOG="$WORK/body.filed"
 export SB_COLLECT_STATE_DIR="$WORK/collect-state"
-export SUPER_BOARD_BIN="$REPO_ROOT/scripts"
+export DROVER_BIN="$REPO_ROOT/scripts"
 
 run() { [ "${KEEP_COLLECT_STATE:-0}" = 1 ] || rm -rf "$SB_COLLECT_STATE_DIR"; : > "$GH_LOG"; : > "$BODY_LOG"; "$SCRIPT" --config "$WORK/config.json" "$@" 2>"$WORK/err"; }
 BUG=(--type bug --source sentry --title "Checkout 500 on empty cart" --body-file "$WORK/bug.md" --fingerprint "err|sentry|4411")
@@ -174,7 +174,7 @@ is  "returns the new issue" "412" "$OUT"
 has "routes via the QA filer (source:qa label)" "$(cat "$GH_LOG")" "source:qa"
 has "lands in Backlog"        "$(cat "$GH_LOG")" "opt_Backlog"
 lacks "never Ready"           "$(cat "$GH_LOG")" "opt_Ready"
-has "stamps the fingerprint"  "$(cat "$BODY_LOG")" "super-collect-fingerprint: err|sentry|4411"
+has "stamps the fingerprint"  "$(cat "$BODY_LOG")" "drover-collect-fingerprint: err|sentry|4411"
 has "labels source:collect"   "$(cat "$GH_LOG")" "source:collect"
 
 echo "── filing a prs fix (weak-body bypass, own section check)"
@@ -195,7 +195,7 @@ has "labels collect:architecture" "$(cat "$GH_LOG")" "collect:architecture"
 echo "── posthog bug with extra labels (needs-triage, ux)"
 OUT=$(run --type bug --source posthog --title "Dead clicks on /checkout" --body-file "$WORK/bug.md" --fingerprint "posthog|dead_click|1a2b3c" --label needs-triage --label ux --yes)
 is  "returns the new issue"   "412" "$OUT"
-has "stamps posthog fingerprint" "$(cat "$BODY_LOG")" "super-collect-fingerprint: posthog|dead_click|1a2b3c"
+has "stamps posthog fingerprint" "$(cat "$BODY_LOG")" "drover-collect-fingerprint: posthog|dead_click|1a2b3c"
 has "labels needs-triage"     "$(cat "$GH_LOG")" "--add-label needs-triage"
 has "labels ux"               "$(cat "$GH_LOG")" "--add-label ux"
 has "labels collect:posthog"  "$(cat "$GH_LOG")" "collect:posthog"

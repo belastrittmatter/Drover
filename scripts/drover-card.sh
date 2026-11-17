@@ -28,7 +28,7 @@
 # Owner/number/repo come from --config (project.owner, project.number,
 # repo.remote), else $BUILD_LOOP_OWNER / $BUILD_LOOP_PROJECT and the origin remote.
 #
-# Cache: <main checkout>/.claude/super-board/cache/board-<owner>-<number>.json
+# Cache: <main checkout>/.claude/drover/cache/board-<owner>-<number>.json
 # (a submodule: <its git dir>/super-board/cache/), shared by every worktree. Option ids are reminted whenever someone edits the
 # column list, so a failed move drops the cache, re-reads it once, and retries
 # once — a stale id costs one extra point, never a wrong move.
@@ -86,8 +86,8 @@ cache_dir() {
   common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
   # Same rule as halt_path() in drover-github-read.py: a submodule's common
   # dir is .git/modules/<path>, shared-parent territory, so its state stays inside.
-  if [ -z "$common" ]; then echo "$PWD/.claude/super-board/cache"
-  elif [ "$(basename "$common")" = .git ]; then echo "$(dirname "$common")/.claude/super-board/cache"
+  if [ -z "$common" ]; then echo "$PWD/.claude/drover/cache"
+  elif [ "$(basename "$common")" = .git ]; then echo "$(dirname "$common")/.claude/drover/cache"
   else echo "$common/super-board/cache"; fi
 }
 CACHE_DIR=$(cache_dir)

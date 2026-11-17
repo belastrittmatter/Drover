@@ -108,7 +108,7 @@ class RunnerRounds(unittest.TestCase):
         self.board_path = self.base / 'board.json'
         self.workers = self.base / 'workers'
         self.env = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.environ['PATH'],
-                        SUPER_BOARD_SKILLS_HOME=str(self.home), SB_GITHUB_RETRY_DELAY='0',
+                        DROVER_SKILLS_HOME=str(self.home), SB_GITHUB_RETRY_DELAY='0',
                         SB_GITHUB_HALT_FILE=str(self.base / 'halt.json'), CALL_LOG=str(self.calls_path),
                         BOARD=str(self.board_path), WORKER_DIR=str(self.workers),
                         GIT_AUTHOR_NAME='f', GIT_AUTHOR_EMAIL='f@example.com',
@@ -123,7 +123,7 @@ class RunnerRounds(unittest.TestCase):
             skill = self.root / '.claude/skills' / name / 'SKILL.md'
             skill.parent.mkdir(parents=True, exist_ok=True)
             skill.write_text('fixture skill instructions')
-        self.state = self.root / '.claude/super-board'
+        self.state = self.root / '.claude/drover'
         (self.state / 'configs').mkdir(parents=True)
         self.addCleanup(self.stop_workers)
 
@@ -228,7 +228,7 @@ class RunnerRounds(unittest.TestCase):
         self.git('commit', '-q', '--allow-empty', '-m', 'wip on #%d' % issue)
         self.git('push', '-q', 'origin', branch)
         self.git('checkout', '-q', 'main')
-        self.git('worktree', 'add', '-q', '.claude/worktrees/issue-%d-build' % issue, branch)
+        self.git('worktree', 'add', '-q', '.drover/worktrees/issue-%d-build' % issue, branch)
         self.env['PR_FOR_%d' % issue] = str(pr)
         self.board({'number': issue, 'status': 'Ready'})
         self.run_board(cycles=1)
@@ -253,7 +253,7 @@ class RunnerRounds(unittest.TestCase):
         self.assertFalse([c for c in calls if c[:2] in (['pr', 'close'], ['pr', 'merge'], ['issue', 'close'])])
         self.assertTrue(self.git('branch', '--list', branch).strip())
         self.assertTrue(self.git('ls-remote', '--heads', 'origin', branch).strip())
-        self.assertTrue((self.root / '.claude/worktrees/issue-12-build').is_dir())
+        self.assertTrue((self.root / '.drover/worktrees/issue-12-build').is_dir())
 
     # FR-RUN-11: run after a stop sends the card back to a builder on the same branch.
     def test_resume_after_stop(self):

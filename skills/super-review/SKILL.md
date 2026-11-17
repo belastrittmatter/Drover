@@ -142,7 +142,7 @@ table. In a super-board run it is ONE PR comment, **edited in place** every roun
 remembers"); R-ids never change.
 
 ```markdown
-<!-- super-review:report -->
+<!-- drover-review:report -->
 [reviewer] [report] <✅ merge-ready | ❌ bounced | 🛑 blocked | 🙋 human-gated | ⚠️ unverified> · round <N>
 Did: <scope reviewed · base · verification command + result>
 ✅ Done: <prior findings fixed, hypotheses that held — each with file:line or command>
@@ -191,12 +191,12 @@ A re-review starts from the last one. Without it, a rebuilt card gets a fresh re
 re-litigates settled points, misses that a finding was "resolved" without a fix, and can
 bounce forever on a moving target.
 
-**Lookup — one call, by marker.** Every report starts with `<!-- super-review:report -->`.
+**Lookup — one call, by marker.** Every report starts with `<!-- drover-review:report -->`.
 `prior_report` is the newest PR comment carrying it:
 
 ```bash
 gh pr view <PR> --json comments \
-  --jq '[.comments[] | select(.body | contains("<!-- super-review:report -->"))] | last | {url, body} // {}'
+  --jq '[.comments[] | select(.body | contains("<!-- drover-review:report -->"))] | last | {url, body} // {}'
 ```
 
 The number after `#issuecomment-` in `url` is the comment id. Write this round's report over it:
@@ -290,12 +290,12 @@ will not stack duplicates.
 
 ## super-board integration
 
-When invoked by super-board (env `SUPER_BOARD_RUN=1` or invocation contains "super-board run"):
+When invoked by super-board (env `DROVER_RUN=1` or invocation contains "super-board run"):
 
 ### State protocol
 - Read from issue + PR comments + PR review threads.
 - **GitHub budget** — every "move card" is `.claude/bin/drover-card.sh --config <cfg> move <N> <Status>` (1 GraphQL point; `gh project item-list` / `field-list` cost ~100–200). Comments, labels and PR reads go over REST; [rate-limit-etiquette.md](../super-board/references/rate-limit-etiquette.md) → "Price list" has the calls.
-- Respect handed-down worktree at `.claude/worktrees/issue-<N>-review/` and branch `issue-<N>-<slug>`.
+- Respect handed-down worktree at `.drover/worktrees/issue-<N>-review/` and branch `issue-<N>-<slug>`.
 
 ### Two card types
 - **Built card (`feature`, `bug`, no label):** review the diff (code + tests).
@@ -337,7 +337,7 @@ See `.claude/skills/super-board/references/run.md` → Reviewer. Summary of the 
    - **Code-side new finding** → new `[builder]`-prefixed thread, move card Review → Ready (`loop:rebuild-N`).
    - **Test-side new finding** → new `[qa]`-prefixed thread, move card Review → QA (`loop:rebuild-N`).
    - **Blocker finding (destructive schema, contract, money, auth, live-DB migration) or rebuild cap hit** → full §4 Block template, move card Review → Blocked. A *clean* PR that merely touches money, auth or schema is not a finding: run the merge protocol, and the gate's `merge_policy` hands it to a human (exit 7 → 🙋 Blocked).
-8. Write the Reviewer report (marker `<!-- super-review:report -->`, ids on every finding) — edit the existing report comment in place, post a new one only on the first review. It is the next re-review's `prior_report`.
+8. Write the Reviewer report (marker `<!-- drover-review:report -->`, ids on every finding) — edit the existing report comment in place, post a new one only on the first review. It is the next re-review's `prior_report`.
 9. Clean up worktree.
 
 ### Merge protocol — Done means merged

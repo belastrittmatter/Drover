@@ -195,7 +195,7 @@ the headless backend. On `claude-p`, six gates stand in the way before any spawn
 
 ```
   1  orphan scan ........... workers alive from a crashed run?  → refuse to start
-  2  in-flight lockfile .... .claude/super-board/inflight/<N>   → skip (survives restart)
+  2  in-flight lockfile .... .claude/drover/inflight/<N>   → skip (survives restart)
   3  assignee claim ........ atomic, BEFORE spawn               → skip (closes the cold-start race)
   4  worker cap ............ max_workers (default 3)            → wait
   5  GraphQL quota <200 .... sleep until reset                  → wait
@@ -209,7 +209,7 @@ crash-recovery sweep of leaked assignees, the rate guard and the usage guard
 (`references/run-workflow.md`).
 
 Guard hooks, installed by `install.sh` unless `--no-hooks`: worktrees only under
-`.claude/worktrees/`, no reading of secret files, no API keys written into source, no deleting
+`.drover/worktrees/`, no reading of secret files, no API keys written into source, no deleting
 outside the project, and merged-worktree cleanup at session start. Blocking direct and force pushes
 to the base branch is opt-in (`onboard` asks once, or `install.sh --protect-main`). See
 `hooks/README.md`.
@@ -237,7 +237,7 @@ the robot runs them on the databases you allowed. A live database is always your
 
 ## Configuration
 
-Minimal config at `.claude/super-board/configs/<slug>.json`:
+Minimal config at `.claude/drover/configs/<slug>.json`:
 
 ```json
 {

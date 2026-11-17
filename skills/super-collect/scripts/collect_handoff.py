@@ -36,7 +36,7 @@ DOC_DIR = "docs/drover/findings"
 def resolver():
     """Load drover-skills-ready.py: installed .claude/bin, else the pack's scripts/."""
     here = Path(__file__).resolve().parent
-    bin_env = os.environ.get("SUPER_BOARD_BIN")
+    bin_env = os.environ.get("DROVER_BIN")
     dirs = ([Path(bin_env)] if bin_env else []) + [Path(".claude/bin"), here.parents[2] / "bin",
                                                    here.parents[2] / "scripts"]
     for d in dirs:
@@ -46,14 +46,14 @@ def resolver():
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
             return mod
-    print("collect-handoff: cannot find drover-skills-ready.py — set SUPER_BOARD_BIN or run install.sh",
+    print("collect-handoff: cannot find drover-skills-ready.py — set DROVER_BIN or run install.sh",
           file=sys.stderr)
     sys.exit(2)
 
 
 def route(args):
     mod = resolver()
-    inv = mod.Inventory(args.root, args.host, args.home or os.environ.get("SUPER_BOARD_SKILLS_HOME"))
+    inv = mod.Inventory(args.root, args.host, args.home or os.environ.get("DROVER_SKILLS_HOME"))
     found = {n: inv.resolve("mattpocock-skills:" + n)[0] for n in CHAIN + ("implement-spec",)}
     missing = [n for n in CHAIN if not found[n]]
     out = {"route": "backlog" if missing else "planning", "missing": missing,

@@ -12,10 +12,10 @@ host() { env -i PATH="$PATH" "$@" bash "$S"; }
 [ "$(host CODEX_THREAD_ID=01a1)" = codex ] || fail 'CODEX_THREAD_ID means codex'
 [ "$(host CODEX_SESSION_ID=01a1)" = codex ] || fail 'CODEX_SESSION_ID means codex'
 [ "$(host CODEX_THREAD_ID=01a1 CLAUDECODE=1)" = codex ] || fail 'a Codex lane under Claude is codex'
-[ "$(host SUPER_BOARD_HOST=codex)" = codex ] || fail 'override forces codex'
-[ "$(host SUPER_BOARD_HOST=claude CODEX_THREAD_ID=01a1)" = claude ] || fail 'override beats the env'
-[ "$(host SUPER_BOARD_HOST=opencode)" = opencode ] || fail 'override accepts opencode'
-rc=0; host SUPER_BOARD_HOST=gemini >/dev/null 2>&1 || rc=$?
+[ "$(host DROVER_HOST=codex)" = codex ] || fail 'override forces codex'
+[ "$(host DROVER_HOST=claude CODEX_THREAD_ID=01a1)" = claude ] || fail 'override beats the env'
+[ "$(host DROVER_HOST=opencode)" = opencode ] || fail 'override accepts opencode'
+rc=0; host DROVER_HOST=gemini >/dev/null 2>&1 || rc=$?
 [ "$rc" = 64 ] || fail "bad override exits 64, got $rc"
 
 # No sign and no override: empty stdout, a hint on stderr, exit 65 — never a guessed claude.
@@ -25,7 +25,7 @@ nohost() {
   out=$(host "$@" 2>"$ERR") || rc=$?
   [ "$rc" = 65 ] || fail "'$*' should exit 65, got $rc"
   [ -z "$out" ] || fail "'$*' should print nothing to stdout, got '$out'"
-  grep -q SUPER_BOARD_HOST "$ERR" || fail "'$*' should explain SUPER_BOARD_HOST on stderr"
+  grep -q DROVER_HOST "$ERR" || fail "'$*' should explain DROVER_HOST on stderr"
 }
 nohost
 nohost CODEX_HOME=/x CODEX_SANDBOX=seatbelt   # not host signs
@@ -36,7 +36,7 @@ nohost AGENT=1                                 # OpenCode sets it, but so do oth
 # session; the override and a Codex id still win over it.
 [ "$(host OPENCODE=1)" = opencode ] || fail 'OPENCODE=1 means opencode'
 [ "$(host OPENCODE=1 CLAUDECODE=1)" = opencode ] || fail 'OpenCode under a Claude parent is opencode'
-[ "$(host SUPER_BOARD_HOST=claude OPENCODE=1)" = claude ] || fail 'override beats the OpenCode sign'
+[ "$(host DROVER_HOST=claude OPENCODE=1)" = claude ] || fail 'override beats the OpenCode sign'
 [ "$(host CODEX_THREAD_ID=01a1 OPENCODE=1)" = codex ] || fail 'a Codex id beats the OpenCode sign'
 
 # Config `host` (top-level key): used only when no override and no env sign is present.
@@ -47,7 +47,7 @@ printf '{"host":"gemini"}' > "$T/bad.json"
 cfg() { local f=$1; shift; env -i PATH="$PATH" "$@" bash "$S" --config "$f"; }
 [ "$(cfg "$T/codex.json")" = codex ] || fail 'config host codex prints codex'
 [ "$(cfg "$T/codex.json" CLAUDECODE=1)" = claude ] || fail 'an env sign beats config host'
-[ "$(cfg "$T/codex.json" SUPER_BOARD_HOST=opencode)" = opencode ] || fail 'override beats config host'
+[ "$(cfg "$T/codex.json" DROVER_HOST=opencode)" = opencode ] || fail 'override beats config host'
 for f in none missing; do
   rc=0; out=$(cfg "$T/$f.json" 2>/dev/null) || rc=$?
   [ "$rc" = 65 ] && [ -z "$out" ] || fail "config $f without host should exit 65, got $rc '$out'"

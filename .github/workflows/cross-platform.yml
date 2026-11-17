@@ -44,7 +44,7 @@ jobs:
 
       # Step 2 — exercise the "no config + no active marker + no single
       # config" path of drover-status.py. Documented to exit 64.
-      # Runs in the repo root, where no `.claude/super-board/configs/` exists.
+      # Runs in the repo root, where no `.claude/drover/configs/` exists.
       - name: status — no-config path exits 64
         shell: bash
         run: |

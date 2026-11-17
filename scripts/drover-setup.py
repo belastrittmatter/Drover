@@ -18,11 +18,11 @@ Every command prints one JSON object. `--text` on check/fix prints the short ✓
 onboard screen shows instead.
 
 What `fix` does, with NO question (all of it backed up first to
-.claude/super-board/backup/<ts>/):
+.claude/drover/backup/<ts>/):
   - installs or refreshes skills, .claude/bin scripts, workflows, guard hooks and their
     settings.json entries (runs the pack's install.sh) when any is missing or older
   - removes the folders of skills that no longer exist: super-refine, cleanup-wt, arch-loop
-  - migrates every .claude/super-board/configs/*.json to the v3 keys (migrate-config), and
+  - migrates every .claude/drover/configs/*.json to the v3 keys (migrate-config), and
     writes a missing top-level `host` from --host (check flags a host outside claude/codex/opencode)
   - `git init` when the folder is not a repo
   - adds Matt Pocock's helper skills with npx when Node is present and they are missing
@@ -34,11 +34,11 @@ Status options (--prune-empty also drops unused extras such as a new board's Tod
 creates the three labels, maps old type labels, labels every card `qa`
 on a board that was "qa-only" (--qa-all), moves Skipped cards to Done, removes the Skipped
 option, and puts back any card status the option rewrite cleared. Before any write it saves
-all cards and conversion intent in .claude/super-board/migrations/ (under --root, the config project root, or cwd).
+all cards and conversion intent in .claude/drover/migrations/ (under --root, the config project root, or cwd).
 Re-run the same command from the same root to recover an interrupted upgrade. Keep the
 board idle during migration: GitHub has no atomic compare-and-swap for field rewrites.
 Before the first option rewrite it also saves the original card statuses to
-.claude/super-board/backup/board-<number>-<ts>.json for manual recovery.
+.claude/drover/backup/board-<number>-<ts>.json for manual recovery.
 No card is deleted. Detected concurrent edits are preserved or halt recovery.
 
 Exit: 0 ok · 1 check found red items · 2 a gh call failed · 64 usage · 66 pack not found.
@@ -162,7 +162,7 @@ def write_json(path, data):
 
 def find_pack(explicit=None):
     """The pack checkout whose install.sh can (re)install pieces. None when not found."""
-    cands = [explicit, os.environ.get("SUPER_BOARD_PACK"),
+    cands = [explicit, os.environ.get("DROVER_PACK"),
              os.path.dirname(os.path.dirname(os.path.abspath(__file__)))]
     home = os.path.expanduser("~/.claude/plugins")
     if os.path.isdir(home):
@@ -300,7 +300,7 @@ def check(root, pack, host="claude", home=None, catalog=None):
     claude = os.path.join(root, ".claude")
     pack_version = read(os.path.join(pack, "VERSION")) if pack else None
     have_v = installed_version(root)
-    upgrade_rec = load_json(os.path.join(claude, "super-board", "upgrade.json")) or {}
+    upgrade_rec = load_json(os.path.join(claude, "drover", "upgrade.json")) or {}
     missing = []
     missing += [f"skill {s}" for s in SKILLS if not os.path.isfile(os.path.join(claude, "skills", s, "SKILL.md"))]
     missing += [f"script {b}" for b in BIN if not os.path.isfile(os.path.join(claude, "bin", b))]
@@ -315,7 +315,7 @@ def check(root, pack, host="claude", home=None, catalog=None):
     configs = {}
     verification = {}
     host_errors = {}
-    for p in sorted(glob.glob(os.path.join(claude, "super-board", "configs", "*.json"))):
+    for p in sorted(glob.glob(os.path.join(claude, "drover", "configs", "*.json"))):
         cfg = load_json(p)
         ready = subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__),
                                 "drover-verification-ready.py"), "--config", p],
@@ -370,7 +370,7 @@ def check(root, pack, host="claude", home=None, catalog=None):
 
 
 def backup(root, paths, stamp):
-    base = os.path.join(root, ".claude", "super-board", "backup", stamp)
+    base = os.path.join(root, ".claude", "drover", "backup", stamp)
     dest, n = base, 1
     while os.path.exists(dest):  # a second fix in the same second gets its own folder
         n += 1
@@ -391,7 +391,7 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
     fixed, notes = [], []
     claude = os.path.join(root, ".claude")
     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-    to_backup = [os.path.join(claude, "settings.json"), os.path.join(claude, "super-board", "configs")]
+    to_backup = [os.path.join(claude, "settings.json"), os.path.join(claude, "drover", "configs")]
     to_backup += [os.path.join(claude, "skills", d) for d in before["old_dirs"]]
     bdir = None
     if not dry and (before["missing"] or before["old_dirs"] or before["configs"] or before["upgrade"]):
@@ -405,7 +405,7 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
                     input="", cwd=root)
             if r.returncode != 0:
                 return {**before, "fixed": fixed, "error": "install.sh failed: " + (r.stderr or r.stdout)[-300:]}
-            rec = load_json(os.path.join(claude, "super-board", "upgrade.json")) or {}
+            rec = load_json(os.path.join(claude, "drover", "upgrade.json")) or {}
             before["added_skills"] = rec.get("added_skills", before["added_skills"])
         if before["upgrade"]:
             fixed.append("scripts, board engine and safety guards updated")
@@ -466,7 +466,7 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
             notes.append("would install the optional security-audit skill")
 
     if not dry:
-        up = os.path.join(claude, "super-board", "upgrade.json")
+        up = os.path.join(claude, "drover", "upgrade.json")
         if os.path.exists(up):
             os.remove(up)
     after = check(root, pack, host, home, catalog) if not dry else before
@@ -787,7 +787,7 @@ def board_migrate(owner, number, repo, qa_all=False, dry=False, prune_empty=Fals
     if not isinstance(proj, dict) or not isinstance(proj.get('id'), str) or not proj.get('url'):
         raise RuntimeError('GitHub omitted the project identity')
     pid = proj['id']
-    path = os.path.join(root or os.getcwd(), '.claude', 'super-board', 'migrations',
+    path = os.path.join(root or os.getcwd(), '.claude', 'drover', 'migrations',
                         hashlib.sha256(pid.encode()).hexdigest()[:24] + '.json')
     binding = {'project': pid, 'owner': owner, 'number': number, 'repo': repo}
     if dry:
@@ -1003,7 +1003,7 @@ def main(argv):
     try:
         if cmd in ("check", "fix"):
             pack = find_pack(flag(rest, "--pack"))
-            host, home, catalog = flag(rest, "--host", "claude"), flag(rest, "--home", os.environ.get("SUPER_BOARD_SKILLS_HOME")), flag(rest, "--catalog", os.environ.get("SUPER_BOARD_SKILLS_CATALOG"))
+            host, home, catalog = flag(rest, "--host", "claude"), flag(rest, "--home", os.environ.get("DROVER_SKILLS_HOME")), flag(rest, "--catalog", os.environ.get("DROVER_SKILLS_CATALOG"))
             if host not in ("claude", "codex"):
                 raise ValueError("--host must be claude or codex")
             res = check(root, pack, host, home, catalog) if cmd == "check" else fix(root, pack, "--no-helpers" not in rest, dry, host, home, catalog)
@@ -1037,7 +1037,7 @@ def main(argv):
             cfg_path = flag(rest, "--config")
             if cfg_path and "--root" not in rest:
                 config_dir = os.path.dirname(os.path.abspath(cfg_path))
-                suffix = os.path.join('.claude', 'super-board', 'configs')
+                suffix = os.path.join('.claude', 'drover', 'configs')
                 root = config_dir[:-len(suffix)].rstrip(os.sep) if config_dir.endswith(os.sep + suffix) else config_dir
             cfg = load_json(cfg_path) if cfg_path else {}
             cfg = cfg if isinstance(cfg, dict) else {}

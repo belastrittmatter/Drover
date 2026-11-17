@@ -27,7 +27,7 @@ Say so once, in the first wave report: `🔁 codex host — running as --codex`.
 
 **Unknown host halts.** Run the host check before preconditions. Exit 65 (no host sign) or
 `opencode` (no OpenCode backend yet) halts before any claim, even with no Workflow tool, with one line:
-`⛔ unknown host — set SUPER_BOARD_HOST=claude|codex and re-run`. Never guess a backend.
+`⛔ unknown host — set DROVER_HOST=claude|codex and re-run`. Never guess a backend.
 
 After the same plan and claim steps, launch this command as a background task:
 `bash .claude/bin/drover-codex-wave.sh --config <config-path> --cards <claimed-cards.json> --codex[=<model>] --tier <low|medium|high> --output <wave-result.json>`.
@@ -55,7 +55,7 @@ form; it never halts the run. Fixed-command scripts set `SB_GITHUB_READ_STRICT=1
 Exit **79**, a workflow result with `halted: true`, or a failed `--check` ends this
 run. Check the helper's `--check` before claims, board/comment writes, each new
 lane/wave, and all migration/merge steps. The marker is shared through the main
-checkout's `.claude/super-board/github-halt.json`, including linked worktrees (a
+checkout's `.claude/drover/github-halt.json`, including linked worktrees (a
 submodule keeps it in its own git dir: `<git-common-dir>/super-board/`).
 Cancel active workflow agents using local workflow controls (Codex: stop the background wave task); do not launch more
 lanes. Already-running agents stop at their next checkpoint; this is not an
@@ -93,7 +93,7 @@ Run the same preconditions as `run.md` §Preconditions, minus PID checks:
 2. Production-merge guard: refuse `base_branch: main` + `human_approves_merge:
    false` when deploy markers exist (same rule as drover-run.sh).
 3. Worktree check: if legacy `.worktrees/issue-*` exists, halt for inspection/move
-   as described in run.md. Scan only board worktrees under `.claude/worktrees/`;
+   as described in run.md. Scan only board worktrees under `.drover/worktrees/`;
    when their named branch is gone use `git worktree remove` without force. Preserve
    detached, dirty, locked, unregistered, and unrelated folders.
 4. For Claude waves, `node --check` passes on a wrapped copy of
@@ -103,11 +103,11 @@ Run the same preconditions as `run.md` §Preconditions, minus PID checks:
    With `--codex`, instead require `codex` on PATH and `bash -n` on both Codex launcher scripts.
 5. Wave marker FIRST, then the legacy check (lock-before-look closes the
    TOCTOU window where both backends pass each other's checks at once):
-   a. Atomically create `.claude/super-board/inflight/workflow-wave.lock`
+   a. Atomically create `.claude/drover/inflight/workflow-wave.lock`
       (mkdir -p the directory) containing the config slug and start time:
       `(set -C; printf 'SLUG=%s\nSTARTED=%s\n' <slug> "$(date -u +%FT%TZ)" > <lock>)`.
       Before replacing an existing marker, check `/workflows` and verify the PID
-      in `.claude/super-board/codex-wave.pid` (plain numeric PID) with `kill -0` plus its process command.
+      in `.claude/drover/codex-wave.pid` (plain numeric PID) with `kill -0` plus its process command.
       Only if neither backend has an active wave and no repo-local Codex lane
       remains is the marker stale from a crashed run — replace it.
       Remove the lock when the run ends or stops. The legacy dispatcher
@@ -214,7 +214,7 @@ Repeat until a done condition or halt gate fires:
    **Stranded Building cards.** A card in Building with no assignee between
    waves has no live worker — a stopped or crashed wave left it mid-build. For
    each: find its branch (`git ls-remote --heads origin 'issue-<N>-*'`) and any
-   leftover `.claude/worktrees/issue-<N>-build/`. If its HEAD is detached, keep it:
+   leftover `.drover/worktrees/issue-<N>-build/`. If its HEAD is detached, keep it:
    its commits may have no other ref. Otherwise remove it with `git worktree remove`
    without force. On detached HEAD or removal failure (dirty, locked, or unregistered),
    keep the folder and Building status, report the recovery path, and do not
@@ -304,7 +304,7 @@ a marker owned by another or uncertain run; preserve it.
 
 - Stop: `x` on the run in `/workflows` (or TaskStop), then release assignees
   for in-flight cards and post "stopped mid-flight" comments (same protocol
-  as `references/stop.md`). Remove `.claude/super-board/inflight/workflow-wave.lock`.
+  as `references/stop.md`). Remove `.claude/drover/inflight/workflow-wave.lock`.
 - Codex stop: with GitHub available, run `bash .claude/bin/drover-stop.sh <slug>`; it validates the wave PID and allows SIGTERM to cancel child lanes before releasing claims. Apply the same claim/comment/lock protocol to ALL selected claimed cards, including queued cards. During a GitHub halt, send SIGTERM only to the verified wave PID, wait for child cancellation, and preserve claims without GitHub writes.
 - Resume: just run again — board state is the only state. A workflow stopped
   mid-wave can also be resumed in-session via `resumeFromRunId` (completed
@@ -349,10 +349,10 @@ script this list does not cover. The read helper is listed in both forms: script
 
 **Headless runs (`claude -p "/super-board run"`).** Supported only where Claude Code may
 write the project's `.claude/` folder without a prompt. `.claude/` is a protected path:
-the wave lock under `.claude/super-board/` (inflight lock, halt and PID files) is prompted
+the wave lock under `.claude/drover/` (inflight lock, halt and PID files) is prompted
 in `default` and `acceptEdits`, denied in `dontAsk`, and no `permissions.allow` rule
-(e.g. `Edit(.claude/**)`) pre-approves it. Claude's own git worktrees under
-`.claude/worktrees/` are exempt, so lane worktrees need only `Bash(git worktree:*)`.
+(e.g. `Edit(.claude/**)`) pre-approves it. Card worktrees under
+`.drover/worktrees/` sit outside `.claude/`, so lane worktrees need only `Bash(git worktree:*)`.
 Pick one:
 - Interactive (recommended): start `/super-board run` in a terminal session and answer
   the first `.claude/` write prompt with "allow Claude to edit files in this project's
