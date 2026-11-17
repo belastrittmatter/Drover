@@ -8,7 +8,7 @@
 //     [--compare round-0] [--sections '<css>'] [--auth <module>] [--env .env.local]
 //
 // --states   comma list of state names, or a path to a JSON array of
-//            {name, query?, env?} (refine.states from the super-board config).
+//            {name, query?, env?} (refine.states from the drover config).
 //            `query` is appended to the route (e.g. "?fixture=empty"); `env` is
 //            handed to the auth module. Default: main.
 // --themes   default light,dark. Dark sets prefers-color-scheme: dark, stores

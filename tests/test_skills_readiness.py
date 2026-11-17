@@ -8,8 +8,8 @@ import tempfile
 import unittest
 
 KIT = Path(__file__).resolve().parents[1]
-CLI = KIT / 'scripts/super-board-skills-ready.py'
-CORE = ['super-board','super-build','super-qa','super-review','super-collect','visual','git-sync','ui-refine-loop','pr-security-review']
+CLI = KIT / 'scripts/drover-skills-ready.py'
+CORE = ['drover','drover-build','drover-qa','drover-review','drover-collect','visual','git-sync','ui-refine-loop','pr-security-review']
 
 class Readiness(unittest.TestCase):
     def setUp(self):
@@ -232,7 +232,7 @@ class Readiness(unittest.TestCase):
             self.card['labels'] = labels
             result = self.run_cli(extra=['--lane','build'])
             names = [e['name'] for e in result['entries'] if e['requirement']=='required']
-            self.assertEqual(names, ['super-board','super-build', *expected, 'ponytail:ponytail','verification-before-completion','mattpocock-skills:code-review'])
+            self.assertEqual(names, ['drover','drover-build', *expected, 'ponytail:ponytail','verification-before-completion','mattpocock-skills:code-review'])
         # A docs chain can be ready while a proposed feature chain is incomplete.
         (self.root / '.claude/skills/implement/SKILL.md').unlink()
         self.card['labels'] = ['docs']; self.run_cli()

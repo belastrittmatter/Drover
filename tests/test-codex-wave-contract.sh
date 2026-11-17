@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The Codex wave hands the orchestrator the same {cards:[summary...], halted} contract as
-# workflows/super-board-wave.js. Expected summary keys are read from the workflow itself.
+# workflows/drover-wave.js. Expected summary keys are read from the workflow itself.
 # Stubbed Codex only (tests/fixtures/fake_codex.py). No network.
 set -euo pipefail
 KIT=$(cd "$(dirname "$0")/.." && pwd)
@@ -9,7 +9,7 @@ mkdir -p "$T/bin" "$T/repo" "$T/bare" "$T/home"
 git init -q "$T/repo"
 git init -q "$T/bare"
 python3 "$KIT/tests/fixtures/install_worker_skills.py" "$T/repo"
-export SUPER_BOARD_SKILLS_HOME="$T/home"
+export DROVER_SKILLS_HOME="$T/home"
 cat > "$T/bin/gh" <<'PYGH'
 #!/usr/bin/env python3
 import json,sys
@@ -27,14 +27,14 @@ CARDS='[{"number":1,"status":"Ready","title":"one"},{"number":2,"status":"Review
 echo '{"max_workers":1,"verify_commands":["git diff --check"]}' > "$T/config.json"
 echo '{"max_workers":1}' > "$T/unready.json"
 fail() { echo "FAIL: $*" >&2; cat "$T/stderr" >&2 2>/dev/null || true; exit 1; }
-wave() { bash "$KIT/scripts/super-board-codex-wave.sh" --cards "$CARDS" "$@" 2>"$T/stderr"; }
+wave() { bash "$KIT/scripts/drover-codex-wave.sh" --cards "$CARDS" "$@" 2>"$T/stderr"; }
 
 # The summary object literal in the workflow is the one source of the key set.
-python3 - "$KIT/workflows/super-board-wave.js" > "$T/keys.json" <<'PY'
+python3 - "$KIT/workflows/drover-wave.js" > "$T/keys.json" <<'PY'
 import json, re, sys
 text = open(sys.argv[1]).read()
 block = re.search(r'const summary = .*?return \{\n(.*?)\n\s*\}\n', text, re.S)
-assert block, 'summary object not found in workflows/super-board-wave.js'
+assert block, 'summary object not found in workflows/drover-wave.js'
 keys = re.findall(r'^\s*(\w+):', block.group(1), re.M)
 assert 'number' in keys and 'finalStatus' in keys, keys
 print(json.dumps(sorted(keys)))

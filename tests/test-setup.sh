@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests scripts/super-board-setup.py — onboard's 🔍 Checks, the upgrade path, config
+# Tests scripts/drover-setup.py — onboard's 🔍 Checks, the upgrade path, config
 # migration, board names, branch detection, and the GitHub board ranking / migration.
 # Offline: `gh` is a stateful stub on PATH (board state in a JSON file, every call
 # logged), install.sh comes from this checkout, helper skills are skipped.
@@ -8,30 +8,30 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PACK="$PWD"
-SETUP="$PACK/scripts/super-board-setup.py"
+SETUP="$PACK/scripts/drover-setup.py"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 fail() { echo "FAIL: $1" >&2; exit 1; }
 export HOME="$WORK/home"; mkdir -p "$HOME"
-export SUPER_BOARD_PACK="$PACK"
+export DROVER_PACK="$PACK"
 q() { jq -e "$@" >/dev/null; }
 
 # 1 — a bare folder: check is red and lists what is missing; fix installs every
 #     must-have with no question, runs git init, and the re-check is green.
 T="$WORK/bare"; mkdir -p "$T"
 OUT=$(python3 "$SETUP" check --root "$T" || true)
-echo "$OUT" | q '.green == false and (.missing | index("skill super-board")) and .git == false' \
-  || fail "bare folder should be red with super-board missing: $OUT"
+echo "$OUT" | q '.green == false and (.missing | index("skill drover")) and .git == false' \
+  || fail "bare folder should be red with drover missing: $OUT"
 OUT=$(python3 "$SETUP" fix --root "$T" --no-helpers || true)
-echo "$OUT" | q '.fixed | index("super-board skills, scripts and board engine installed")' || fail "fix should install: $OUT"
+echo "$OUT" | q '.fixed | index("drover skills, scripts and board engine installed")' || fail "fix should install: $OUT"
 echo "$OUT" | q '.fixed | index("git repo created (git init)")' || fail "fix should git init: $OUT"
 echo "$OUT" | q '.missing == [] and .git == true and .upgraded == false' || fail "re-check after fix should have nothing missing: $OUT"
-[ -x "$T/.claude/bin/super-board-setup.py" ] || fail "the setup script installs itself into .claude/bin"
+[ -x "$T/.claude/bin/drover-setup.py" ] || fail "the setup script installs itself into .claude/bin"
 TXT=$(python3 "$SETUP" check --root "$T" --text || true)
-echo "$TXT" | grep -q "✓ super-board skills, scripts and board engine present" || fail "text report should list what is present: $TXT"
+echo "$TXT" | grep -q "✓ drover skills, scripts and board engine present" || fail "text report should list what is present: $TXT"
 
 # 1b — missing safety helpers must trigger a repair even on a current installation.
-for helper in super-board-approval.py super-board-github-read.py super-board-project-verifier.py; do
+for helper in drover-approval.py drover-github-read.py drover-project-verifier.py; do
   rm "$T/.claude/bin/$helper"
   OUT=$(python3 "$SETUP" check --root "$T" || true)
   echo "$OUT" | q --arg helper "script $helper" '.missing | index($helper)' \
@@ -41,14 +41,14 @@ for helper in super-board-approval.py super-board-github-read.py super-board-pro
   echo "$OUT" | q '.missing == []' || fail "repair must leave no missing scripts: $OUT"
 done
 
-# 2 — upgrade: an older super-board (VERSION 1.8.2, removed skill folders, a qa-only
+# 2 — upgrade: an older drover (VERSION 1.8.2, removed skill folders, a qa-only
 #     config with Skipped, old collect keys, telegram) is detected and upgraded with
 #     no question, backed up first, and listed as "Upgraded for you".
-T="$WORK/old"; mkdir -p "$T/.claude/skills/super-board" "$T/.claude/super-board/configs"
+T="$WORK/old"; mkdir -p "$T/.claude/skills/drover" "$T/.claude/drover/configs"
 git -C "$T" init -q
-echo "1.8.2" > "$T/.claude/skills/super-board/VERSION"
+echo "1.8.2" > "$T/.claude/skills/drover/VERSION"
 for d in super-refine cleanup-wt arch-loop; do mkdir -p "$T/.claude/skills/$d"; echo x > "$T/.claude/skills/$d/SKILL.md"; done
-cat > "$T/.claude/super-board/configs/books.json" <<'JSON'
+cat > "$T/.claude/drover/configs/books.json" <<'JSON'
 {"version":1,"variant":"qa-only","project":{"owner":"eric","number":2},
  "columns":["Ready","QA","Review","Done","Blocked","Skipped"],
  "repo":{"path":".","remote":"https://github.com/eric/books.git"},
@@ -61,21 +61,21 @@ echo "$OUT" | q '.upgrade == true and .from == "1.8.2" and .old_dirs == ["super-
   || fail "older install should be detected: $OUT"
 OUT=$(python3 "$SETUP" fix --root "$T" --no-helpers || true)
 echo "$OUT" | q '.upgraded == true and .from == "1.8.2"' || fail "fix should report the upgrade: $OUT"
-echo "$OUT" | q '.fixed | any(test("^skills updated; added .*super-collect"))' || fail "upgrade should name the added skills: $OUT"
+echo "$OUT" | q '.fixed | any(test("^skills updated; added .*drover-collect"))' || fail "upgrade should name the added skills: $OUT"
 echo "$OUT" | q '.fixed | index("removed old folders: super-refine, cleanup-wt, arch-loop")' || fail "old folders line missing: $OUT"
 echo "$OUT" | q '.fixed | any(test("^config moved to the new keys"))' || fail "config line missing: $OUT"
 for d in super-refine cleanup-wt arch-loop; do [ ! -e "$T/.claude/skills/$d" ] || fail "$d should be removed"; done
 B=$(echo "$OUT" | jq -r .backup)
-[ -f "$T/$B/.claude/skills/arch-loop/SKILL.md" ] && [ -f "$T/$B/.claude/super-board/configs/books.json" ] \
+[ -f "$T/$B/.claude/skills/arch-loop/SKILL.md" ] && [ -f "$T/$B/.claude/drover/configs/books.json" ] \
   || fail "old folders and config must be backed up first (backup: $B)"
-C="$T/.claude/super-board/configs/books.json"
+C="$T/.claude/drover/configs/books.json"
 q '(has("variant") | not) and ._qa_all == true' "$C" || fail "variant must go, qa-only remembered for the board: $(cat "$C")"
 q '.columns == ["Backlog","Ready","Building","QA","Review","Blocked","Done"]' "$C" || fail "columns must be the v3 seven"
 q '.collect.sources == ["sentry","github","prs","architecture"] and (.collect | has("lookback_runs") | not)' "$C" || fail "collect keys not migrated"
 q '.merge_policy.default == "human" and .notifications.channel == "session" and (.refine | has("qa_hook_rounds") | not)' "$C" \
   || fail "merge rule / notifications / refine not migrated: $(cat "$C")"
 q '.host == "claude"' "$C" || fail "fix must always write the top-level host (from --host): $(cat "$C")"
-[ ! -e "$T/.claude/super-board/upgrade.json" ] || fail "upgrade.json should be cleared once the upgrade is done"
+[ ! -e "$T/.claude/drover/upgrade.json" ] || fail "upgrade.json should be cleared once the upgrade is done"
 TXT=$(python3 "$SETUP" check --root "$T" --text || true)
 echo "$TXT" | grep -q "Upgraded for you" && fail "a finished upgrade must not be reported again"
 
@@ -276,7 +276,7 @@ q '[.items[] | {(.id): .status}] | add == {"I1":"Done","I2":"Building","I3":"Rev
   || fail "prune-empty must put every wiped status back: $(jq -c .items "$GH_STATE")"
 echo "$OUT" | q '.restored == 3' || fail "three cards should be restored: $OUT"
 BK=$(echo "$OUT" | jq -r .status_backup)
-case "$BK" in "$WORK/.claude/super-board/backup/board-2-"*.json) ;; *) fail "backup path wrong: $BK" ;; esac
+case "$BK" in "$WORK/.claude/drover/backup/board-2-"*.json) ;; *) fail "backup path wrong: $BK" ;; esac
 q '. == {"I1":"Done","I2":"Building","I3":"Review","I4":null}' "$BK" || fail "backup must hold the pre-rewrite statuses: $(cat "$BK")"
 
 # 11 — a gh that does not surface `status`: the snapshot falls back to GraphQL
@@ -304,7 +304,7 @@ echo "$OUT" | q '.status_backup == null and .restored == 0 and .added_columns !=
 
 # 13 — config `host`: check accepts claude / codex / opencode, flags anything else, and
 #      fix never overwrites a host that is already set.
-H="$WORK/bare/.claude/super-board/configs"; mkdir -p "$H"
+H="$WORK/bare/.claude/drover/configs"; mkdir -p "$H"
 for h in claude codex opencode; do
   printf '{"host":"%s"}' "$h" > "$H/b.json"
   OUT=$(python3 "$SETUP" check --root "$WORK/bare" || true)
@@ -335,14 +335,14 @@ rm "$H/b.json"
 
 # 14 — two backup-needing fixes back to back (same minute) each keep their own backup and
 #      both migrate; the per-minute stamp used to crash the second with EEXIST.
-R="$WORK/twice"; C="$R/.claude/super-board/configs"; mkdir -p "$C"; git -C "$R" init -q
+R="$WORK/twice"; C="$R/.claude/drover/configs"; mkdir -p "$C"; git -C "$R" init -q
 for i in 1 2; do
   printf '{"host":"codex"}' > "$C/b.json"
   OUT=$(python3 "$SETUP" fix --root "$R" --no-helpers || true)
   echo "$OUT" | q '.error == null' || fail "fix #$i in the same minute must not fail: $OUT"
   q '.columns != null' "$C/b.json" || fail "fix #$i must migrate the config: $(cat "$C/b.json")"
 done
-N=$(find "$R/.claude/super-board/backup" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
+N=$(find "$R/.claude/drover/backup" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
 [ "$N" = 2 ] || fail "two fixes must keep two distinct backups, got $N"
 
 echo "PASS: test-setup.sh (14 scenarios)"

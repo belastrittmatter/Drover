@@ -1,6 +1,6 @@
 {
   "$comment": [
-    "The dependency graph super-board-deps.sh would emit for wave-items.json.",
+    "The dependency graph drover-deps.sh would emit for wave-items.json.",
     "Held as a fixture so the planner's tests need no network and no gh.",
     "",
     "The four shapes that matter, one card each:",

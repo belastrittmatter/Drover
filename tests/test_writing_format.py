@@ -1,4 +1,4 @@
-"""Format tests for the writing standard (skills/super-board/references/writing-standard.md).
+"""Format tests for the writing standard (skills/drover/references/writing-standard.md).
 
 Pins the shapes scripts and agents depend on: the commit subject, the ticket's required
 sections, the comment header, the PR body markers. Each test reads the shipped docs and
@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-REF = ROOT / "skills" / "super-board" / "references"
+REF = ROOT / "skills" / "drover" / "references"
 STANDARD = (REF / "writing-standard.md").read_text(encoding="utf-8")
 
 EMOJI = {
@@ -54,7 +54,7 @@ def test_subject_regex():
         "🐛 [fix] receipts: show a size error over 10 MB",
         "🔧 [chore] loop: close #42 — stream replies",
         "🚧 [wip] loop: #42 partial — schema only",
-        "🧪 [test] super-qa: iter 3 (2 bugs, 9 items, 1 PRs opened)",
+        "🧪 [test] drover-qa: iter 3 (2 bugs, 9 items, 1 PRs opened)",
         "💄 [ui] reports: before/after screenshots",
     ]
     bad = [
@@ -92,7 +92,7 @@ def test_standard_examples_are_valid_subjects():
 
 
 def test_dispatcher_greps_the_standard_loop_subjects():
-    src = (ROOT / "skills" / "super-build" / "scripts" / "super-build-dispatch.sh").read_text(encoding="utf-8")
+    src = (ROOT / "skills" / "drover-build" / "scripts" / "drover-build-dispatch.sh").read_text(encoding="utf-8")
     pats = re.findall(r'grep -E "\^\[0-9a-f\]\+ (.*?)" \| head', src)
     assert len(pats) == 2, f"expected the close and wip greps, found {pats}"
     close_pat, wip_pat = (p.replace("$N", "42").replace("\\\\", "\\") for p in pats)
@@ -109,8 +109,8 @@ def test_dispatcher_greps_the_standard_loop_subjects():
 
 
 def test_no_old_commit_shapes_in_templates():
-    old = re.compile(r"chore\(loop\)|wip\(loop\)|fix\(super-qa\)|feat\(super-qa\)|refine\(\$?\{?[a-z<]")
-    allowed = {"super-build-dispatch.sh"}  # documents and still accepts the legacy shapes
+    old = re.compile(r"chore\(loop\)|wip\(loop\)|fix\(drover-qa\)|feat\(drover-qa\)|refine\(\$?\{?[a-z<]")
+    allowed = {"drover-build-dispatch.sh"}  # documents and still accepts the legacy shapes
     for p in list((ROOT / "skills").rglob("*.md")) + list((ROOT / "skills").rglob("*.sh")) + list((ROOT / "workflows").glob("*.js")):
         if p.name in allowed or "visual" in p.parts:
             continue
@@ -134,9 +134,9 @@ def test_ticket_template_has_required_sections_in_order():
 
 
 def test_bug_filer_matches_the_standard():
-    src = (ROOT / "scripts" / "super-qa-file-bug.sh").read_text(encoding="utf-8")
+    src = (ROOT / "scripts" / "drover-qa-file-bug.sh").read_text(encoding="utf-8")
     for s in ["Problem", "Context", "Evidence", "Fix", "Acceptance Criteria", "Risk"]:
-        assert f'"{s}"' in src, f"super-qa-file-bug.sh does not require {s}"
+        assert f'"{s}"' in src, f"drover-qa-file-bug.sh does not require {s}"
     rows = re.search(r'EVIDENCE_ROWS="([^"]+)"', src)[1].split("|")
     assert rows == [r.lower() for r in EVIDENCE_ROWS], f"filer evidence rows drifted: {rows}"
     table = re.findall(r"^\| ([A-Za-z][^|]+?) \| ", STANDARD.split("**Bug Evidence**", 1)[1], flags=re.M)
@@ -148,7 +148,7 @@ def test_ticket_title_shape():
     title = re.compile(r"^(🐛 \[bug\]|✨ \[feat\]|💄 \[ui\]|🧪 \[test\]|📝 \[docs\]|♻️ \[refactor\]|🔒 \[security\]) [a-z0-9][a-z0-9._/-]*: \S")
     assert title.match("🐛 [bug] receipts: spinner never stops over 10 MB")
     assert not title.match("🐛 Bug /imports — CSV upload silently drops rows")
-    src = (ROOT / "scripts" / "super-qa-file-bug.sh").read_text(encoding="utf-8")
+    src = (ROOT / "scripts" / "drover-qa-file-bug.sh").read_text(encoding="utf-8")
     assert 'FULL_TITLE="${BADGE} ${SCOPE}: ${TITLE}"' in src
 
 
@@ -157,7 +157,7 @@ def test_ticket_title_shape():
 def test_comment_header_regex():
     assert COMMENT_HEADER.match("[qa] [report] ❌ failing · round 1")
     assert COMMENT_HEADER.match("[reviewer] [blocker] 🛑 blocked · 🔐 missing key")
-    assert not COMMENT_HEADER.match("🔍 super-board · QA fail · v1")
+    assert not COMMENT_HEADER.match("🔍 drover · QA fail · v1")
     assert not COMMENT_HEADER.match("[QA] [report] ❌ failing")
     assert not COMMENT_HEADER.match("[qa] [fyi] ❌ failing")
 
@@ -171,7 +171,7 @@ def test_comment_examples_follow_the_header():
     for text in (STANDARD, run_md):
         for block in fenced(text):
             lines = block.splitlines()
-            if lines and lines[0].startswith("<!-- super-board:author-note "):
+            if lines and lines[0].startswith("<!-- drover:author-note "):
                 assert lines[0].endswith(" -->"), "author-note marker must stay hidden"
                 labels = re.findall(r"^\*\*(.+?):\*\* \S", block, flags=re.M)
                 assert labels == ["Purpose", "What changed", "Why it matters"], labels
@@ -179,7 +179,7 @@ def test_comment_examples_follow_the_header():
                 assert not any(COMMENT_HEADER.match(line) for line in lines), "author notes must not route as findings"
                 author_notes += 1
                 continue
-            lines = [l for l in lines if not l.startswith("<!-- super-review:report")]
+            lines = [l for l in lines if not l.startswith("<!-- drover-review:report")]
             if not lines or not re.match(r"^\[[a-z<]", lines[0]) or lines[0].startswith("[<"):
                 continue
             assert COMMENT_HEADER.match(lines[0]), f"bad comment header: {lines[0]}"
@@ -196,7 +196,7 @@ def test_block_template_uses_the_header():
     assert heads, "block-template.md has no header line"
     for h in heads:
         assert re.match(r"^\[(<role>|builder|qa|reviewer|collect|orchestrator)\] \[blocker\] \S", h), h
-    assert "Reason tag:" in text, "super-board-deps.sh parses 'Reason tag:'"
+    assert "Reason tag:" in text, "drover-deps.sh parses 'Reason tag:'"
 
 
 def test_needs_you_comment_is_checklist_first():
@@ -217,7 +217,7 @@ def test_needs_you_comment_is_checklist_first():
 # ── PR body ──────────────────────────────────────────────────────────────────
 
 def test_pr_body_markers():
-    out = subprocess.run(["bash", str(ROOT / "scripts" / "super-board-pr-body.sh"), "--skeleton"],
+    out = subprocess.run(["bash", str(ROOT / "scripts" / "drover-pr-body.sh"), "--skeleton"],
                          capture_output=True, text=True, check=True).stdout
     for b in PR_BLOCKS:
         assert f"<!-- sb:{b} -->" in out and f"<!-- /sb:{b} -->" in out, f"skeleton lacks {b}"

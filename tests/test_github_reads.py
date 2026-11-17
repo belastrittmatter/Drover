@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-HELPER = ROOT / 'scripts/super-board-github-read.py'
+HELPER = ROOT / 'scripts/drover-github-read.py'
 
 
 class RequiredReadTests(unittest.TestCase):
@@ -144,7 +144,7 @@ fetch_project_items; rc=$?
 printf '%s %s\n' "$rc" "$PROJECT_ITEMS_JSON"
 dispatch_lane build 7
 """
-        result = subprocess.run(['bash', '-c', script, 'test', str(ROOT / 'scripts/super-board-run.sh')],
+        result = subprocess.run(['bash', '-c', script, 'test', str(ROOT / 'scripts/drover-run.sh')],
                                 cwd=self.root, env=self.env, text=True, capture_output=True)
         self.assertEqual(result.returncode, 79, result.stderr)
         self.assertIn('79 {"items":[{"id":"preserved"}]}', result.stdout)
@@ -153,7 +153,7 @@ dispatch_lane build 7
     def test_unknown_issue_state_never_means_open(self):
         self.env['READ_RESPONSES'] = json.dumps([{'rc': 1}])
         script = 'SB_LIB_ONLY=1 . "$1"; issue_is_open 7'
-        result = subprocess.run(['bash', '-c', script, 'test', str(ROOT / 'scripts/super-board-run.sh')],
+        result = subprocess.run(['bash', '-c', script, 'test', str(ROOT / 'scripts/drover-run.sh')],
                                 cwd=self.root, env=self.env, capture_output=True)
         self.assertEqual(result.returncode, 79)
         self.assertEqual(self.log.read_text(), '3')
@@ -161,7 +161,7 @@ dispatch_lane build 7
     def test_missing_quota_never_means_full_allowance(self):
         self.env['READ_RESPONSES'] = json.dumps([{'rc': 1}])
         result = subprocess.run(['bash', '-c', '. "$1"; sb_gh_guard_check 200', 'test',
-                                 str(ROOT / 'scripts/super-board-gh-guard.sh')], cwd=self.root,
+                                 str(ROOT / 'scripts/drover-gh-guard.sh')], cwd=self.root,
                                 env=self.env, capture_output=True)
         self.assertEqual(result.returncode, 79)
         self.assertEqual(self.log.read_text(), '3')
@@ -238,7 +238,7 @@ STATUS_FIELD_ID=field; STATUS_OPTIONS_JSON='[{"id":"done","name":"Done"}]'
 PROJECT_ITEMS_JSON='{"items":[{"id":"item","status":"Review","content":{"number":7,"type":"Issue","assignees":[]}}]}'
 top_card_in_column Review
 """
-        result = subprocess.run(['bash','-c',script,'test',str(ROOT / 'scripts/super-board-run.sh'),str(self.root)],
+        result = subprocess.run(['bash','-c',script,'test',str(ROOT / 'scripts/drover-run.sh'),str(self.root)],
                                 env=self.env,cwd=self.root,capture_output=True)
         self.assertEqual(result.returncode,79,result.stderr)
         self.assertEqual(self.log.read_text(),'4','one state read, three failed project reads, no claim release')
@@ -256,7 +256,7 @@ top_card_in_column Review
         lock = inflight / '7'; lock.write_text('PID=\nLANE=build\n')
         self.env['READ_RESPONSES'] = json.dumps([{'rc':1}])
         script = 'SB_LIB_ONLY=1 . "$1"; INFLIGHT_DIR="$2/inflight"; RUN_MANIFEST="$2/run.log"; BOT_LOGIN=robot; reap_finished_locks'
-        result = subprocess.run(['bash','-c',script,'test',str(ROOT / 'scripts/super-board-run.sh'),str(self.root)],
+        result = subprocess.run(['bash','-c',script,'test',str(ROOT / 'scripts/drover-run.sh'),str(self.root)],
                                 env=self.env,cwd=self.root,capture_output=True)
         self.assertEqual(result.returncode,79)
         self.assertEqual(self.log.read_text(),'1')
@@ -273,7 +273,7 @@ top_card_in_column Review
         subprocess.run(['git', '-C', str(main), 'worktree', 'add', '-q', '--detach', str(linked)], check=True)
         self.env['SB_REPO_PATH'] = str(linked)
         self.assertEqual(self.read([{'rc': 1}]).returncode, 79)
-        marker = main / '.claude/super-board/github-halt.json'
+        marker = main / '.claude/drover/github-halt.json'
         self.assertTrue(marker.exists())
         self.env['SB_REPO_PATH'] = str(main)
         self.assertEqual(self.read([{'out': '{}'}]).returncode, 79)
@@ -300,7 +300,7 @@ top_card_in_column Review
         self.git('-C', str(sup), 'submodule', 'add', '-q', str(self.root / 'origin-b'), 'projects/b')
         self.env['SB_REPO_PATH'] = str(sup / 'projects/a')
         self.assertEqual(self.read([{'rc': 1}]).returncode, 79)
-        self.assertTrue((sup / '.git/modules/projects/a/super-board/github-halt.json').exists())
+        self.assertTrue((sup / '.git/modules/projects/a/drover/github-halt.json').exists())
         self.assertFalse((sup / '.git/modules/projects/.claude').exists())
         self.env['SB_REPO_PATH'] = str(sup / 'projects/b')
         self.assertEqual(self.read([{'out': '{}'}]).returncode, 0)

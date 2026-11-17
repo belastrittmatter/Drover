@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests super-board-wave-plan.sh against fixtures. No gh calls, no network —
+# Tests drover-wave-plan.sh against fixtures. No gh calls, no network —
 # the dependency graph is injected with --deps.
 #
 # The contract these tests pin down changed on 2026-08-20. A wave used to be
@@ -10,7 +10,7 @@
 # after their blockers had closed.
 set -euo pipefail
 cd "$(dirname "$0")"
-PLAN="../scripts/super-board-wave-plan.sh"
+PLAN="../scripts/drover-wave-plan.sh"
 CFG=fixtures/wave-config.json
 ITEMS=fixtures/wave-items.json
 DEPS=fixtures/wave-deps.json

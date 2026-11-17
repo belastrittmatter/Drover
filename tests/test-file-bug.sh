@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests scripts/super-qa-file-bug.sh. Deterministic, no network: `gh` is a stub
+# Tests scripts/drover-qa-file-bug.sh. Deterministic, no network: `gh` is a stub
 # on PATH. Covers the enum guards, the body guardrails that keep unactionable
 # tickets off the board, project resolution, fingerprint dedupe, and the exit-71
 # contract (issue number reaches stdout even when the board promote fails).
@@ -9,7 +9,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/super-qa-file-bug.sh"
+SCRIPT="$REPO_ROOT/scripts/drover-qa-file-bug.sh"
 WORK="$(mktemp -d)"
 export SB_GITHUB_RETRY_DELAY=0 SB_GITHUB_HALT_FILE="$WORK/halt.json"
 trap 'rm -rf "$WORK"' EXIT
@@ -34,7 +34,7 @@ CSV upload reports success but no rows land in the imports table.
   - c. Click **Submit**
 - **Who:** any signed-in user
 
-![imports](https://github.com/acme/app/raw/abc1234/docs/super-qa/report/imports/tc-1/en/after-submit.png)
+![imports](https://github.com/acme/app/raw/abc1234/docs/drover-qa/report/imports/tc-1/en/after-submit.png)
 
 ## Evidence
 <details><summary>12 rows · no Sentry event · 1 user</summary>
@@ -62,7 +62,7 @@ Make the import job reach a terminal state; see `server/imports/job-handler.ts`.
 ## Acceptance Criteria
 - [ ] Uploaded rows are visible after submit
 - [ ] Regression coverage added
-- [ ] Super QA rerun passes /imports
+- [ ] Drover QA rerun passes /imports
 
 ## Risk
 🟢 **Low** · one handler, covered by the imports spec.
@@ -71,7 +71,7 @@ BODY
 # A valid body padded to ~460 KB inside Evidence and Acceptance Criteria, so a
 # check that pipes the body into `grep -q` loses the race (SIGPIPE + pipefail).
 awk 'BEGIN { for (i = 0; i < 6000; i++) pad = pad "padding line " i " of the evidence log\n" }
-  { print } /^<\/details>$|^- \[ \] Super QA rerun/ { printf "```\n%s```\n", pad }' \
+  { print } /^<\/details>$|^- \[ \] Drover QA rerun/ { printf "```\n%s```\n", pad }' \
   "$WORK/good.md" > "$WORK/big.md"
 sed '/## Evidence/,/## Fix/d' "$WORK/good.md" > "$WORK/no-evidence.md"
 sed 's|CSV upload reports success but no rows land in the imports table.|<one sentence: what is wrong and where>|' "$WORK/good.md" > "$WORK/placeholder.md"
@@ -106,7 +106,7 @@ case "$1 ${2:-}" in
   "label create")  exit 0 ;;
   "project list")
     P=""
-    for t in ${PROJECTS:-Super_Ultimate_QA}; do
+    for t in ${PROJECTS:-drover_QA}; do
       P="${P}{\"number\":9,\"title\":\"$(echo "$t" | tr '_' ' ')\"},"
     done
     echo "{\"projects\":[${P%,}]}" ;;
@@ -148,7 +148,7 @@ is "rejects a missing section"   66 "$(code --title T --body-file "$WORK/no-evid
 has "names the missing section"  "$(cat "$WORK/err")" "Evidence"
 is "rejects <placeholder>"       66 "$(code --title T --body-file "$WORK/placeholder.md")"
 is "rejects TBD"                 66 "$(code --title T --body-file "$WORK/tbd.md")"
-is "escape hatch files it anyway" 0 "$(SUPER_QA_ALLOW_WEAK_BODY=1 code --title T --body-file "$WORK/tbd.md")"
+is "escape hatch files it anyway" 0 "$(DROVER_QA_ALLOW_WEAK_BODY=1 code --title T --body-file "$WORK/tbd.md")"
 is "rejects AC without a checklist" 66 "$(code --title T --body-file "$WORK/no-checklist.md")"
 has "says why"                      "$(cat "$WORK/err")" "checklist"
 is "rejects Context without lettered steps" 66 "$(code --title T --body-file "$WORK/no-steps.md")"
@@ -164,13 +164,13 @@ is "accepts a large valid body (5 runs, no broken-pipe false reject)" 0 "$BIG_RC
 echo "── happy path"
 OUT=$(run "${BASE[@]}" --kind bug --priority high --category functional \
   --area imports --route /imports --spec e2e/paths/imports.spec.ts --iter 3 \
-  --fingerprint "imports|tc-1|silent-drop" --suggested-skill super-build)
+  --fingerprint "imports|tc-1|silent-drop" --suggested-skill drover-build)
 is  "returns the issue number"   "77" "$OUT"
 has "board-readable title"       "$(cat "$GH_LOG")" "🐛 [bug] imports: CSV upload silently drops rows"
 has "labels the source"          "$(cat "$GH_LOG")" "source:qa"
 has "labels the priority"        "$(cat "$GH_LOG")" "priority:high"
 has "labels the qa category"     "$(cat "$GH_LOG")" "qa:functional"
-has "labels the owner"           "$(cat "$GH_LOG")" "skill:super-build"
+has "labels the owner"           "$(cat "$GH_LOG")" "skill:drover-build"
 has "lands in Bug column"        "$(cat "$GH_LOG")" "opt_Bug"
 has "prepends Board summary"     "$(cat "$BODY_CAPTURE")" "## Board summary"
 has "appends Blocked by when absent" "$(cat "$BODY_CAPTURE")" "## Blocked by"
@@ -187,11 +187,11 @@ is "same finding, later iter → same key" "$FP3" "$FP9"
 
 echo "── project resolution"
 is "halts when the QA project is absent" 70 "$(PROJECTS="Some_Other_Board" code "${BASE[@]}")"
-has "tells the operator what to do" "$(cat "$WORK/err")" "create one, or set SUPER_QA_PROJECT_TITLE"
-OUT=$(PROJECTS="My_QA_Board" SUPER_QA_PROJECT_TITLE="My QA Board" run "${BASE[@]}")
-is "honours SUPER_QA_PROJECT_TITLE" "77" "$OUT"
-OUT=$(STATUS_OPTS="Bug Triage" SUPER_QA_TARGET_OPTION_NAME="Triage" run "${BASE[@]}")
-has "honours SUPER_QA_TARGET_OPTION_NAME" "$(cat "$GH_LOG")" "opt_Triage"
+has "tells the operator what to do" "$(cat "$WORK/err")" "create one, or set DROVER_QA_PROJECT_TITLE"
+OUT=$(PROJECTS="My_QA_Board" DROVER_QA_PROJECT_TITLE="My QA Board" run "${BASE[@]}")
+is "honours DROVER_QA_PROJECT_TITLE" "77" "$OUT"
+OUT=$(STATUS_OPTS="Bug Triage" DROVER_QA_TARGET_OPTION_NAME="Triage" run "${BASE[@]}")
+has "honours DROVER_QA_TARGET_OPTION_NAME" "$(cat "$GH_LOG")" "opt_Triage"
 
 echo "── dedupe"
 OUT=$(DEDUPE_HIT="55" run "${BASE[@]}" --fingerprint "imports|tc-1|silent-drop" --iter 4)

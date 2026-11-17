@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Tests super-board-usage.sh — the Claude plan-usage guard the run loop checks
+# Tests drover-usage.sh — the Claude plan-usage guard the run loop checks
 # before each wave. No network: the status-line JSON is fed on stdin and the
 # snapshot lives in a temp file.
 set -euo pipefail
 cd "$(dirname "$0")"
-U="../scripts/super-board-usage.sh"
+U="../scripts/drover-usage.sh"
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 export SB_USAGE_FILE="$TMP/usage.json"
 fail() { echo "FAIL: $1" >&2; exit 1; }

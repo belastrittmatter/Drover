@@ -14,7 +14,7 @@
   },
   "nodes": [
     {
-      "id": "super-board",
+      "id": "drover",
       "label": "/super-board",
       "kind": "public",
       "what": "The **autonomous GitHub-Project pipeline**: five verbs (onboard, lint, status, run, stop) take one board shape (Backlog · Ready · Building · QA · Review · Blocked · Done) ==from empty to drained==, with labels qa · bug · feature routing each card.",
@@ -32,11 +32,11 @@
         "stop"
       ],
       "sublabel": "onboard · lint · status · run · stop",
-      "opensView": "super-board",
+      "opensView": "drover",
       "author": "EricTechPro"
     },
     {
-      "id": "super-collect",
+      "id": "drover-collect",
       "label": "/super-collect",
       "kind": "public",
       "what": "Finds **problems** in one project from Sentry, PostHog, GitHub, merged PRs, architecture and any custom source. It writes ==one findings doc== and never builds or edits app code.",
@@ -54,7 +54,7 @@
         "custom"
       ],
       "sublabel": "sentry · posthog · github · prs · architecture · custom",
-      "opensView": "super-collect",
+      "opensView": "drover-collect",
       "author": "EricTechPro"
     },
     {
@@ -184,7 +184,7 @@
         "--low",
         "--high"
       ],
-      "opensView": "super-board-run",
+      "opensView": "drover-run",
       "author": "EricTechPro"
     },
     {
@@ -201,8 +201,8 @@
       "author": "EricTechPro"
     },
     {
-      "id": "super-build",
-      "label": "super-build",
+      "id": "drover-build",
+      "label": "drover-build",
       "kind": "lane",
       "what": "**Builder lane**: takes a pre-flighted Ready card into its own worktree, makes the ==smallest safe change test-first== under the 400-line PR cap, opens a draft PR and moves the card to QA. It never merges.",
       "when": "==Started by the board==: the super-board-wave workflow runs it for **Ready cards** labelled feature or bug (or unlabelled) once pre-flight says proceed. Also runnable standalone as /super-build (legacy headless claude -p dispatch).",
@@ -213,12 +213,12 @@
         "_skills/vendor/super-board/skills/super-build/references/worker-preamble.md",
         "_skills/vendor/super-board/skills/super-board/references/run.md"
       ],
-      "opensView": "super-build",
+      "opensView": "drover-build",
       "author": "EricTechPro"
     },
     {
-      "id": "super-qa",
-      "label": "super-qa",
+      "id": "drover-qa",
+      "label": "drover-qa",
       "kind": "lane",
       "what": "**Tester lane**: builds an issue-scoped test plan, runs a ==test-gap check== on the Builder's diff, captures evidence and screenshots, then passes the card to Review or bounces it to Build.",
       "when": "==Started by the board== for cards in **QA**, and straight from Ready for cards labelled qa (they skip Building). Also runnable standalone as /super-qa, a BFS route-crawling bug-bash, or /super-qa <url> for a live site with no repo.",
@@ -228,12 +228,12 @@
         "_skills/vendor/super-board/skills/super-qa/references/iteration-preamble.md",
         "_skills/vendor/super-board/skills/super-board/references/run.md"
       ],
-      "opensView": "super-qa",
+      "opensView": "drover-qa",
       "author": "EricTechPro"
     },
     {
-      "id": "super-review",
-      "label": "super-review",
+      "id": "drover-review",
+      "label": "drover-review",
       "kind": "lane",
       "what": "**Reviewer lane** and standalone PR review: forms its own hypotheses first, remembers prior findings, classes every finding, and ==merges only through the merge gate==.",
       "when": "==Started by the board== for cards in **Review** (always on the session model). Also runnable standalone when Eric says \"review this branch\" or \"is this merge-ready\".",
@@ -241,7 +241,7 @@
       "source": [
         "_skills/vendor/super-board/skills/super-review/SKILL.md"
       ],
-      "opensView": "super-review",
+      "opensView": "drover-review",
       "author": "EricTechPro"
     },
     {
@@ -1609,84 +1609,84 @@
   "edges": [
     {
       "id": "r-board-build",
-      "from": "super-board",
-      "to": "super-build",
+      "from": "drover",
+      "to": "drover-build",
       "label": "starts Build lane",
       "when": "a planned Ready card labelled feature or bug (or unlabelled) passes pre-flight"
     },
     {
       "id": "r-board-qa",
-      "from": "super-board",
-      "to": "super-qa",
+      "from": "drover",
+      "to": "drover-qa",
       "label": "starts QA lane",
       "when": "a card is in QA, or in Ready with the qa label (skips Building)"
     },
     {
       "id": "r-board-review",
-      "from": "super-board",
-      "to": "super-review",
+      "from": "drover",
+      "to": "drover-review",
       "label": "starts Review lane",
       "when": "a card is in Review"
     },
     {
       "id": "r-board-gh",
-      "from": "super-board",
+      "from": "drover",
       "to": "gh-board",
       "label": "drains",
       "when": "every wave until drained or halted"
     },
     {
       "id": "r-board-config",
-      "from": "super-board",
+      "from": "drover",
       "to": "sb-config",
       "label": "reads config",
       "when": "onboard writes it; every run reads it"
     },
     {
       "id": "r-collect-gh",
-      "from": "super-collect",
+      "from": "drover-collect",
       "to": "gh-board",
       "label": "files to Backlog",
       "when": "6+ tickets after /to-tickets, or the direct path (--direct, scheduled runs, no /to-spec or /to-tickets)"
     },
     {
       "id": "r-collect-config",
-      "from": "super-collect",
+      "from": "drover-collect",
       "to": "sb-config",
       "label": "reads collect block",
       "when": "every run, to resolve sources, window and board"
     },
     {
       "id": "r-build-qa",
-      "from": "super-build",
-      "to": "super-qa",
+      "from": "drover-build",
+      "to": "drover-qa",
       "label": "hands off",
       "when": "the draft PR is open and the card moved to QA"
     },
     {
       "id": "r-qa-review",
-      "from": "super-qa",
-      "to": "super-review",
+      "from": "drover-qa",
+      "to": "drover-review",
       "label": "hands off",
       "when": "every AC passes and evidence is committed; a fail sends the card back to Ready"
     },
     {
       "id": "r-review-build",
-      "from": "super-review",
-      "to": "super-build",
+      "from": "drover-review",
+      "to": "drover-build",
       "label": "bounces [builder]",
       "when": "a code-side finding or an unfixed prior finding"
     },
     {
       "id": "r-review-base",
-      "from": "super-review",
+      "from": "drover-review",
       "to": "base-branch",
       "label": "merges via gate",
       "when": "review is clean, tests rerun green, and merge_policy lets the robot merge"
     },
     {
       "id": "r-review-hooks",
-      "from": "super-review",
+      "from": "drover-review",
       "to": "hooks",
       "label": "triggers cleanup-wt",
       "when": "the merge gate merged a PR and cleanup-wt is installed"
@@ -1721,35 +1721,35 @@
     },
     {
       "id": "sb-v-onboard",
-      "from": "super-board",
+      "from": "drover",
       "to": "sb-onboard",
       "label": "routes onboard",
       "when": "Eric runs /super-board onboard"
     },
     {
       "id": "sb-v-lint",
-      "from": "super-board",
+      "from": "drover",
       "to": "sb-lint",
       "label": "routes lint",
       "when": "Eric runs /super-board lint"
     },
     {
       "id": "sb-v-status",
-      "from": "super-board",
+      "from": "drover",
       "to": "sb-status",
       "label": "routes status",
       "when": "Eric runs /super-board status"
     },
     {
       "id": "sb-v-run",
-      "from": "super-board",
+      "from": "drover",
       "to": "sb-run",
       "label": "routes run",
       "when": "Eric runs /super-board run, or asks to resume"
     },
     {
       "id": "sb-v-stop",
-      "from": "super-board",
+      "from": "drover",
       "to": "sb-stop",
       "label": "routes stop",
       "when": "Eric runs /super-board stop or says pause"
@@ -1841,27 +1841,27 @@
     {
       "id": "wave-build",
       "from": "wave-js",
-      "to": "super-build",
+      "to": "drover-build",
       "label": "runs Build lane",
       "when": "card enters at Ready (feature, bug or no label) and pre-flight said proceed"
     },
     {
       "id": "wave-qa",
       "from": "wave-js",
-      "to": "super-qa",
+      "to": "drover-qa",
       "label": "runs QA lane",
       "when": "card enters at QA, or Ready with the qa label"
     },
     {
       "id": "wave-review",
       "from": "wave-js",
-      "to": "super-review",
+      "to": "drover-review",
       "label": "runs Review lane",
       "when": "card enters at Review; always on the session model"
     },
     {
       "id": "review-gate",
-      "from": "super-review",
+      "from": "drover-review",
       "to": "merge-gate",
       "label": "calls merge gate",
       "when": "clean review, threads resolved, truth score over threshold, tests green"
@@ -1889,154 +1889,154 @@
     },
     {
       "id": "b-pony",
-      "from": "super-build",
+      "from": "drover-build",
       "to": "ponytail",
       "label": "climbs ladder first",
       "when": "every ticket, before the first line of code"
     },
     {
       "id": "b-impl",
-      "from": "super-build",
+      "from": "drover-build",
       "to": "implement",
       "label": "routes feature",
       "when": "type label feature or ux (then tdd, codebase-design)"
     },
     {
       "id": "b-diag",
-      "from": "super-build",
+      "from": "drover-build",
       "to": "diagnosing-bugs",
       "label": "routes bug",
       "when": "type label bug (then tdd)"
     },
     {
       "id": "b-design",
-      "from": "super-build",
+      "from": "drover-build",
       "to": "codebase-design",
       "label": "routes refactor",
       "when": "type label refactor or tech-debt, or feature"
     },
     {
       "id": "b-tdd",
-      "from": "super-build",
+      "from": "drover-build",
       "to": "tdd",
       "label": "builds test-first",
       "when": "every ticket except docs"
     },
     {
       "id": "b-docs",
-      "from": "super-build",
+      "from": "drover-build",
       "to": "context7",
       "label": "reads current docs",
       "when": "the ticket touches a third-party surface, an upgrade, or auth/billing"
     },
     {
       "id": "b-verify",
-      "from": "super-build",
+      "from": "drover-build",
       "to": "verification",
       "label": "proves before commit",
       "when": "before the final commit"
     },
     {
       "id": "b-review",
-      "from": "super-build",
+      "from": "drover-build",
       "to": "code-review",
       "label": "reviews own diff",
       "when": "once, against the merge-base, before the final commit"
     },
     {
       "id": "b-conflict",
-      "from": "super-build",
+      "from": "drover-build",
       "to": "resolving-merge-conflicts",
       "label": "resolves conflict",
       "when": "a live conflict, e.g. after merge-gate exit 2 or 5"
     },
     {
       "id": "b-askmatt",
-      "from": "super-build",
+      "from": "drover-build",
       "to": "ask-matt",
       "label": "asks the router",
       "when": "the right flow is unclear"
     },
     {
       "id": "b-gh",
-      "from": "super-build",
+      "from": "drover-build",
       "to": "gh-board",
       "label": "moves card to QA",
       "when": "draft PR opened and comments posted"
     },
     {
       "id": "q-tdd",
-      "from": "super-qa",
+      "from": "drover-qa",
       "to": "tdd",
       "label": "writes gaps red-first",
       "when": "the test-gap check finds a High gap"
     },
     {
       "id": "q-tddv2",
-      "from": "super-qa",
+      "from": "drover-qa",
       "to": "tdd-v2",
       "label": "picks the rung",
       "when": "the repo has tdd-v2 (used instead of plain tdd)"
     },
     {
       "id": "q-diag",
-      "from": "super-qa",
+      "from": "drover-qa",
       "to": "diagnosing-bugs",
       "label": "diagnoses failures",
       "when": "a spec goes red and the cause is unclear"
     },
     {
       "id": "q-verify",
-      "from": "super-qa",
+      "from": "drover-qa",
       "to": "verification",
       "label": "proves the pass",
       "when": "before a pass handoff"
     },
     {
       "id": "q-askmatt",
-      "from": "super-qa",
+      "from": "drover-qa",
       "to": "ask-matt",
       "label": "asks the router",
       "when": "the right flow is unclear"
     },
     {
       "id": "q-strat",
-      "from": "super-qa",
+      "from": "drover-qa",
       "to": "testing-strategy",
       "label": "judges coverage",
       "when": "deciding what is worth testing per component type"
     },
     {
       "id": "q-vitest",
-      "from": "super-qa",
+      "from": "drover-qa",
       "to": "vitest",
       "label": "writes unit tests",
       "when": "the ladder stops at unit or integration in TS/JS"
     },
     {
       "id": "q-pw",
-      "from": "super-qa",
+      "from": "drover-qa",
       "to": "playwright-bp",
       "label": "writes e2e specs",
       "when": "the browser is the thing that broke, or standalone crawl specs"
     },
     {
       "id": "q-gh",
-      "from": "super-qa",
+      "from": "drover-qa",
       "to": "gh-board",
       "label": "moves card",
       "when": "pass: QA to Review; fail: QA to Ready (loop:rebuild-N); a qa card first moves itself Ready to QA"
     },
     {
       "id": "q-secrev",
-      "from": "super-qa",
+      "from": "drover-qa",
       "to": "pr-security-review",
       "label": "security pass on the PR diff",
       "when": "every PR; a kept finding fails QA and goes back to Build"
     },
     {
       "id": "q-filebug",
-      "from": "super-qa",
+      "from": "drover-qa",
       "to": "file-bug",
       "label": "files red spec",
       "when": "a standalone crawl finds a failing spec, or a qa card finds a defect tests alone cannot fix"
@@ -2050,91 +2050,91 @@
     },
     {
       "id": "v-cr",
-      "from": "super-review",
+      "from": "drover-review",
       "to": "code-review",
       "label": "runs two-axis review",
       "when": "every card, with the merge-base as the fixed point"
     },
     {
       "id": "v-design",
-      "from": "super-review",
+      "from": "drover-review",
       "to": "codebase-design",
       "label": "reads diff shape",
       "when": "step 2, and when writing every deepening opportunity"
     },
     {
       "id": "v-pony",
-      "from": "super-review",
+      "from": "drover-review",
       "to": "ponytail-review",
       "label": "hunts over-engineering",
       "when": "step 3, on the merge-base diff; inline ladder if absent"
     },
     {
       "id": "v-refactor",
-      "from": "super-review",
+      "from": "drover-review",
       "to": "file-refactor",
       "label": "files deepening card",
       "when": "the diff is correct but leaves a shallow module or misplaced seam"
     },
     {
       "id": "v-gh",
-      "from": "super-review",
+      "from": "drover-review",
       "to": "gh-board",
       "label": "bounces or closes",
       "when": "unresolved [builder]/[qa] threads bounce; a confirmed merge moves the card to Done"
     },
     {
       "id": "c-sentry",
-      "from": "super-collect",
+      "from": "drover-collect",
       "to": "collect-sentry",
       "label": "fetches sentry",
       "when": "sentry is requested or enabled in collect.sources"
     },
     {
       "id": "c-posthog",
-      "from": "super-collect",
+      "from": "drover-collect",
       "to": "collect-posthog",
       "label": "fetches posthog",
       "when": "posthog is requested or enabled"
     },
     {
       "id": "c-github",
-      "from": "super-collect",
+      "from": "drover-collect",
       "to": "gh-issues",
       "label": "reads github",
       "when": "github is requested or enabled"
     },
     {
       "id": "c-prs",
-      "from": "super-collect",
+      "from": "drover-collect",
       "to": "collect-prs",
       "label": "fetches merged PRs",
       "when": "prs is requested or enabled"
     },
     {
       "id": "c-ica",
-      "from": "super-collect",
+      "from": "drover-collect",
       "to": "improve-codebase-architecture",
       "label": "finds refactors",
       "when": "architecture source; read-only finder, findings only"
     },
     {
       "id": "c-design",
-      "from": "super-collect",
+      "from": "drover-collect",
       "to": "codebase-design",
       "label": "finds refactors",
       "when": "architecture source when improve-codebase-architecture is not installed"
     },
     {
       "id": "c-audit",
-      "from": "super-collect",
+      "from": "drover-collect",
       "to": "ponytail-audit",
       "label": "finds bloat",
       "when": "architecture source, always alongside the finder"
     },
     {
       "id": "c-file",
-      "from": "super-collect",
+      "from": "drover-collect",
       "to": "collect-file",
       "label": "adopts or files",
       "when": "6+ tickets from /to-tickets, a GitHub issue, or the direct path; a duplicate gets a comment"
@@ -2897,56 +2897,56 @@
     },
     {
       "id": "super-build-prbody",
-      "from": "super-build",
+      "from": "drover-build",
       "to": "pr-body",
       "label": "writes PR blocks",
       "when": "opening the draft PR and on every rebuild"
     },
     {
       "id": "super-build-human",
-      "from": "super-build",
+      "from": "drover-build",
       "to": "humanizer",
       "label": "humanizes prose",
       "when": "writing commits, PR text and comments, when humanizer is installed"
     },
     {
       "id": "super-qa-prbody",
-      "from": "super-qa",
+      "from": "drover-qa",
       "to": "pr-body",
       "label": "ticks ac, visual",
       "when": "every pass or fail handoff"
     },
     {
       "id": "super-qa-human",
-      "from": "super-qa",
+      "from": "drover-qa",
       "to": "humanizer",
       "label": "humanizes prose",
       "when": "writing commits, PR text and comments, when humanizer is installed"
     },
     {
       "id": "super-review-prbody",
-      "from": "super-review",
+      "from": "drover-review",
       "to": "pr-body",
       "label": "updates status",
       "when": "after a merge (✅ Merged) or a block"
     },
     {
       "id": "super-review-human",
-      "from": "super-review",
+      "from": "drover-review",
       "to": "humanizer",
       "label": "humanizes prose",
       "when": "writing commits, PR text and comments, when humanizer is installed"
     },
     {
       "id": "review-needsyou",
-      "from": "super-review",
+      "from": "drover-review",
       "to": "needs-you",
       "label": "posts 🙋 checklist",
       "when": "the merge gate exits 7 or 8"
     },
     {
       "id": "c-custom",
-      "from": "super-collect",
+      "from": "drover-collect",
       "to": "collect-custom",
       "label": "runs custom sources",
       "when": "a custom source is requested by name or enabled in collect.sources"
@@ -3030,7 +3030,7 @@
     },
     {
       "id": "v-audit",
-      "from": "super-review",
+      "from": "drover-review",
       "to": "security-audit",
       "label": "mentions for a whole-repo audit",
       "when": "never run by the lane; the user runs it on demand"
@@ -3045,15 +3045,15 @@
       "nodeIds": [
         "grill-me",
         "wayfinder",
-        "super-collect",
+        "drover-collect",
         "to-spec",
         "to-tickets",
         "route-fork",
         "implement-spec",
-        "super-board",
-        "super-build",
-        "super-qa",
-        "super-review",
+        "drover",
+        "drover-build",
+        "drover-qa",
+        "drover-review",
         "super-deploy",
         "ui-refine-loop",
         "visual",
@@ -3072,7 +3072,7 @@
           "label": "map cleared"
         },
         {
-          "from": "super-collect",
+          "from": "drover-collect",
           "to": "to-spec",
           "label": "findings doc",
           "when": "one findings doc per run; you run /to-spec on it"
@@ -3095,27 +3095,27 @@
         },
         {
           "from": "route-fork",
-          "to": "super-board",
+          "to": "drover",
           "label": "6+ tickets",
           "when": "big job: every ticket gets its own build, QA and review"
         },
         {
-          "from": "super-board",
-          "to": "super-build",
+          "from": "drover",
+          "to": "drover-build",
           "label": "Ready cards"
         },
         "r-build-qa",
         "r-qa-review",
         {
-          "from": "super-review",
+          "from": "drover-review",
           "to": "super-deploy",
           "label": "merge",
           "style": "dashed",
           "when": "planned: after a merge, watch the deploy and roll back on failure"
         },
         {
-          "from": "super-review",
-          "to": "super-collect",
+          "from": "drover-review",
+          "to": "drover-collect",
           "label": "review done → collect again",
           "kind": "feeds",
           "when": "the board drains; /super-collect looks for the next problems",
@@ -3126,29 +3126,29 @@
         {
           "label": "Sentry",
           "logo": "assets/logos/sentry.svg",
-          "to": "super-collect"
+          "to": "drover-collect"
         },
         {
           "label": "PostHog",
           "logo": "assets/logos/posthog.svg",
-          "to": "super-collect"
+          "to": "drover-collect"
         },
         {
           "label": "GitHub",
           "logo": "assets/logos/github.svg",
-          "to": "super-collect"
+          "to": "drover-collect"
         }
       ],
       "tour": [
-        "super-collect",
+        "drover-collect",
         "to-spec",
         "to-tickets",
         "route-fork",
-        "super-board",
-        "super-build",
-        "super-qa",
-        "super-review",
-        "super-collect"
+        "drover",
+        "drover-build",
+        "drover-qa",
+        "drover-review",
+        "drover-collect"
       ],
       "lanes": false,
       "layout": {
@@ -3160,7 +3160,7 @@
           0,
           1
         ],
-        "super-collect": [
+        "drover-collect": [
           0,
           3
         ],
@@ -3180,19 +3180,19 @@
           4,
           0
         ],
-        "super-board": [
+        "drover": [
           4,
           2
         ],
-        "super-build": [
+        "drover-build": [
           5,
           2
         ],
-        "super-qa": [
+        "drover-qa": [
           6,
           2
         ],
-        "super-review": [
+        "drover-review": [
           7,
           2
         ],
@@ -3218,12 +3218,12 @@
         ]
       },
       "nodeOverrides": {
-        "super-collect": {
+        "drover-collect": {
           "verbs": [],
           "sublabel": "Find real problems",
           "emphasis": true
         },
-        "super-board": {
+        "drover": {
           "verbs": [],
           "sublabel": "6+ tickets · run the board",
           "emphasis": true
@@ -3238,13 +3238,13 @@
           "sublabel": "Draw one visual",
           "emphasis": true
         },
-        "super-build": {
+        "drover-build": {
           "emphasis": true
         },
-        "super-qa": {
+        "drover-qa": {
           "emphasis": true
         },
-        "super-review": {
+        "drover-review": {
           "emphasis": true
         },
         "git-sync": {
@@ -3301,17 +3301,17 @@
           "id": "door-bugs",
           "label": "Bugs and errors",
           "nodeIds": [
-            "super-collect"
+            "drover-collect"
           ]
         },
         {
           "id": "board-family",
           "label": "/super-board · Build → QA → Review",
           "nodeIds": [
-            "super-board",
-            "super-build",
-            "super-qa",
-            "super-review"
+            "drover",
+            "drover-build",
+            "drover-qa",
+            "drover-review"
           ]
         },
         {
@@ -3327,13 +3327,13 @@
       ],
       "browserOrder": [
         "wayfinder",
-        "super-collect",
+        "drover-collect",
         "to-spec",
         "to-tickets",
-        "super-board",
-        "super-build",
-        "super-qa",
-        "super-review",
+        "drover",
+        "drover-build",
+        "drover-qa",
+        "drover-review",
         "ui-refine-loop",
         "visual",
         "git-sync",
@@ -3355,12 +3355,12 @@
       ]
     },
     {
-      "id": "super-board",
+      "id": "drover",
       "parent": "root",
       "title": "/super-board · five verbs",
       "caption": "Onboard sets up; lint makes cards ready; run delegates the lanes. Status inspects a run; stop halts it.",
       "nodeIds": [
-        "super-board",
+        "drover",
         "sb-onboard",
         "sb-lint",
         "sb-status",
@@ -3397,7 +3397,7 @@
         }
       ],
       "nodeOverrides": {
-        "super-board": {
+        "drover": {
           "label": "/super-board",
           "verbs": [],
           "sublabel": "Five verbs",
@@ -3435,19 +3435,19 @@
         }
       },
       "browserOrder": [
-        "super-build",
-        "super-qa",
-        "super-review",
+        "drover-build",
+        "drover-qa",
+        "drover-review",
         "sb-onboard",
         "sb-lint",
-        "super-board-run",
+        "drover-run",
         "sb-status",
         "sb-stop"
       ]
     },
     {
       "id": "sb-lint",
-      "parent": "super-board",
+      "parent": "drover",
       "title": "/super-board lint · Phase 4 routing",
       "caption": "Interactive-only skills live here, never inside an unattended worker. Ticket-format fixes (criteria 16–18) and catch-alls get an inline draft.",
       "nodeIds": [
@@ -3471,8 +3471,8 @@
       ]
     },
     {
-      "id": "super-board-run",
-      "parent": "super-board",
+      "id": "drover-run",
+      "parent": "drover",
       "title": "/super-board run · main steps",
       "caption": "One wave: classify → pre-flight → delegate → merge → done. Up to min(16, CPUs − 2) cards run at once; the runtime queues the rest. Pre-flight checks batches of 5. Open a step for scripts and policies.",
       "nodeIds": [
@@ -3619,12 +3619,12 @@
       }
     },
     {
-      "id": "super-build",
-      "parent": "super-board",
+      "id": "drover-build",
+      "parent": "drover",
       "title": "super-build · skills by ticket type",
       "caption": "An explicit `Skills:` line wins; otherwise the type label picks the chain. Each PR stays under 400 changed lines. grilling is forbidden here and lives in lint.",
       "nodeIds": [
-        "super-build",
+        "drover-build",
         "ponytail",
         "implement",
         "diagnosing-bugs",
@@ -3664,12 +3664,12 @@
       }
     },
     {
-      "id": "super-qa",
-      "parent": "super-board",
+      "id": "drover-qa",
+      "parent": "drover",
       "title": "super-qa · test plan, gap check, evidence",
       "caption": "Issue-scoped inside a run (qa-labelled cards skip Building); standalone it crawls routes and files onto the Super Ultimate QA board. Every PR also gets the pr-security-review pass.",
       "nodeIds": [
-        "super-qa",
+        "drover-qa",
         "tdd",
         "tdd-v2",
         "diagnosing-bugs",
@@ -3711,12 +3711,12 @@
       }
     },
     {
-      "id": "super-review",
-      "parent": "super-board",
+      "id": "drover-review",
+      "parent": "drover",
       "title": "super-review · own pass, memory, merge gate",
       "caption": "Fresh review, adversarial grounding and refactor findings. Passing review enters the merge gate; human-only steps open their own view.",
       "nodeIds": [
-        "super-review",
+        "drover-review",
         "code-review",
         "codebase-design",
         "ponytail-review",
@@ -3747,7 +3747,7 @@
       }
     },
     {
-      "id": "super-collect",
+      "id": "drover-collect",
       "parent": "root",
       "title": "/super-collect · fetch, verify, file",
       "caption": "Fetch sources → verify → confirm → write one findings doc. The doc goes to /to-spec, then /to-tickets; collecting never moves a card to Ready.",
@@ -4249,7 +4249,7 @@
     },
     {
       "id": "tdd",
-      "parent": "super-build",
+      "parent": "drover-build",
       "title": "tdd · discipline",
       "caption": "tdd consults, it does not run sessions.",
       "nodeIds": [
@@ -4264,7 +4264,7 @@
     },
     {
       "id": "tdd-v2",
-      "parent": "super-qa",
+      "parent": "drover-qa",
       "title": "tdd-v2 · the testing ladder",
       "caption": "tdd-v2 owns the rung; tdd owns the loop.",
       "nodeIds": [
@@ -4277,7 +4277,7 @@
     },
     {
       "id": "implement",
-      "parent": "super-build",
+      "parent": "drover-build",
       "title": "implement · build then review",
       "caption": "EricOS local override of the mattpocock skill.",
       "nodeIds": [
@@ -4294,7 +4294,7 @@
     },
     {
       "id": "code-review",
-      "parent": "super-build",
+      "parent": "drover-build",
       "title": "code-review · two axes",
       "caption": "Standards and Spec run as parallel sub-agents and are reported side by side.",
       "nodeIds": [
@@ -4312,7 +4312,7 @@
     },
     {
       "id": "diagnosing-bugs",
-      "parent": "super-build",
+      "parent": "drover-build",
       "title": "diagnosing-bugs · six phases",
       "caption": "Feedback loop, reproduce, hypothesise, instrument, fix + regression test, cleanup + post-mortem.",
       "nodeIds": [
@@ -4325,7 +4325,7 @@
     },
     {
       "id": "improve-codebase-architecture",
-      "parent": "super-collect",
+      "parent": "drover-collect",
       "title": "improve-codebase-architecture",
       "caption": "super-collect's finder uses only the findings: no HTML report, no grilling.",
       "nodeIds": [
@@ -4342,7 +4342,7 @@
     },
     {
       "id": "ask-matt",
-      "parent": "super-build",
+      "parent": "drover-build",
       "title": "ask-matt · idea to ship",
       "caption": "The router's main flow and on-ramps; codebase-design is the other vocabulary underneath.",
       "nodeIds": [
@@ -4476,7 +4476,7 @@
     },
     {
       "id": "sb-onboard",
-      "parent": "super-board",
+      "parent": "drover",
       "title": "/super-board onboard · setup",
       "caption": "Eight questions, grouped into five phases. Answers save as you go; files change once at the final “Write everything” step.",
       "nodeIds": [
@@ -4657,7 +4657,7 @@
     },
     {
       "id": "run-start",
-      "parent": "super-board-run",
+      "parent": "drover-run",
       "title": "Run trigger · planner and guards",
       "caption": "",
       "nodeIds": [
@@ -4731,7 +4731,7 @@
     },
     {
       "id": "run-classify",
-      "parent": "super-board-run",
+      "parent": "drover-run",
       "title": "Classifier · labels, planner and state",
       "caption": "",
       "nodeIds": [
@@ -4772,7 +4772,7 @@
     },
     {
       "id": "run-preflight",
-      "parent": "super-board-run",
+      "parent": "drover-run",
       "title": "Pre-flight · readiness and size",
       "caption": "",
       "nodeIds": [
@@ -4829,14 +4829,14 @@
       "caption": "",
       "nodeIds": [
         "policy-size-cap",
-        "super-build",
+        "drover-build",
         "to-tickets",
         "merge-gate"
       ],
       "edges": [
         {
           "from": "policy-size-cap",
-          "to": "super-build",
+          "to": "drover-build",
           "label": "stop if too big"
         },
         {
@@ -4859,24 +4859,24 @@
     },
     {
       "id": "run-lanes",
-      "parent": "super-board-run",
+      "parent": "drover-run",
       "title": "Delegate · Build → QA → Review",
       "caption": "Each card enters the lane selected by its label. Review gets a fresh context.",
       "nodeIds": [
         "run-delegate",
-        "super-build",
-        "super-qa",
-        "super-review"
+        "drover-build",
+        "drover-qa",
+        "drover-review"
       ],
       "edges": [
         {
           "from": "run-delegate",
-          "to": "super-build",
+          "to": "drover-build",
           "label": "bug / feature"
         },
         {
           "from": "run-delegate",
-          "to": "super-qa",
+          "to": "drover-qa",
           "label": "qa skips Build"
         },
         "r-build-qa",
@@ -4887,26 +4887,26 @@
         {
           "title": "Build",
           "nodeIds": [
-            "super-build"
+            "drover-build"
           ]
         },
         {
           "title": "QA",
           "nodeIds": [
-            "super-qa"
+            "drover-qa"
           ]
         },
         {
           "title": "Review",
           "nodeIds": [
-            "super-review"
+            "drover-review"
           ]
         }
       ]
     },
     {
       "id": "merge-gate",
-      "parent": "super-board-run",
+      "parent": "drover-run",
       "title": "Merge gate · proof, policy and human handoff",
       "caption": "",
       "nodeIds": [
@@ -5003,13 +5003,13 @@
       "nodeIds": [
         "needs-you",
         "wave-plan",
-        "super-review"
+        "drover-review"
       ],
       "edges": [
         "needsyou-plan",
         {
           "from": "needs-you",
-          "to": "super-review",
+          "to": "drover-review",
           "label": "done → re-review"
         }
       ],
@@ -5052,7 +5052,7 @@
     },
     {
       "id": "run-done",
-      "parent": "super-board-run",
+      "parent": "drover-run",
       "title": "Done · cleanup and reconciliation",
       "caption": "",
       "nodeIds": [
@@ -5217,14 +5217,14 @@
       "caption": "",
       "nodeIds": [
         "onboard-sources",
-        "super-collect",
+        "drover-collect",
         "collect-custom",
         "sb-config"
       ],
       "edges": [
         {
           "from": "onboard-sources",
-          "to": "super-collect",
+          "to": "drover-collect",
           "label": "five built-ins"
         },
         {
@@ -5278,7 +5278,7 @@
     },
     {
       "id": "collect-sources",
-      "parent": "super-collect",
+      "parent": "drover-collect",
       "title": "Fetch · source adapters",
       "caption": "",
       "nodeIds": [
@@ -5326,7 +5326,7 @@
     },
     {
       "id": "collect-verify",
-      "parent": "super-collect",
+      "parent": "drover-collect",
       "title": "Verify · a fresh pass for every candidate",
       "caption": "",
       "nodeIds": [
@@ -5356,7 +5356,7 @@
     },
     {
       "id": "collect-confirm",
-      "parent": "super-collect",
+      "parent": "drover-collect",
       "title": "Confirm · dry-run and enabled sources",
       "caption": "",
       "nodeIds": [
@@ -5380,7 +5380,7 @@
     },
     {
       "id": "collect-submit",
-      "parent": "super-collect",
+      "parent": "drover-collect",
       "title": "Hand-off · findings doc, spec, tickets",
       "caption": "Verified problems go into one findings doc, then /to-spec and /to-tickets. 1–5 tickets go to /implement-spec once you say yes; 6 or more go to Backlog. --direct, scheduled runs and a missing /to-spec or /to-tickets file straight to Backlog. GitHub issues are adopted as they are.",
       "nodeIds": [
@@ -5656,7 +5656,7 @@
     },
     {
       "id": "sb-status",
-      "parent": "super-board",
+      "parent": "drover",
       "title": "/super-board status",
       "caption": "Inspect active work, lane outcomes and the dispatcher status without starting a worker.",
       "nodeIds": [
@@ -5666,7 +5666,7 @@
     },
     {
       "id": "sb-stop",
-      "parent": "super-board",
+      "parent": "drover",
       "title": "/super-board stop",
       "caption": "Halt the active dispatcher and report what was stopped.",
       "nodeIds": [

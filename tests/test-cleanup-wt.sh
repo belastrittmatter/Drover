@@ -36,16 +36,20 @@ g switch -q trunk
 g switch -q -c feat-old;      commit old.txt 1; g switch -q trunk
 g switch -q -c feat-today;    commit today.txt 1 "$(date +%Y-%m-%dT%H:%M:%S)"; g switch -q trunk
 g switch -q -c feat-dirty;    commit dirty.txt 1; g switch -q trunk; g merge -q --ff-only feat-dirty
+g switch -q -c feat-dirty2;   commit dirty2.txt 1; g switch -q trunk; g merge -q --ff-only feat-dirty2
 g switch -q -c feat-cur;      commit cur.txt 1; g switch -q trunk; g merge -q --ff-only feat-cur
 g switch -q -c feat-stray;    commit stray.txt 1; g switch -q trunk
 g switch -q -c feat-wtmerged; commit wtm.txt 1; g switch -q trunk; g merge -q --ff-only feat-wtmerged
 g push -q origin trunk staging
 
-g worktree add -q "$R/.claude/worktrees/wt-merged" feat-wtmerged
-g worktree add -q "$R/.claude/worktrees/wt-dirty"  feat-dirty
-g worktree add -q "$R/.claude/worktrees/wt-cur"    feat-cur
+g worktree add -q "$R/.drover/worktrees/wt-merged" feat-wtmerged
+g worktree add -q "$R/.drover/worktrees/wt-dirty"  feat-dirty
+g worktree add -q "$R/.drover/worktrees/wt-cur"    feat-cur
+g worktree add -q "$R/.claude/worktrees/wt-harness" feat-old
+g worktree add -q "$R/.claude/worktrees/wt-dirty2" feat-dirty2
 g worktree add -q "$T/repo-stray"                  feat-stray
-echo scratch > "$R/.claude/worktrees/wt-dirty/notes.txt"
+echo scratch > "$R/.drover/worktrees/wt-dirty/notes.txt"
+echo scratch2 > "$R/.claude/worktrees/wt-dirty2/notes2.txt"
 # Age the worktrees past the 24h "fresh" window.
 for d in "$R"/.git/worktrees/*; do touch -t 202001010000 "$d/gitdir" "$d/commondir"; done
 
@@ -63,17 +67,22 @@ printf '%s\n' "$OUT" | grep -q 'bases: trunk, staging' || fail "bases should be 
 g rev-parse -q --verify feat-ff >/dev/null || fail "dry run must not delete anything"
 
 # 2 -- apply from inside wt-cur: that worktree survives even though its branch is merged.
-OUT=$(cd "$R/.claude/worktrees/wt-cur" && python3 "$CW" --no-fetch --apply)
+OUT=$(cd "$R/.drover/worktrees/wt-cur" && python3 "$CW" --no-fetch --apply)
 gone()  { ! g rev-parse -q --verify "refs/heads/$1" >/dev/null || fail "$1 should be deleted"$'\n'"$OUT"; }
 kept()  { g rev-parse -q --verify "refs/heads/$1" >/dev/null || fail "$1 should be kept"$'\n'"$OUT"; }
 gone feat-ff; gone feat-squash; gone feat-staging; gone feat-wtmerged
 kept feat-old; kept feat-today; kept feat-cur; kept trunk; kept staging
-[ -d "$R/.claude/worktrees/wt-cur" ]      || fail "the current worktree must never be removed"
-[ ! -d "$R/.claude/worktrees/wt-merged" ] || fail "merged clean worktree should be removed"
+[ -d "$R/.drover/worktrees/wt-cur" ]      || fail "the current worktree must never be removed"
+[ ! -d "$R/.drover/worktrees/wt-merged" ] || fail "merged clean worktree should be removed"
 # dirty merged worktree: removed, branch kept with a wip commit holding notes.txt
-[ ! -d "$R/.claude/worktrees/wt-dirty" ]  || fail "dirty merged worktree should be removed after the wip commit"
+[ ! -d "$R/.drover/worktrees/wt-dirty" ]  || fail "dirty merged worktree should be removed after the wip commit"
 kept feat-dirty
 g show feat-dirty:notes.txt | grep -q scratch || fail "wip commit should hold the dirty file"
+[ -d "$R/.claude/worktrees/wt-harness" ] || fail "an unmerged worktree under .claude/worktrees is not stray"
+# the same for a dirty merged worktree under the harness folder: work kept in a wip commit
+[ ! -d "$R/.claude/worktrees/wt-dirty2" ] || fail "dirty merged .claude/worktrees worktree should be removed after the wip commit"
+kept feat-dirty2
+g show feat-dirty2:notes2.txt | grep -q scratch2 || fail "wip commit should hold the dirty file under .claude/worktrees"
 # stray unmerged worktree: folder gone, branch kept
 [ ! -d "$T/repo-stray" ] || fail "stray worktree folder should be removed"
 kept feat-stray
@@ -94,15 +103,15 @@ printf '%s\n' "$OUT" | grep -q 'gh unavailable' || fail "should note gh unavaila
 printf '%s\n' "$OUT" | grep -qE '^WOULD' && fail "nothing remote may be planned without gh"
 
 # 5 -- --post-merge is silent unless it acts, local only, and never wip-commits.
-g worktree add -q "$R/.claude/worktrees/wt-pm" feat-ff
+g worktree add -q "$R/.drover/worktrees/wt-pm" feat-ff
 for d in "$R"/.git/worktrees/wt-pm; do touch -t 202001010000 "$d/gitdir" "$d/commondir"; done
-echo wip > "$R/.claude/worktrees/wt-pm/x.txt"
+echo wip > "$R/.drover/worktrees/wt-pm/x.txt"
 OUT=$(cd "$R" && python3 "$CW" --post-merge --base trunk </dev/null)
-[ -d "$R/.claude/worktrees/wt-pm" ] || fail "--post-merge must keep a dirty worktree"
-[ ! -d "$R/.claude/worktrees/wt-cur" ] || fail "wt-cur is merged and no longer current: it should go"
+[ -d "$R/.drover/worktrees/wt-pm" ] || fail "--post-merge must keep a dirty worktree"
+[ ! -d "$R/.drover/worktrees/wt-cur" ] || fail "wt-cur is merged and no longer current: it should go"
 OUT=$(cd "$R" && python3 "$CW" --post-merge --base trunk </dev/null)
 [ -z "$OUT" ] || fail "--post-merge with nothing to do should be silent, got: $OUT"
-rm "$R/.claude/worktrees/wt-pm/x.txt"
+rm "$R/.drover/worktrees/wt-pm/x.txt"
 OUT=$(cd "$R" && python3 "$CW" --post-merge --base trunk </dev/null)
 printf '%s' "$OUT" | grep -q 'removed worktree' || fail "--post-merge should report what it removed, got: $OUT"
 gone feat-ff

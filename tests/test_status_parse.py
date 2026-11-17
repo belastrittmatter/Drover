@@ -1,10 +1,10 @@
-"""Tests for super-board-status.py's manifest parser.
+"""Tests for drover-status.py's manifest parser.
 
 Pure stdlib. No pytest dependency, no `gh` auth, no network — runs anywhere
 Python 3.10+ runs (matches the CI matrix in `.github/workflows/cross-platform.yml`).
 
 Why these tests exist: the renderer's regexes are the contract between this
-script and `scripts/super-board-run.sh`. When the dispatcher's log format
+script and `scripts/drover-run.sh`. When the dispatcher's log format
 diverges from the parser's expectations, the Workers / Recent / Health
 sections silently empty out — which is exactly what happened before these
 tests existed (cf. the `attempt=` / `reaped worktree` calibration bugs).
@@ -24,8 +24,8 @@ from pathlib import Path
 
 # The script has a hyphen in its filename, so import via spec_from_file_location.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_SCRIPT = _REPO_ROOT / "scripts" / "super-board-status.py"
-_spec = importlib.util.spec_from_file_location("super_board_status", _SCRIPT)
+_SCRIPT = _REPO_ROOT / "scripts" / "drover-status.py"
+_spec = importlib.util.spec_from_file_location("drover_status", _SCRIPT)
 assert _spec is not None and _spec.loader is not None
 sbs = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(sbs)
@@ -125,7 +125,7 @@ def test_lane_handoff_drops_prior_inflight() -> None:
 def test_tick_and_exited_tracked() -> None:
     """`tick —` updates last_tick; `exiting cleanly` flips exited."""
     manifest = (
-        "[10:00:00] super-board run started — config=foo\n"
+        "[10:00:00] drover run started — config=foo\n"
         "[10:02:00] tick — Ready=1 Building=0\n"
         "[10:04:00] tick — Ready=0 Building=1\n"
         "[10:30:00] ✅ all active-pipeline columns empty and all lanes idle — exiting cleanly\n"
@@ -161,7 +161,7 @@ def test_empty_manifest_returns_defaults() -> None:
 
 
 def test_real_live_manifest_lines() -> None:
-    """Two-line manifest matching the live NSAdashboard 2026-05-27 board.
+    """Two-line manifest matching a live 2026-05-27 board.
 
     This is the case the original PR shipped broken: with the old
     DISPATCH_RE (`.*attempt=(\\d+)/3`) and the old reap prefix check
@@ -210,7 +210,7 @@ def test_field_status_picks_status_select() -> None:
 
 def test_valid_slug_accepts_normal_slugs() -> None:
     assert sbs.valid_slug("my-project")
-    assert sbs.valid_slug("nsadashboard-super-board")
+    assert sbs.valid_slug("my-app-drover")
     assert sbs.valid_slug("Project_1.0")
     assert sbs.valid_slug("a")
 

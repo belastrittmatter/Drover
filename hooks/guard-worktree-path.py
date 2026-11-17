@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""PreToolUse(Bash) guard: a git worktree may only live under <repo>/.claude/worktrees/.
+"""PreToolUse(Bash) guard: a git worktree may only live under <repo>/.drover/worktrees/
+(card worktrees) or <repo>/.claude/worktrees/ (the harness's own).
 
 A worktree created next to the repo (`git worktree add ../proj-feature`) sits outside
 every sweep -- cleanup-wt, Claude Code's own -- long after its PR merges. Claude
@@ -7,7 +8,7 @@ Code's docs show that very pattern, so it keeps coming back.
 
 Reads the Bash command, finds every `git worktree add` / `git worktree move`,
 resolves its target (honouring `cd X &&` and `git -C X`) and denies the call when the
-target is outside `.claude/worktrees/` of the repo git will run in. Its own errors
+target is outside both folders of the repo git will run in. Its own errors
 never block a tool call: anything unexpected exits 0 with no output.
 
 Adapted from BookKeepingApp's .claude/hooks/guard-worktree-path.js (Eric Tech).
@@ -18,7 +19,7 @@ import re
 import subprocess
 import sys
 
-ALLOWED_DIR = os.path.join(".claude", "worktrees")
+ALLOWED_DIRS = (os.path.join(".drover", "worktrees"), os.path.join(".claude", "worktrees"))
 ADD_VALUE_OPTS = {"-b", "-B", "--reason"}
 GIT_VALUE_OPTS = {"-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
 
@@ -137,10 +138,12 @@ def worktree_targets(command, cwd, env):
 
 
 def repo_root(toplevel):
-    """The main checkout's root, from it or any worktree under .claude/worktrees/."""
-    marker = os.sep + ALLOWED_DIR + os.sep
-    at = toplevel.find(marker)
-    return toplevel if at == -1 else toplevel[:at]
+    """The main checkout's root, from it or any worktree under an allowed folder."""
+    for d in ALLOWED_DIRS:
+        at = toplevel.find(os.sep + d + os.sep)
+        if at != -1:
+            return toplevel[:at]
+    return toplevel
 
 
 def check(command, cwd, root_of, env):
@@ -151,15 +154,15 @@ def check(command, cwd, root_of, env):
         repo = root_of(git_dir) or root_of(cwd)
         if not repo:
             continue  # not a repository: git itself will refuse
-        allowed = os.path.join(repo, ALLOWED_DIR)
-        if resolved and resolved.startswith(allowed + os.sep):
+        allowed = os.path.join(repo, ALLOWED_DIRS[0])
+        if resolved and any(resolved.startswith(os.path.join(repo, d) + os.sep) for d in ALLOWED_DIRS):
             continue
         where = ("resolves to " + resolved) if resolved else "cannot be resolved before it runs"
         return (
             'Blocked: worktree path "%s" %s, outside %s/.\n'
-            "Worktrees live only under .claude/worktrees/ so cleanup-wt and Claude Code's sweep can see them.\n"
+            "Worktrees live only under .drover/worktrees/ (or the harness's .claude/worktrees/) so cleanup-wt can see them.\n"
             'Prefer the Agent tool\'s isolation: "worktree" or `claude --worktree <name>`. If you need git directly:\n'
-            "  git worktree add .claude/worktrees/<name> -b <branch> <base>\n"
+            "  git worktree add .drover/worktrees/<name> -b <branch> <base>\n"
             "(from the repo root, with a literal path)." % (raw, where, allowed)
         )
     return None

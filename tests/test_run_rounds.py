@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Whole runner rounds (scripts/super-board-run.sh) with fakes on PATH for gh, claude
+"""Whole runner rounds (scripts/drover-run.sh) with fakes on PATH for gh, claude
 and pgrep (NFR-7). The board is a JSON file the fake gh serves; nothing reaches GitHub,
 and no real worker or dispatcher on this machine is ever matched or signalled."""
 import json
@@ -15,14 +15,14 @@ import unittest
 KIT = Path(__file__).resolve().parents[1]
 IDLE_ROUND_CALLS = 3  # measured at d0b7d5a; see docs/baseline.md
 # The skills the readiness check needs for every lane (see test_skill_dispatch.py).
-NAMES = ['super-board', 'super-build', 'super-qa', 'super-review', 'super-collect', 'visual', 'git-sync',
+NAMES = ['drover', 'drover-build', 'drover-qa', 'drover-review', 'drover-collect', 'visual', 'git-sync',
          'ui-refine-loop', 'pr-security-review', 'tdd', 'implement', 'codebase-design', 'code-review',
          'diagnosing-bugs', 'verification-before-completion', 'testing-strategy']
 
 FAKE_GH = r'''
 import glob, json, os, re, sys
 args = sys.argv[1:]
-manifest = ''.join(open(p).read() for p in glob.glob('docs/super-board/runs/*-fixture.md'))
+manifest = ''.join(open(p).read() for p in glob.glob('docs/drover/runs/*-fixture.md'))
 phase = 'round' if 'initial Ready count' in manifest else 'startup'
 with open(os.environ['CALL_LOG'], 'a') as f:
     f.write(json.dumps({'phase': phase, 'args': args}) + '\n')
@@ -108,7 +108,7 @@ class RunnerRounds(unittest.TestCase):
         self.board_path = self.base / 'board.json'
         self.workers = self.base / 'workers'
         self.env = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.environ['PATH'],
-                        SUPER_BOARD_SKILLS_HOME=str(self.home), SB_GITHUB_RETRY_DELAY='0',
+                        DROVER_SKILLS_HOME=str(self.home), SB_GITHUB_RETRY_DELAY='0',
                         SB_GITHUB_HALT_FILE=str(self.base / 'halt.json'), CALL_LOG=str(self.calls_path),
                         BOARD=str(self.board_path), WORKER_DIR=str(self.workers),
                         GIT_AUTHOR_NAME='f', GIT_AUTHOR_EMAIL='f@example.com',
@@ -123,7 +123,7 @@ class RunnerRounds(unittest.TestCase):
             skill = self.root / '.claude/skills' / name / 'SKILL.md'
             skill.parent.mkdir(parents=True, exist_ok=True)
             skill.write_text('fixture skill instructions')
-        self.state = self.root / '.claude/super-board'
+        self.state = self.root / '.claude/drover'
         (self.state / 'configs').mkdir(parents=True)
         self.addCleanup(self.stop_workers)
 
@@ -140,13 +140,13 @@ class RunnerRounds(unittest.TestCase):
             project=dict(owner='o', number=1), base_branch='main', worker_backend='claude-p',
             max_workers=3, bot_identity='bot', verify_commands=['true'], human_approves_merge=True,
             tick_seconds=0, no_progress_cycles=cycles)))
-        result = subprocess.run(['bash', str(KIT / 'scripts/super-board-run.sh'), 'fixture'], cwd=self.root,
+        result = subprocess.run(['bash', str(KIT / 'scripts/drover-run.sh'), 'fixture'], cwd=self.root,
                                 env=self.env, text=True, capture_output=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
 
     def stop(self):
-        result = subprocess.run(['bash', str(KIT / 'scripts/super-board-stop.sh'), 'fixture'], cwd=self.root,
+        result = subprocess.run(['bash', str(KIT / 'scripts/drover-stop.sh'), 'fixture'], cwd=self.root,
                                 env=self.env, text=True, capture_output=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
@@ -189,7 +189,7 @@ class RunnerRounds(unittest.TestCase):
         [pid] = self.worker_pids(expect=1)
         self.assertTrue(alive(pid), 'the fake worker should still be running')
         self.assertIn('PID=%d\n' % pid, self.lock(7) or '', 'live worker lost its lock')
-        manifest = next((self.root / 'docs/super-board/runs').glob('*-fixture.md')).read_text()
+        manifest = next((self.root / 'docs/drover/runs').glob('*-fixture.md')).read_text()
         self.assertNotIn('reaped stale lock', manifest)
         self.assertEqual(manifest.count('dispatch lane=build issue=#7'), 1, manifest)
         self.assertNotIn(['issue', 'edit', '7', '--remove-assignee', 'bot'], self.calls())
@@ -228,7 +228,7 @@ class RunnerRounds(unittest.TestCase):
         self.git('commit', '-q', '--allow-empty', '-m', 'wip on #%d' % issue)
         self.git('push', '-q', 'origin', branch)
         self.git('checkout', '-q', 'main')
-        self.git('worktree', 'add', '-q', '.claude/worktrees/issue-%d-build' % issue, branch)
+        self.git('worktree', 'add', '-q', '.drover/worktrees/issue-%d-build' % issue, branch)
         self.env['PR_FOR_%d' % issue] = str(pr)
         self.board({'number': issue, 'status': 'Ready'})
         self.run_board(cycles=1)
@@ -253,7 +253,7 @@ class RunnerRounds(unittest.TestCase):
         self.assertFalse([c for c in calls if c[:2] in (['pr', 'close'], ['pr', 'merge'], ['issue', 'close'])])
         self.assertTrue(self.git('branch', '--list', branch).strip())
         self.assertTrue(self.git('ls-remote', '--heads', 'origin', branch).strip())
-        self.assertTrue((self.root / '.claude/worktrees/issue-12-build').is_dir())
+        self.assertTrue((self.root / '.drover/worktrees/issue-12-build').is_dir())
 
     # FR-RUN-11: run after a stop sends the card back to a builder on the same branch.
     def test_resume_after_stop(self):
@@ -270,7 +270,7 @@ class RunnerRounds(unittest.TestCase):
         self.assertTrue(self.git('ls-remote', '--heads', 'origin', branch).strip(), 'branch was dropped')
         self.assertFalse([c for c in calls if c[:2] in (['pr', 'create'], ['pr', 'close'])])
         [second] = [p for p in self.worker_pids(expect=2) if p != first]
-        self.assertIn('Run super-build on issue #12 ', (self.workers / str(second)).read_text())
+        self.assertIn('Run drover-build on issue #12 ', (self.workers / str(second)).read_text())
 
     # NFR-6 measurement: GitHub calls in one round with nothing to do. Prints the
     # call list; asserts only the count measured at the fork point (docs/baseline.md).

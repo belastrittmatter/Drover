@@ -1,6 +1,6 @@
 ---
 name: git-sync
-description: Sync the current branch in one pass — commit the working tree as one commit per logical change (in the host repo's commit format, or the super-board writing standard), gate Supabase schema changes, merge-pull, resolve conflicts hunk by hunk, then push without force. Use when the user runs /git-sync or says "git-sync", "sync", "commit and push", "pull and push", or "sync my branch".
+description: Sync the current branch in one pass — commit the working tree as one commit per logical change (in the host repo's commit format, or the drover writing standard), gate Supabase schema changes, merge-pull, resolve conflicts hunk by hunk, then push without force. Use when the user runs /git-sync or says "git-sync", "sync", "commit and push", "pull and push", or "sync my branch".
 ---
 
 # /git-sync
@@ -37,8 +37,8 @@ skip a hook (`--no-verify`).
 
 1. The host's `AGENTS.md`, `CLAUDE.md` or `CONTRIBUTING.md` defines a commit format: follow it
    (for example `#N: type: description`).
-2. Otherwise use section "1 · Commit" of the super-board writing standard
-   (`.claude/skills/super-board/references/writing-standard.md`): emoji, `[type]`, scope,
+2. Otherwise use section "1 · Commit" of the drover writing standard
+   (`.claude/skills/drover/references/writing-standard.md`): emoji, `[type]`, scope,
    subject, 1–4 bullets, `Closes #N` when the commit finishes a ticket.
 3. Keep any attribution trailer the session asks for.
 

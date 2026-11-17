@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_collect_intake_safety as intake  # noqa: E402
 
 ROOT = intake.ROOT
-STATE = ROOT/'scripts/super-board-collect-state.py'
+STATE = ROOT/'scripts/drover-collect-state.py'
 SHIM = r'''#!/usr/bin/env python3
 import fcntl as _real, os, runpy, sys, types
 # Python 3.12+ stdlib (subprocess) probes `import msvcrt` to decide it is on Windows; load it
@@ -48,7 +48,7 @@ class WindowsIntakeTests(intake.IntakeTests):
     """Every intake regression again, through the portable lock path."""
     def setUp(self):
         super().setUp()
-        self.env.update(SUPER_BOARD_BIN=str(shim_bin(self.root)), SB_TEST_REAL_STATE=str(STATE))
+        self.env.update(DROVER_BIN=str(shim_bin(self.root)), SB_TEST_REAL_STATE=str(STATE))
 
     def test_portable_path_never_passes_an_fd_token(self):
         log = self.root/'fds.log'

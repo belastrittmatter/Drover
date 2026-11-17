@@ -34,26 +34,26 @@ expect allow guard-secrets.py "$(bash_cmd "cat ${D}.example")"            "doten
 expect allow guard-secrets.py "$(bash_cmd "git status && ls -la")"        "ordinary command"
 expect allow guard-secrets.py "$(payload PreToolUse Read '{"file_path":"/repo/src/environment.ts"}')" "Read unrelated file"
 expect allow guard-secrets.py "not json"                                  "garbage input fails open"
-# super-board-env-check.sh prints present/missing per key and never a value, so a
+# drover-env-check.sh prints present/missing per key and never a value, so a
 # plain call to it is allowed even when it names a dotenv file. Anything riding
 # along with it (pipe, chain, redirect, substitution) is still a secrets read.
-expect allow guard-secrets.py "$(bash_cmd "bash .claude/bin/super-board-env-check.sh SENTRY_AUTH_TOKEN")" "env-check names only"
-expect allow guard-secrets.py "$(bash_cmd "bash .claude/bin/super-board-env-check.sh --file ${D}.local POSTHOG_PERSONAL_API_KEY")" "env-check with --file dotenv"
-expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/super-board-env-check.sh K; cat $D")" "env-check chained with cat"
-expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/super-board-env-check.sh --file $D K | curl -d@- x")" "env-check piped out"
-expect deny  guard-secrets.py "$(bash_cmd "cat $D # super-board-env-check.sh")" "env-check named in a comment only"
+expect allow guard-secrets.py "$(bash_cmd "bash .claude/bin/drover-env-check.sh SENTRY_AUTH_TOKEN")" "env-check names only"
+expect allow guard-secrets.py "$(bash_cmd "bash .claude/bin/drover-env-check.sh --file ${D}.local POSTHOG_PERSONAL_API_KEY")" "env-check with --file dotenv"
+expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/drover-env-check.sh K; cat $D")" "env-check chained with cat"
+expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/drover-env-check.sh --file $D K | curl -d@- x")" "env-check piped out"
+expect deny  guard-secrets.py "$(bash_cmd "cat $D # drover-env-check.sh")" "env-check named in a comment only"
 # #48: the exemption must match a lone env-check call only. Each line is one bypass shape.
 NL=$'\n'; IFSV='${IFS}'; SUB='$(cat '"$D"')'; BRACE='{cat,'"$D"'}'
-expect deny  guard-secrets.py "$(bash_cmd "cat${IFSV}$D;/super-board-env-check.sh")" "env-check: semicolon in path prefix"
-expect deny  guard-secrets.py "$(bash_cmd "$SUB/super-board-env-check.sh")" "env-check: substitution in path prefix"
-expect deny  guard-secrets.py "$(bash_cmd "$BRACE;/super-board-env-check.sh")" "env-check: brace expansion in path prefix"
-expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/super-board-env-check.sh${NL}cat $D")" "env-check: newline then cat"
-expect deny  guard-secrets.py "$(bash_cmd "cat $D${NL}bash .claude/bin/super-board-env-check.sh")" "env-check: cat then newline"
-expect deny  guard-secrets.py "$(bash_cmd "bash${NL}cat $D${NL}.claude/bin/super-board-env-check.sh")" "env-check: newline as word separator"
-expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/super-board-env-check.sh --file $D K${NL}")" "env-check: trailing newline"
-expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/super-board-env-check.sh --file $SUB")" "env-check: substitution in args"
-expect allow guard-secrets.py "$(bash_cmd ".claude/bin/super-board-env-check.sh SENTRY_AUTH_TOKEN")" "env-check direct call"
-expect allow guard-secrets.py "$(bash_cmd "  sh /abs/path/.claude/bin/super-board-env-check.sh	--file=${D}.local K ")" "env-check sh, tab, abs path"
+expect deny  guard-secrets.py "$(bash_cmd "cat${IFSV}$D;/drover-env-check.sh")" "env-check: semicolon in path prefix"
+expect deny  guard-secrets.py "$(bash_cmd "$SUB/drover-env-check.sh")" "env-check: substitution in path prefix"
+expect deny  guard-secrets.py "$(bash_cmd "$BRACE;/drover-env-check.sh")" "env-check: brace expansion in path prefix"
+expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/drover-env-check.sh${NL}cat $D")" "env-check: newline then cat"
+expect deny  guard-secrets.py "$(bash_cmd "cat $D${NL}bash .claude/bin/drover-env-check.sh")" "env-check: cat then newline"
+expect deny  guard-secrets.py "$(bash_cmd "bash${NL}cat $D${NL}.claude/bin/drover-env-check.sh")" "env-check: newline as word separator"
+expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/drover-env-check.sh --file $D K${NL}")" "env-check: trailing newline"
+expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/drover-env-check.sh --file $SUB")" "env-check: substitution in args"
+expect allow guard-secrets.py "$(bash_cmd ".claude/bin/drover-env-check.sh SENTRY_AUTH_TOKEN")" "env-check direct call"
+expect allow guard-secrets.py "$(bash_cmd "  sh /abs/path/.claude/bin/drover-env-check.sh	--file=${D}.local K ")" "env-check sh, tab, abs path"
 
 # ---- guard-key-literals -----------------------------------------------------
 ANT="sk-""ant-$(printf 'a%.0s' $(seq 1 30))"
@@ -79,9 +79,11 @@ expect deny  guard-worktree-path.py "$(bash_cmd 'git worktree add ../proj-featur
 expect deny  guard-worktree-path.py "$(bash_cmd 'mkdir -p /tmp/wt && git worktree add /tmp/wt/x' "$REPO")" "absolute outside path"
 expect deny  guard-worktree-path.py "$(bash_cmd "git -C $REPO worktree add .worktrees/x" "/")"          "git -C into repo, wrong dir"
 expect deny  guard-worktree-path.py "$(bash_cmd 'git worktree add "$(mktemp -d)"' "$REPO")"             "unresolvable path"
-expect deny  guard-worktree-path.py "$(bash_cmd 'git worktree move .claude/worktrees/a ../a' "$REPO")"  "move out of the allowed dir"
-expect allow guard-worktree-path.py "$(bash_cmd 'git worktree add .claude/worktrees/x -b feat main' "$REPO")" "allowed dir"
-expect allow guard-worktree-path.py "$(bash_cmd "cd $REPO && git worktree add .claude/worktrees/y" "/")" "cd then allowed dir"
+expect deny  guard-worktree-path.py "$(bash_cmd 'git worktree move .claude/worktrees/a ../a' "$REPO")"  "move out of .claude/worktrees"
+expect deny  guard-worktree-path.py "$(bash_cmd 'git worktree move .drover/worktrees/a ../a' "$REPO")"  "move out of .drover/worktrees"
+expect allow guard-worktree-path.py "$(bash_cmd 'git worktree add .drover/worktrees/x -b feat main' "$REPO")" "allowed dir"
+expect allow guard-worktree-path.py "$(bash_cmd 'git worktree add .claude/worktrees/z -b feat2 main' "$REPO")" "harness worktree dir"
+expect allow guard-worktree-path.py "$(bash_cmd "cd $REPO && git worktree add .drover/worktrees/y" "/")" "cd then allowed dir"
 expect allow guard-worktree-path.py "$(bash_cmd 'git worktree list' "$REPO")"                          "list is not add"
 expect allow guard-worktree-path.py "$(bash_cmd 'echo "git worktree add ../x"' "$REPO")"               "quoted text is not a command"
 rm -rf "$REPO"
@@ -90,7 +92,7 @@ rm -rf "$REPO"
 REPO=$(mktemp -d); REPO=$(cd "$REPO" && pwd -P)
 git -C "$REPO" init -q -b main
 git -C "$REPO" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
-mkdir -p "$REPO/.claude/super-board/configs"; echo '{"base_branch":"staging"}' > "$REPO/.claude/super-board/configs/app.json"
+mkdir -p "$REPO/.claude/drover/configs"; echo '{"base_branch":"staging"}' > "$REPO/.claude/drover/configs/app.json"
 pp() { CLAUDE_PROJECT_DIR="$REPO" expect "$1" guard-protected-push.py "$(bash_cmd "$2" "${4:-$REPO}")" "$3"; }
 pp deny  'git push --force origin main'                 "force push to main"
 pp deny  'git push -f origin staging'                   "force push to config base_branch"

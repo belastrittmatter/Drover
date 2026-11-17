@@ -34,8 +34,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ -z "$CONFIG" ] && [ -f .claude/super-board/active ]; then
-  CONFIG=".claude/super-board/configs/$(tr -d '[:space:]' < .claude/super-board/active).json"
+if [ -z "$CONFIG" ] && [ -f .claude/drover/active ]; then
+  CONFIG=".claude/drover/configs/$(tr -d '[:space:]' < .claude/drover/active).json"
 fi
 
 detect() {
@@ -183,7 +183,7 @@ case "$cmd" in
     S=$(detect)
     PM=$(field packageManager <<<"$S"); LOCK=$(field lockfile <<<"$S")
     DEV=$(field devCommand <<<"$S"); READY=$(field readyPath <<<"$S")
-    [ -n "$DEV" ] || die "no dev command: set refine.dev_command in the super-board config" 70
+    [ -n "$DEV" ] || die "no dev command: set refine.dev_command in the drover config" 70
     [ -n "$SLUG" ] || die "up needs --slug" 64
     ROOT="${SUPER_REFINE_WT_ROOT:-.claude/worktrees}"
     mkdir -p "$ROOT"

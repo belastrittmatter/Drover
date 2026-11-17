@@ -1,4 +1,4 @@
-"""Unit tests for super-collect's fetchers: collect_sentry.py, collect_posthog.py, collect_prs.py.
+"""Unit tests for drover-collect's fetchers: collect_sentry.py, collect_posthog.py, collect_prs.py.
 
 Stdlib unittest, no network: urllib.request.urlopen is replaced by a router that
 answers by URL substring and records every request; `gh` is a fake runner.
@@ -19,7 +19,7 @@ import urllib.error
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "skills", "super-collect", "scripts"))
+sys.path.insert(0, os.path.join(HERE, "..", "skills", "drover-collect", "scripts"))
 import collect_common as cc  # noqa: E402
 import collect_posthog as ph  # noqa: E402
 import collect_prs as prs  # noqa: E402
@@ -103,8 +103,8 @@ class Common(unittest.TestCase):
             self.assertEqual(cc.secret("MISSING"), "")
 
     def test_active_config_follows_pointer(self):
-        files = {".claude/super-board/active": "app\n",
-                 ".claude/super-board/configs/app.json": json.dumps({"collect": {"window_days": 30}})}
+        files = {".claude/drover/active": "app\n",
+                 ".claude/drover/configs/app.json": json.dumps({"collect": {"window_days": 30}})}
         with in_dir(files):
             cfg, path = cc.active_config()
             self.assertEqual(cc.window_days(cfg), 30)
@@ -316,9 +316,9 @@ class PRs(unittest.TestCase):
                 "reviewThreads": {"nodes": [{"path": "a.ts", "isResolved": False,
                                              "comments": {"nodes": [{"author": {"login": "eric"}, "body": "why?"}]}}]}}
 
-    def test_paginates_and_marks_super_review_and_bots(self):
+    def test_paginates_and_marks_drover_review_and_bots(self):
         pages = [self.page([self.pr(1, [{"author": {"login": "sb[bot]", "__typename": "Bot"},
-                                         "body": "<!-- super-review:report -->\nR1 fixed"}])], True, "C1"),
+                                         "body": "<!-- drover-review:report -->\nR1 fixed"}])], True, "C1"),
                  self.page([self.pr(2), None], False)]
         calls = []
 
@@ -328,7 +328,7 @@ class PRs(unittest.TestCase):
         out, truncated = prs.list_prs("acme/app", dt.datetime(2026, 9, 18, tzinfo=UTC), run=run)
         self.assertEqual([p["number"] for p in out], [1, 2])
         self.assertFalse(truncated)
-        self.assertTrue(out[0]["comments"][0]["superReview"])
+        self.assertTrue(out[0]["comments"][0]["droverReview"])
         self.assertTrue(out[0]["comments"][0]["author"]["bot"])
         self.assertTrue(out[0]["reviews"][0]["author"]["bot"])
         self.assertEqual(out[0]["threads"][0]["path"], "a.ts")

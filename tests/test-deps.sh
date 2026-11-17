@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests super-board-deps.sh — the `## Blocked by` parser. No gh calls: the issue
+# Tests drover-deps.sh — the `## Blocked by` parser. No gh calls: the issue
 # payload is injected with --from.
 #
 # Every scenario here is a shape that was observed on a real board, not an
@@ -8,14 +8,14 @@
 # they needed.
 set -euo pipefail
 cd "$(dirname "$0")"
-DEPS="../scripts/super-board-deps.sh"
+DEPS="../scripts/drover-deps.sh"
 FIX=fixtures/deps-issues.json
 
 fail() { echo "FAIL: $1" >&2; exit 1; }
 OUT=$("$DEPS" --from "$FIX")
 get() { echo "$OUT" | jq -e ".[\"$1\"] | $2" >/dev/null; }
 
-# 1 — the banner decoy. Every super-board ticket quotes the words "## Blocked by"
+# 1 — the banner decoy. Every drover ticket quotes the words "## Blocked by"
 #     in its preflight banner. A parser that takes the FIRST match reads the
 #     banner and reports no blockers on every card in the repo.
 get 1 '.blockers == [2]'    || fail "#1 should read one blocker past the banner: $(echo "$OUT" | jq -c '.["1"]')"

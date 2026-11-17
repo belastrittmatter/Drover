@@ -18,7 +18,7 @@ import urllib.request
 from unittest import mock
 from fixtures.runtime_http_server import LoopbackHTTPServer
 
-PATH = pathlib.Path(__file__).resolve().parents[1] / 'skills/super-qa/scripts/runtime_compare.py'
+PATH = pathlib.Path(__file__).resolve().parents[1] / 'skills/drover-qa/scripts/runtime_compare.py'
 spec = importlib.util.spec_from_file_location('runtime_compare', PATH)
 runtime = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runtime)

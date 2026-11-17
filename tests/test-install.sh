@@ -24,10 +24,10 @@ plant_decoys() { for d in decoy-one decoy-two decoy-three; do mkdir -p "$1/.clau
 decoys_intact() { [ "$(ls "$1/.claude/skills" | grep -c '^decoy')" -eq 3 ]; }
 
 # A Codex shell would add .codex/ links by detection; keep the default layout predictable.
-unset CODEX_THREAD_ID CODEX_SESSION_ID SUPER_BOARD_HOST
+unset CODEX_THREAD_ID CODEX_SESSION_ID DROVER_HOST
 
-SKILLS="super-board super-build super-qa super-review"
-ALL_SKILLS="$SKILLS super-collect ui-refine-loop visual git-sync pr-security-review"
+SKILLS="drover drover-build drover-qa drover-review"
+ALL_SKILLS="$SKILLS drover-collect ui-refine-loop visual git-sync pr-security-review"
 
 # 1 — a fresh project: plain directories, nothing to preserve. Every primary and
 #     secondary skill lands, and both workflows.
@@ -36,7 +36,7 @@ T=$(mktemp -d)
 for s in $ALL_SKILLS; do
   [ -f "$T/.claude/skills/$s/SKILL.md" ] || fail "plain layout: $s/SKILL.md missing"
 done
-for w in super-board-wave.js ui-refine-loop.js; do
+for w in drover-wave.js ui-refine-loop.js; do
   [ -f "$T/.claude/workflows/$w" ] || fail "workflow $w was not installed"
 done
 rm -rf "$T"
@@ -62,7 +62,7 @@ rm -rf "$T"
 # 3 — a symlink pointing nowhere. Skip it and say so; never guess, never delete.
 T=$(mktemp -d)
 mkdir -p "$T/.claude/skills"
-( cd "$T/.claude/skills" && ln -s ../../nowhere/super-board super-board )
+( cd "$T/.claude/skills" && ln -s ../../nowhere/drover drover )
 plant_decoys "$T"
 OUT=$("$INSTALL" "$T" 2>&1 || true)
 echo "$OUT" | grep -q "pointing nowhere" || fail "a dangling symlink should be reported, got: $OUT"
@@ -73,10 +73,10 @@ rm -rf "$T"
 #     is not named after the skill is refused before anything is removed.
 T=$(mktemp -d)
 mkdir -p "$T/.claude/skills" "$T/elsewhere"
-( cd "$T/.claude/skills" && ln -s ../../elsewhere super-board )
+( cd "$T/.claude/skills" && ln -s ../../elsewhere drover )
 plant_decoys "$T"
 OUT=$("$INSTALL" "$T" 2>&1 || true)
-echo "$OUT" | grep -q "which is not a super-board directory" \
+echo "$OUT" | grep -q "which is not a drover directory" \
   || fail "a mis-resolved destination should be refused by name, got: $OUT"
 [ "$(ls "$T/elsewhere" | wc -l | tr -d ' ')" -eq 0 ] || fail "the refused destination must not be written to"
 decoys_intact "$T" || fail "mis-resolved destination: DECOYS DESTROYED"
@@ -85,11 +85,11 @@ rm -rf "$T"
 # 4b — a vendored pack is already exposed through two layers of skill links.
 #      Refreshing it must preserve the source and both links, on repeated runs.
 T=$(mktemp -d)
-PACK="$T/_skills/vendor/super-board"
+PACK="$T/_skills/vendor/drover"
 mkdir -p "$PACK" "$T/.agents/skills" "$T/.claude/skills"
 cp -R ../install.sh ../VERSION ../skills ../scripts ../workflows ../hooks "$PACK/"
 for s in $ALL_SKILLS; do
-  ln -s "../../_skills/vendor/super-board/skills/$s" "$T/.agents/skills/$s"
+  ln -s "../../_skills/vendor/drover/skills/$s" "$T/.agents/skills/$s"
   ln -s "../../.agents/skills/$s" "$T/.claude/skills/$s"
 done
 plant_decoys "$T"
@@ -108,7 +108,7 @@ rm -rf "$T"
 # 4c — individual helper links also point into the vendored pack. Both the full
 #      hook install and the push-guard-only path must tolerate the same files.
 T=$(mktemp -d)
-PACK="$T/_skills/vendor/super-board"
+PACK="$T/_skills/vendor/drover"
 mkdir -p "$PACK" "$T/.claude/bin" "$T/.claude/workflows" "$T/.claude/hooks"
 cp -R ../install.sh ../VERSION ../skills ../scripts ../workflows ../hooks "$PACK/"
 for group in scripts workflows hooks; do
@@ -123,7 +123,7 @@ for flags in '--protect-main' '--no-hooks --protect-main'; do
   for group in scripts workflows hooks; do
     diff -qr "../$group" "$PACK/$group" >/dev/null || fail "linked helper refresh changed source $group"
   done
-  for file in bin/super-board-run.sh workflows/super-board-wave.js hooks/guard-protected-push.py; do
+  for file in bin/drover-run.sh workflows/drover-wave.js hooks/guard-protected-push.py; do
     [ -L "$T/.claude/$file" ] || fail "linked helper refresh replaced $file"
     [ -s "$T/.claude/$file" ] || fail "linked helper refresh emptied $file"
   done
@@ -132,10 +132,10 @@ rm -rf "$T"
 
 # 4d — a linked destination contains the pack itself. Refuse before clearing it.
 T=$(mktemp -d)
-PACK="$T/super-board/vendor"
+PACK="$T/drover/vendor"
 mkdir -p "$PACK" "$T/.claude/skills"
 cp -R ../install.sh ../VERSION ../skills ../scripts ../workflows ../hooks "$PACK/"
-ln -s "$T/super-board" "$T/.claude/skills/super-board"
+ln -s "$T/drover" "$T/.claude/skills/drover"
 plant_decoys "$T"
 if OUT=$("$PACK/install.sh" --no-hooks "$T" 2>&1); then
   fail "a destination containing the source pack was accepted"
@@ -152,8 +152,8 @@ T=$(mktemp -d)
 PACK="$T/pack"
 mkdir -p "$PACK" "$T/.claude/skills"
 cp -R ../install.sh ../VERSION ../skills ../scripts ../workflows ../hooks "$PACK/"
-mkdir -p "$PACK/skills/super-board/nested/super-board"
-ln -s "$PACK/skills/super-board/nested/super-board" "$T/.claude/skills/super-board"
+mkdir -p "$PACK/skills/drover/nested/drover"
+ln -s "$PACK/skills/drover/nested/drover" "$T/.claude/skills/drover"
 cp -R "$PACK/skills" "$T/expected-skills"
 plant_decoys "$T"
 if OUT=$("$PACK/install.sh" --no-hooks "$T" 2>&1); then
@@ -168,14 +168,14 @@ rm -rf "$T"
 #     whose script was never installed fails only when a user reaches for it.
 T=$(mktemp -d)
 "$INSTALL" "$T" >/dev/null 2>&1
-for s in super-board-run.sh super-board-stop.sh super-board-wave-plan.sh \
-         super-board-lane.sh super-board-codex-lane.sh super-board-codex-wave.sh super-board-card.sh super-board-throttle.sh super-board-host.sh \
-         super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-usage.sh super-board-pr-body.sh \
-         super-review-file-refactor.sh super-qa-file-bug.sh; do
+for s in drover-run.sh drover-stop.sh drover-wave-plan.sh \
+         drover-lane.sh drover-codex-lane.sh drover-codex-wave.sh drover-card.sh drover-throttle.sh drover-host.sh \
+         drover-deps.sh drover-preflight.sh drover-merge-gate.sh drover-usage.sh drover-pr-body.sh \
+         drover-review-file-refactor.sh drover-qa-file-bug.sh; do
   [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed, or is not executable"
 done
 # The Codex shim runs the shared launcher installed beside it.
-[ -x "$T/.agents/bin/super-board-lane.sh" ] && [ -e "$T/.agents/bin/super-board-codex-lane.sh" ] || fail "super-board-lane.sh must sit next to its codex shim in .agents/bin"
+[ -x "$T/.agents/bin/drover-lane.sh" ] && [ -e "$T/.agents/bin/drover-codex-lane.sh" ] || fail "drover-lane.sh must sit next to its codex shim in .agents/bin"
 rm -rf "$T"
 
 # 6 — guard hooks: scripts copied, settings merged into an existing file without
@@ -216,7 +216,7 @@ T=$(mktemp -d)
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1
 [ ! -e "$T/.claude/hooks" ] || fail "--no-hooks still installed hooks"
 [ ! -e "$T/.claude/settings.json" ] || fail "--no-hooks still wrote settings.json"
-[ -f "$T/.claude/skills/super-board/SKILL.md" ] || fail "--no-hooks must still install the skills"
+[ -f "$T/.claude/skills/drover/SKILL.md" ] || fail "--no-hooks must still install the skills"
 rm -rf "$T"
 
 # 7b — --no-hooks --protect-main: exactly the one guard, wired; no other hook.
@@ -250,18 +250,18 @@ rm -rf "$T"
 # 11 — AGENTS.md and CLAUDE.md are the project's own: install leaves both byte for
 #      byte, managed markers included; the last line names onboard as the one next step.
 T=$(mktemp -d)
-printf '# AGENTS.md\n\n- keep me\n<!-- super-board:begin v0.0.1 -->\nold\n<!-- super-board:end -->\n- and me\n' > "$T/AGENTS.md"
+printf '# AGENTS.md\n\n- keep me\n<!-- drover:begin v0.0.1 -->\nold\n<!-- drover:end -->\n- and me\n' > "$T/AGENTS.md"
 printf '# Rules\n- pnpm\n' > "$T/CLAUDE.md"
 cp "$T/AGENTS.md" "$T/AGENTS.before"; cp "$T/CLAUDE.md" "$T/CLAUDE.before"
 OUT=$("$INSTALL" --no-hooks "$T" 2>&1)
 cmp -s "$T/AGENTS.md" "$T/AGENTS.before" || fail "install changed AGENTS.md"
 cmp -s "$T/CLAUDE.md" "$T/CLAUDE.before" || fail "install changed CLAUDE.md"
-[ "$(echo "$OUT" | tail -1)" = "👉 next: open Claude Code here and run /super-board onboard" ] || fail "last line should name onboard, got: $(echo "$OUT" | tail -1)"
+[ "$(echo "$OUT" | tail -1)" = "👉 next: open Claude Code here and run /drover onboard" ] || fail "last line should name onboard, got: $(echo "$OUT" | tail -1)"
 rm -rf "$T"
-# SUPER_BOARD_QUIET_NEXT=1 (for a wrapper that prints its own header and next step)
+# DROVER_QUIET_NEXT=1 (for a wrapper that prints its own header and next step)
 # prints only the 🔧 installing group: one line per group of files, no per-file list.
 T=$(mktemp -d)
-OUT=$(SUPER_BOARD_QUIET_NEXT=1 "$INSTALL" "$T" 2>&1)
+OUT=$(DROVER_QUIET_NEXT=1 "$INSTALL" "$T" 2>&1)
 [ "$(echo "$OUT" | head -1)" = "🔧 installing" ] || fail "quiet mode should start at the installing group, got: $OUT"
 echo "$OUT" | grep -q "next:" && fail "quiet mode must not print the next step"
 echo "$OUT" | grep -q "✓ skills, scripts and workflows → .agents/" || fail "quiet mode should print the grouped files line"
@@ -269,24 +269,24 @@ echo "$OUT" | grep -q "🛡️  6 guard hooks → .claude/settings.json (new fil
 [ "$(echo "$OUT" | wc -l | tr -d ' ')" -le 3 ] || fail "grouped output should be ≤ 3 lines here, got: $OUT"
 rm -rf "$T"
 
-# 12 — upgrade record: an older super-board in the target is written to
-#      .claude/super-board/upgrade.json (from, to, the skills that are new) for onboard.
-T=$(mktemp -d); mkdir -p "$T/.claude/skills/super-board" "$T/.claude/skills/super-build"
-echo "1.8.2" > "$T/.claude/skills/super-board/VERSION"
+# 12 — upgrade record: an older drover in the target is written to
+#      .claude/drover/upgrade.json (from, to, the skills that are new) for onboard.
+T=$(mktemp -d); mkdir -p "$T/.claude/skills/drover" "$T/.claude/skills/drover-build"
+echo "1.8.2" > "$T/.claude/skills/drover/VERSION"
 OUT=$("$INSTALL" --no-hooks "$T" 2>&1)
-jq -e --arg v "$(cat ../VERSION)" '.from == "1.8.2" and .to == $v and (.added_skills | index("super-collect")) and (.added_skills | index("super-build") | not)' \
-  "$T/.claude/super-board/upgrade.json" >/dev/null || fail "upgrade.json wrong: $(cat "$T/.claude/super-board/upgrade.json" 2>&1)"
+jq -e --arg v "$(cat ../VERSION)" '.from == "1.8.2" and .to == $v and (.added_skills | index("drover-collect")) and (.added_skills | index("drover-build") | not)' \
+  "$T/.claude/drover/upgrade.json" >/dev/null || fail "upgrade.json wrong: $(cat "$T/.claude/drover/upgrade.json" 2>&1)"
 echo "$OUT" | grep -q "⬆️  upgrade from 1.8.2" || fail "the upgrade should be one grouped line, got: $OUT"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1
-jq -e '.from == "1.8.2"' "$T/.claude/super-board/upgrade.json" >/dev/null || fail "a second install must keep the original from-version"
+jq -e '.from == "1.8.2"' "$T/.claude/drover/upgrade.json" >/dev/null || fail "a second install must keep the original from-version"
 rm -rf "$T"
 T=$(mktemp -d); "$INSTALL" --no-hooks "$T" >/dev/null 2>&1
-[ -e "$T/.claude/super-board/upgrade.json" ] && fail "a fresh install is not an upgrade"
+[ -e "$T/.claude/drover/upgrade.json" ] && fail "a fresh install is not an upgrade"
 rm -rf "$T"
 T=$(mktemp -d); printf '# AGENTS.md\n- mine\n' > "$T/AGENTS.md"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1
 [ "$(cat "$T/AGENTS.md")" = "$(printf '# AGENTS.md\n- mine')" ] || fail "install must not add a block uninvited"
-for s in super-board-skills-ready.py super-board-host.sh super-board-codex-wave.sh super-board-codex-lane.sh super-board-env-check.sh super-board-merge-policy.py super-board-settings.py super-board-setup.py; do
+for s in drover-skills-ready.py drover-host.sh drover-codex-wave.sh drover-codex-lane.sh drover-env-check.sh drover-merge-policy.py drover-settings.py drover-setup.py; do
   [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed"
 done
 rm -rf "$T"
@@ -294,18 +294,18 @@ rm -rf "$T"
 # 13 — shared layout: the files live once under .agents/; .claude/ reaches them through
 #      links. No .codex/ or .opencode/ unless that host is configured, detected or asked for.
 resolves() { # <target> <host> — host paths reach the .agents/ copy
-  for p in skills/super-board/SKILL.md skills/git-sync/SKILL.md bin/super-board-host.sh workflows/super-board-wave.js; do
+  for p in skills/drover/SKILL.md skills/git-sync/SKILL.md bin/drover-host.sh workflows/drover-wave.js; do
     [ "$1/.$2/$p" -ef "$1/.agents/$p" ] || fail "$2: $p does not resolve to .agents/$p"
   done
 }
 T=$(mktemp -d)
 OUT=$("$INSTALL" "$T" 2>&1)
-[ -d "$T/.agents/skills/super-board" ] && [ ! -L "$T/.agents/skills/super-board" ] || fail "fresh: .agents/skills/super-board should be a real directory"
-[ -f "$T/.agents/bin/super-board-host.sh" ] && [ ! -L "$T/.agents/bin/super-board-host.sh" ] || fail "fresh: .agents/bin should hold real files"
-[ -x "$T/.agents/bin/super-board-run.sh" ] || fail "fresh: .agents/bin scripts must be executable"
+[ -d "$T/.agents/skills/drover" ] && [ ! -L "$T/.agents/skills/drover" ] || fail "fresh: .agents/skills/drover should be a real directory"
+[ -f "$T/.agents/bin/drover-host.sh" ] && [ ! -L "$T/.agents/bin/drover-host.sh" ] || fail "fresh: .agents/bin should hold real files"
+[ -x "$T/.agents/bin/drover-run.sh" ] || fail "fresh: .agents/bin scripts must be executable"
 resolves "$T" claude
-[ -L "$T/.claude/skills/super-board" ] || fail "fresh: .claude/skills/super-board should be a link"
-[ "$(readlink "$T/.claude/skills/super-board")" = "../../.agents/skills/super-board" ] || fail "fresh: links must be relative, got $(readlink "$T/.claude/skills/super-board")"
+[ -L "$T/.claude/skills/drover" ] || fail "fresh: .claude/skills/drover should be a link"
+[ "$(readlink "$T/.claude/skills/drover")" = "../../.agents/skills/drover" ] || fail "fresh: links must be relative, got $(readlink "$T/.claude/skills/drover")"
 [ "$T/.claude/hooks/guard-secrets.py" -ef "$T/.agents/hooks/guard-secrets.py" ] || fail "fresh: hooks should resolve to .agents/hooks"
 [ ! -e "$T/.codex" ] && [ ! -e "$T/.opencode" ] || fail "fresh: no host was asked for, yet .codex/ or .opencode/ appeared"
 echo "$OUT" | grep -q "✓ skills, scripts and workflows → .agents/ (linked from .claude)" || fail "fresh: grouped line should name .agents/ and the hosts, got: $OUT"
@@ -332,35 +332,35 @@ T=$(mktemp -d); mkdir -p "$T/.codex"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1; resolves "$T" codex
 [ ! -e "$T/.opencode" ] || fail "detection: .codex/ alone must not add .opencode/"
 rm -rf "$T"
-T=$(mktemp -d); mkdir -p "$T/.claude/super-board/configs"
-echo '{"host": "opencode"}' > "$T/.claude/super-board/configs/app.json"
+T=$(mktemp -d); mkdir -p "$T/.claude/drover/configs"
+echo '{"host": "opencode"}' > "$T/.claude/drover/configs/app.json"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1; resolves "$T" opencode
 rm -rf "$T"
 T=$(mktemp -d)
 CODEX_THREAD_ID=t1 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1; resolves "$T" codex
 rm -rf "$T"
 
-# 16 — upgrade a real-directory .claude/ install: every path it had still resolves, super-board's
-#      own entries become links, anything that is not super-board's stays exactly as it was.
+# 16 — upgrade a real-directory .claude/ install: every path it had still resolves, drover's
+#      own entries become links, anything that is not drover's stays exactly as it was.
 T=$(mktemp -d)
-mkdir -p "$T/.claude/skills/super-board" "$T/.claude/skills/super-qa" "$T/.claude/skills/other-skill" \
+mkdir -p "$T/.claude/skills/drover" "$T/.claude/skills/drover-qa" "$T/.claude/skills/other-skill" \
          "$T/.claude/bin" "$T/.claude/workflows" "$T/.claude/hooks"
-echo "1.8.2" > "$T/.claude/skills/super-board/VERSION"; echo old > "$T/.claude/skills/super-board/SKILL.md"
-echo old > "$T/.claude/skills/super-board/stale-file.md"
+echo "1.8.2" > "$T/.claude/skills/drover/VERSION"; echo old > "$T/.claude/skills/drover/SKILL.md"
+echo old > "$T/.claude/skills/drover/stale-file.md"
 echo mine > "$T/.claude/skills/other-skill/SKILL.md"
-echo old > "$T/.claude/bin/super-board-run.sh"; echo mine > "$T/.claude/bin/mine.sh"
-echo old > "$T/.claude/workflows/super-board-wave.js"; echo mine > "$T/.claude/hooks/my-hook.py"
+echo old > "$T/.claude/bin/drover-run.sh"; echo mine > "$T/.claude/bin/mine.sh"
+echo old > "$T/.claude/workflows/drover-wave.js"; echo mine > "$T/.claude/hooks/my-hook.py"
 echo old > "$T/.claude/hooks/guard-secrets.py"
 "$INSTALL" "$T" >/dev/null 2>&1 || fail "upgrade from a real-directory install failed"
 resolves "$T" claude
-for p in skills/super-board skills/super-qa bin/super-board-run.sh workflows/super-board-wave.js hooks/guard-secrets.py; do
+for p in skills/drover skills/drover-qa bin/drover-run.sh workflows/drover-wave.js hooks/guard-secrets.py; do
   [ -L "$T/.claude/$p" ] || fail "upgrade: .claude/$p should now be a link into .agents/"
 done
-[ ! -e "$T/.agents/skills/super-board/stale-file.md" ] || fail "upgrade: stale files must not carry over"
+[ ! -e "$T/.agents/skills/drover/stale-file.md" ] || fail "upgrade: stale files must not carry over"
 [ "$(cat "$T/.claude/skills/other-skill/SKILL.md")" = mine ] && [ ! -L "$T/.claude/skills/other-skill" ] || fail "upgrade: other-skill was touched"
 [ "$(cat "$T/.claude/bin/mine.sh")" = mine ] && [ "$(cat "$T/.claude/hooks/my-hook.py")" = mine ] || fail "upgrade: user bin/hooks were touched"
 [ ! -e "$T/.agents/skills/other-skill" ] || fail "upgrade: other-skill must not move into .agents/"
-jq -e '.from == "1.8.2"' "$T/.claude/super-board/upgrade.json" >/dev/null || fail "upgrade: upgrade.json not recorded"
+jq -e '.from == "1.8.2"' "$T/.claude/drover/upgrade.json" >/dev/null || fail "upgrade: upgrade.json not recorded"
 rm -rf "$T"
 
 # 17 — a second run changes nothing (tree, link targets, file contents).
@@ -388,8 +388,8 @@ T=$(mktemp -d); mkdir -p "$T/.agents/skills" "$T/.agents/bin" "$T/.claude"
 ln -s ../.agents/skills "$T/.claude/skills"; ln -s ../.agents/bin "$T/.claude/bin"
 plant_decoys "$T"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1 || fail "whole-folder link layout failed"
-[ -d "$T/.agents/skills/super-board" ] && [ ! -L "$T/.agents/skills/super-board" ] || fail "whole-folder link: skill turned into a self-link"
-[ -f "$T/.claude/skills/super-board/SKILL.md" ] && [ -x "$T/.claude/bin/super-board-run.sh" ] || fail "whole-folder link: files missing"
+[ -d "$T/.agents/skills/drover" ] && [ ! -L "$T/.agents/skills/drover" ] || fail "whole-folder link: skill turned into a self-link"
+[ -f "$T/.claude/skills/drover/SKILL.md" ] && [ -x "$T/.claude/bin/drover-run.sh" ] || fail "whole-folder link: files missing"
 decoys_intact "$T" || fail "whole-folder link: DECOYS DESTROYED"
 rm -rf "$T"
 
@@ -398,9 +398,9 @@ T=$(mktemp -d); FAKE=$(mktemp -d)
 printf '#!/bin/sh\nexit 1\n' > "$FAKE/ln"; chmod +x "$FAKE/ln"
 for run in 1 2; do
   OUT=$(PATH="$FAKE:$PATH" "$INSTALL" "$T" 2>&1) || fail "no-symlink install failed: $OUT"
-  [ -f "$T/.claude/skills/super-board/SKILL.md" ] && [ -x "$T/.claude/bin/super-board-host.sh" ] \
+  [ -f "$T/.claude/skills/drover/SKILL.md" ] && [ -x "$T/.claude/bin/drover-host.sh" ] \
     && [ -f "$T/.claude/hooks/guard-secrets.py" ] || fail "no-symlink install: .claude paths missing"
-  cmp -s "$T/.claude/skills/super-board/SKILL.md" "$T/.agents/skills/super-board/SKILL.md" || fail "no-symlink: copy differs"
+  cmp -s "$T/.claude/skills/drover/SKILL.md" "$T/.agents/skills/drover/SKILL.md" || fail "no-symlink: copy differs"
 done
 echo "$OUT" | grep -q "copied" || fail "no-symlink install should say it copied, got: $OUT"
 rm -rf "$T" "$FAKE"

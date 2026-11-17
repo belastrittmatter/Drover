@@ -1,4 +1,4 @@
-"""Offline Sentry / PostHog for super-collect: a urlopen stand-in that answers from this folder.
+"""Offline Sentry / PostHog for drover-collect: a urlopen stand-in that answers from this folder.
 
 tests/test_collect_baseline.py patches `urllib.request.urlopen` with `Urlopen(dir, now)`.
 

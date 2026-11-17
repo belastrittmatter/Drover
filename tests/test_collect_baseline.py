@@ -1,4 +1,4 @@
-"""Baseline regression suite for super-collect's fetchers, driven by canned payloads.
+"""Baseline regression suite for drover-collect's fetchers, driven by canned payloads.
 
 Pins today's behaviour of collect_sentry.py, collect_posthog.py and collect_prs.py end to end
 (CLI `main()` included) against the fixtures in tests/fixtures/collect/. No network: urlopen is the fixture router and `gh`
@@ -24,7 +24,7 @@ from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FX = os.path.join(HERE, "fixtures", "collect")
-sys.path.insert(0, os.path.join(HERE, "..", "skills", "super-collect", "scripts"))
+sys.path.insert(0, os.path.join(HERE, "..", "skills", "drover-collect", "scripts"))
 sys.path.insert(0, FX)
 import collect_common as cc  # noqa: E402
 import collect_posthog as ph  # noqa: E402
@@ -135,7 +135,7 @@ class Window(unittest.TestCase):
         self.assertEqual(calls[0]["q"], "repo:example/shop is:pr is:merged merged:>=2026-09-27")
         out = json.loads(buf.getvalue())
         self.assertEqual(out["since"], (NOW - dt.timedelta(days=14)).isoformat())
-        self.assertEqual(out["superReviewReports"], 5)
+        self.assertEqual(out["droverReviewReports"], 5)
 
 
 class SentryFixture(unittest.TestCase):
@@ -242,7 +242,7 @@ class PRsFixture(unittest.TestCase):
         self.assertFalse(truncated)
         self.assertEqual([p["number"] for p in out], [21, 24, 26])
         p21 = out[0]
-        self.assertEqual(sum(c["superReview"] for c in p21["comments"]), 2)
+        self.assertEqual(sum(c["droverReview"] for c in p21["comments"]), 2)
         self.assertTrue(p21["comments"][0]["author"]["bot"])
         self.assertEqual(p21["threads"][0]["path"], "src/reports/monthly.ts")
         self.assertTrue(out[1]["reviews"][0]["author"]["bot"])  # coderabbitai

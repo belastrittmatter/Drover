@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests super-board-card.sh against a fake gh. No network.
+# Tests drover-card.sh against a fake gh. No network.
 #
 # The point of the helper is cost: a card move used to be item-list (~203
 # points on a 131-card board) + field-list (101) + item-edit. These tests pin
@@ -7,7 +7,7 @@
 # plus the mutation — and that a stale option id is recovered, not mis-moved.
 set -euo pipefail
 cd "$(dirname "$0")"
-CARD="$PWD/../scripts/super-board-card.sh"
+CARD="$PWD/../scripts/drover-card.sh"
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 fail() { echo "FAIL: $1" >&2; exit 1; }
 pass=0; ok() { pass=$((pass + 1)); echo "  ✅ $1"; }
@@ -113,15 +113,15 @@ RC=0; card items >/dev/null 2>&1 || RC=$?
 ok "incomplete board read refused"
 
 # 10 — no override: the cache lives with its repo. A normal repo keeps
-# <root>/.claude/super-board/cache; a submodule keeps its own, never the
+# <root>/.claude/drover/cache; a submodule keeps its own, never the
 # .git/modules/ parent its siblings share.
 G() { git -c user.name=t -c user.email=t@t -c protocol.file.allow=always "$@" >/dev/null 2>&1; }
 for r in origin super; do mkdir -p "$TMP/$r"; G init -q "$TMP/$r"; G -C "$TMP/$r" commit --allow-empty -qm i; done
 G -C "$TMP/super" submodule add -q "$TMP/origin" projects/a
 (unset SB_CARD_CACHE_DIR; cd "$TMP/super" && card move 232 QA >/dev/null) || fail "move in normal repo"
-[ -f "$TMP/super/.claude/super-board/cache/board-acme-15.json" ] || fail "normal repo cache moved"
+[ -f "$TMP/super/.claude/drover/cache/board-acme-15.json" ] || fail "normal repo cache moved"
 (unset SB_CARD_CACHE_DIR; cd "$TMP/super/projects/a" && card move 232 QA >/dev/null) || fail "move in submodule"
-[ -f "$TMP/super/.git/modules/projects/a/super-board/cache/board-acme-15.json" ] || fail "submodule cache not in its own git dir"
+[ -f "$TMP/super/.git/modules/projects/a/drover/cache/board-acme-15.json" ] || fail "submodule cache not in its own git dir"
 [ ! -e "$TMP/super/.git/modules/.claude" ] || fail "submodule cache leaked into shared .git/modules"
 ok "cache stays inside its own repo (normal + submodule)"
 

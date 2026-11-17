@@ -10,7 +10,7 @@ import hashlib
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-ROUTER = ROOT/'skills/super-collect/scripts/super-collect-file.sh'
+ROUTER = ROOT/'skills/drover-collect/scripts/drover-collect-file.sh'
 BODY = '''## Problem
 PRIVATE_NOTE_DO_NOT_STORE: the request fails.
 ## Context
@@ -76,7 +76,7 @@ class IntakeTests(unittest.TestCase):
         cfg={'project':{'owner':'acme','number':7,'title':'Board'},'repo':{'remote':'https://github.com/acme/app.git','path':'.'}}
         (self.root/'config.json').write_text(json.dumps(cfg));(self.root/'other.json').write_text(json.dumps(cfg))
         self.env=dict(os.environ,PATH=str(self.root)+':'+os.environ['PATH'],FIXTURE_ROOT=str(self.root),
-            SUPER_BOARD_BIN=str(ROOT/'scripts'),SB_GITHUB_HALT_FILE=str(self.root/'halt.json'),
+            DROVER_BIN=str(ROOT/'scripts'),SB_GITHUB_HALT_FILE=str(self.root/'halt.json'),
             SB_GITHUB_RETRY_DELAY='0',SB_COLLECT_STATE_DIR=str(self.root/'collector-state'))
         self.argv=[str(ROUTER),'--config',str(self.root/'config.json'),'--type','feature','--source','custom',
             '--title','Fix request','--body-file',str(self.root/'body.md'),'--fingerprint','custom|demo|one','--yes']

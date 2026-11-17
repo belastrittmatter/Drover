@@ -80,40 +80,40 @@ The drill-down map takes its own file: shared nodes and edges, plus views that e
 
 ```jsonc
 {
-  "title": "super-board skill map",
+  "title": "drover skill map",
   "root": "overview",                      // optional; default = the view with no parent
-  "sourcesBase": "_skills/vendor/super-board/",   // optional prefix for node `source` paths (from the repo root)
+  "sourcesBase": "_skills/vendor/drover/",   // optional prefix for node `source` paths (from the repo root)
   // publishing the page away from the checkout (GitHub Pages)? `render --map map.json --source-base
   // https://github.com/OWNER/REPO/blob/main/ [--source-root <pack dir>]` links each source under the
   // source root to that URL (`:12-20` → `#L12-L20`); sources outside it show as text, no link
   "authors": { "mattpocock": { "name": "Matt Pocock", "url": "https://github.com/mattpocock" } },  // avatars are fetched once and inlined by render
   "nodes": [
-    { "id": "super-board", "label": "/super-board",
+    { "id": "drover", "label": "/drover",
       "kind": "public",                    // public | lane | external | verb | script | hook | board
       "verbs": ["onboard", "run", "stop"], // chips on the node and in the panel
       "what": "One line: what it does.", "when": "What triggers it.", "how": "How it works (markdown).",
-      "source": "skills/super-board/SKILL.md",      // string or array; `:line` suffixes are fine
+      "source": "skills/drover/SKILL.md",      // string or array; `:line` suffixes are fine
       "sublabel": "optional line under the label",
-      "opensView": "super-board",          // optional; otherwise a view with the node's id opens
-      "author": "EricTechPro",             // optional GitHub login; external skills show the author's avatar
+      "opensView": "drover",          // optional; otherwise a view with the node's id opens
+      "author": "my-org",                // optional GitHub login; external skills show the author's avatar
       "origin": "mattpocock-skills",       // optional: where an external skill comes from
       "credits": ["BuilderIO"] }           // optional: further authors listed in the panel
   ],
-  "edges": [ { "id": "e1", "from": "super-board", "to": "super-build", "label": "dispatches", "when": "each wave" } ],
+  "edges": [ { "id": "e1", "from": "drover", "to": "drover-build", "label": "dispatches", "when": "each wave" } ],
   "views": [
-    { "id": "overview", "parent": null, "title": "super-board", "caption": "optional one line", "nodeIds": ["super-board", "super-build"] },
-    { "id": "super-board", "parent": "overview", "title": "/super-board", "nodeIds": ["super-board", "..."],
+    { "id": "overview", "parent": null, "title": "drover", "caption": "optional one line", "nodeIds": ["drover", "drover-build"] },
+    { "id": "drover", "parent": "overview", "title": "/drover", "nodeIds": ["drover", "..."],
       "edges": ["e1"],                     // optional: edge ids or edge objects; default = every model edge between its nodes
       "render": "sequence",                // optional: edges are the run order and get step numbers
       "lanes": [ { "title": "Ask", "nodeIds": ["grilling"] } ],   // optional swimlanes; false turns derived lanes off
-      "layout": { "super-board": [0, 0] } }  // optional [col,row] per node; default = layered auto-layout
+      "layout": { "drover": [0, 0] } }  // optional [col,row] per node; default = layered auto-layout
   ]
 }
 ```
 
 - **Main steps.** Set `mainSteps: true` (or `render: "process"`) to show a compact left-to-right process, with larger, bold, numbered cards and no inferred hub lanes. Keep it to roughly four to six columns. Give each step a short `sublabel` that says what it decides or does; place scripts, state, and policy details in a child view.
-- **Nested families.** A view's `containers: [{"id": "board-family", "label": "/super-board", "nodeIds": ["super-board", "super-build", "super-qa", "super-review"], "parent": "intake-family"}]` draws enclosing boxes. `parent` names another container in that view; omit it for an outer box. Bounds include member cards and child boxes automatically. Keep sibling families in separate columns with a `layout`; the check covers containment, overlapping sibling boxes and wires crossing family headers. Cards inside a family retain their normal details and drill-down. For a process with visible nested tools, set `stepIds` to its four to six primary cards; other `nodeIds` render as ordinary tools.
-- **Column browser.** Children normally follow view order. `browserOrder: ["super-collect", "super-board", "super-build", "super-qa", "super-review"]` puts these views first and can expose shortcuts to descendants; remaining direct children follow. The actual `parent` hierarchy still owns breadcrumbs. Columns scroll horizontally, labels wrap and every row is at least 34 px high.
+- **Nested families.** A view's `containers: [{"id": "board-family", "label": "/drover", "nodeIds": ["drover", "drover-build", "drover-qa", "drover-review"], "parent": "intake-family"}]` draws enclosing boxes. `parent` names another container in that view; omit it for an outer box. Bounds include member cards and child boxes automatically. Keep sibling families in separate columns with a `layout`; the check covers containment, overlapping sibling boxes and wires crossing family headers. Cards inside a family retain their normal details and drill-down. For a process with visible nested tools, set `stepIds` to its four to six primary cards; other `nodeIds` render as ordinary tools.
+- **Column browser.** Children normally follow view order. `browserOrder: ["drover-collect", "drover", "drover-build", "drover-qa", "drover-review"]` puts these views first and can expose shortcuts to descendants; remaining direct children follow. The actual `parent` hierarchy still owns breadcrumbs. Columns scroll horizontally, labels wrap and every row is at least 34 px high.
 - **View-local steps.** A view may define `nodes: [{"id", "label", "kind": "step", "what", "when", "how", "opensView"}]`. These join the page's node index without changing the shared captured nodes. IDs must be unique across both collections; list them in `nodeIds` as usual. Inline `edges` can link them to one another or to shared nodes. The check, search, details, source links, and drill-down use the same model.
 - **Presentation overrides.** `nodeOverrides: {"node-id": {"label": "Short label", "sublabel": "One line", "opensView": "detail-view", "emphasis": true, "verbs": []}}` changes that card only in this view. Keep captured `what`, `when`, and `how` intact. An explicit empty `edges: []` hides all wires in that view.
 - **Focus and details.** Clicking a card highlights its direct neighbors, its wires, and their attached ports; the rest dims. Selected wires flow automatically. A background click clears selection, and reduced motion keeps a static highlight. The tabs run When to use · What it is · How it works · Example · Behind the scenes. The first three derive two to four one-line bullets from the node's captured text; the complete point remains in its tooltip. Text takes `**bold**` and one `==highlight==` per section. Example appears only when the node has `examples: [{"title", "caption", "thumb", "full", "href"}]` (paths relative to the page): a thumbnail gallery, a click opens the full image with a link to the live page. Behind the scenes lists what comes in and what goes out, the sources, and other views.

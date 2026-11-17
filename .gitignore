@@ -4,7 +4,7 @@
 
 # build artifacts
 /dist/
-super-board-v*.zip
+drover-v*.zip
 
 # editor / OS noise
 .idea/
@@ -15,24 +15,25 @@ super-board-v*.zip
 __pycache__/
 *.pyc
 
-# super-board runtime state (if anyone runs the loop *inside* this repo)
-.claude/super-board/active
-.claude/super-board/collect/
-.claude/super-board/inflight/
-.claude/super-board/migrations/
+# drover runtime state (if anyone runs the loop *inside* this repo)
+.claude/drover/active
+.claude/drover/collect/
+.claude/drover/inflight/
+.claude/drover/migrations/
 .claude/worktrees/
+.drover/worktrees/
 .worktrees/
 
 # QA evidence (heavy artifacts; keep summaries)
-docs/super-board/runs/**/*.png
-docs/super-board/runs/**/*.jpg
-docs/super-board/runs/**/*.jpeg
-docs/super-board/runs/**/*.webp
-docs/super-board/runs/**/*.html
-docs/super-board/runs/**/*.log
-docs/super-board/runs/**/*.patch
-docs/super-board/runs/**/*.diff
-docs/super-board/runs/**/*.zip
-docs/super-board/runs/**/*.trace
-docs/super-board/runs/**/*.trace.zip
+docs/drover/runs/**/*.png
+docs/drover/runs/**/*.jpg
+docs/drover/runs/**/*.jpeg
+docs/drover/runs/**/*.webp
+docs/drover/runs/**/*.html
+docs/drover/runs/**/*.log
+docs/drover/runs/**/*.patch
+docs/drover/runs/**/*.diff
+docs/drover/runs/**/*.zip
+docs/drover/runs/**/*.trace
+docs/drover/runs/**/*.trace.zip
 

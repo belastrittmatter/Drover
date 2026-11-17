@@ -12,7 +12,7 @@ import time
 import unittest
 
 KIT = Path(os.environ.get('SB_TEST_PACK', Path(__file__).resolve().parents[1]))
-NAMES = ['super-board','super-build','super-qa','super-review','super-collect','visual','git-sync','ui-refine-loop','pr-security-review',
+NAMES = ['drover','drover-build','drover-qa','drover-review','drover-collect','visual','git-sync','ui-refine-loop','pr-security-review',
          'tdd','implement','codebase-design','code-review','diagnosing-bugs','verification-before-completion','testing-strategy']
 
 class Dispatch(unittest.TestCase):
@@ -22,7 +22,7 @@ class Dispatch(unittest.TestCase):
         self.root, self.home, self.bin = [self.base / name for name in ['repo','home','bin']]
         for path in [self.root,self.home,self.bin]: path.mkdir()
         self.env = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.environ['PATH'],
-                        SUPER_BOARD_SKILLS_HOME=str(self.home), SB_GITHUB_RETRY_DELAY='0',
+                        DROVER_SKILLS_HOME=str(self.home), SB_GITHUB_RETRY_DELAY='0',
                         SB_GITHUB_HALT_FILE=str(self.base / 'halt.json'), CALL_LOG=str(self.base / 'calls.jsonl'))
         subprocess.run(['git','init','-q',str(self.root)], check=True)
         self.config = self.base / 'config.json'
@@ -47,18 +47,18 @@ if 'Grade complexity' in prompt:
     result={'complexity':'low'}
 else:
     card=json.loads(re.search(r'^Card: (.+)$',prompt,re.M).group(1))
-    lane=re.search(r'Run super-(build|qa|review)',prompt).group(1)
+    lane=re.search(r'Run drover-(build|qa|review)',prompt).group(1)
     result={'status':'advanced','column':{'build':'QA','qa':'Review','review':'Done'}[lane], 'detail':'fixture','prUrl':None,'branch':None,'priorFindings':None}
 output.write_text(json.dumps(result))
 ''')
         self.tool('claude', "import json,os\nwith open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps({'tool':'claude'})+'\\n')\n")
         self.tool('npx', "import json,os,sys\nwith open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps({'tool':'npx','args':sys.argv[1:]})+'\\n')\n")
-        self.state = self.root / '.claude/super-board'
+        self.state = self.root / '.claude/drover'
         (self.state / 'inflight').mkdir(parents=True)
         (self.state / 'inflight/99').write_text('PID=99999\nLANE=review\n')
         (self.state / 'approval.json').write_text('{"human":"existing"}')
-        (self.root / '.claude/worktrees/preserved').mkdir(parents=True)
-        (self.root / '.claude/worktrees/preserved/user.txt').write_text('existing work')
+        (self.root / '.drover/worktrees/preserved').mkdir(parents=True)
+        (self.root / '.drover/worktrees/preserved/user.txt').write_text('existing work')
 
     def tool(self,name,source):
         compile(source, name, 'exec')
@@ -79,13 +79,13 @@ output.write_text(json.dumps(result))
     def preserved(self):
         self.assertEqual((self.state/'inflight/99').read_text(),'PID=99999\nLANE=review\n')
         self.assertEqual((self.state/'approval.json').read_text(),'{"human":"existing"}')
-        self.assertEqual((self.root/'.claude/worktrees/preserved/user.txt').read_text(),'existing work')
+        self.assertEqual((self.root/'.drover/worktrees/preserved/user.txt').read_text(),'existing work')
         self.assertFalse((self.state/'codex-wave.pid').exists())
 
     def test_missing_all_remaining_chains_halt_before_router_or_marker(self):
         for status,labels in [('Ready',[]),('Ready',['qa']),('QA',[]),('Review',[])]:
             with self.subTest(status=status,labels=labels):
-                result=self.invoke('super-board-codex-wave.sh','--config',str(self.config),'--cards',json.dumps([dict(number=1,status=status,labels=labels)]),'--codex')
+                result=self.invoke('drover-codex-wave.sh','--config',str(self.config),'--cards',json.dumps([dict(number=1,status=status,labels=labels)]),'--codex')
                 self.assertEqual(result.returncode,10,result.stderr)
                 output=json.loads(result.stdout)
                 self.assertTrue(output['halted']);self.assertEqual(output['cards'][0]['column'],status)
@@ -97,7 +97,7 @@ output.write_text(json.dumps(result))
 
     def test_passing_wave_progresses_all_lanes_and_hydrates_body(self):
         self.full()
-        result=self.invoke('super-board-codex-wave.sh','--config',str(self.config),'--cards','[{"number":1,"status":"Ready"}]','--codex=fixture')
+        result=self.invoke('drover-codex-wave.sh','--config',str(self.config),'--cards','[{"number":1,"status":"Ready"}]','--codex=fixture')
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(json.loads(result.stdout)['cards'][0]['column'],'Done')
         host=[c for c in self.calls() if c['tool']=='codex']
@@ -108,7 +108,7 @@ output.write_text(json.dumps(result))
     def test_removed_skill_after_wave_check_halts_before_worker(self):
         self.full()
         self.env['REMOVE_AFTER_GRADE']=str(self.root/'.agents/skills/code-review/SKILL.md')
-        result=self.invoke('super-board-codex-wave.sh','--config',str(self.config),'--cards','[{"number":1,"status":"Ready","body":""}]','--codex')
+        result=self.invoke('drover-codex-wave.sh','--config',str(self.config),'--cards','[{"number":1,"status":"Ready","body":""}]','--codex')
         self.assertEqual(result.returncode,10,result.stderr)
         calls=[c for c in self.calls() if c['tool']=='codex']
         self.assertEqual(len(calls),1);self.assertIn('Grade complexity',calls[0]['prompt'])
@@ -118,22 +118,22 @@ output.write_text(json.dumps(result))
     def test_codex_fallback_and_override_cannot_use_claude_only_files(self):
         self.full('claude')
         card=dict(number=1,status='Ready',body='Skills: custom')
-        result=self.invoke('super-board-codex-lane.sh','--config',str(self.config),'--card',json.dumps(card),'--lane','build')
+        result=self.invoke('drover-codex-lane.sh','--config',str(self.config),'--card',json.dumps(card),'--lane','build')
         self.assertEqual(result.returncode,10,result.stderr)
         self.assertFalse(any(c['tool']=='codex' for c in self.calls()))
         self.full()
-        result=self.invoke('super-board-codex-lane.sh','--config',str(self.config),'--card',json.dumps(card),'--lane','build')
+        result=self.invoke('drover-codex-lane.sh','--config',str(self.config),'--card',json.dumps(card),'--lane','build')
         self.assertEqual(result.returncode,10,result.stderr)
         path=self.root/'.agents/skills/custom/SKILL.md';path.parent.mkdir(parents=True);path.write_text('custom')
-        result=self.invoke('super-board-codex-lane.sh','--config',str(self.config),'--card',json.dumps(card),'--lane','build')
+        result=self.invoke('drover-codex-lane.sh','--config',str(self.config),'--card',json.dumps(card),'--lane','build')
         self.assertEqual(result.returncode,0,result.stderr)
 
     def test_legacy_dispatch_missing_skills_stops_before_claim(self):
         body='''export SB_LIB_ONLY=1
-source "$1/scripts/super-board-run.sh"
+source "$1/scripts/drover-run.sh"
 BOT_LOGIN=bot
 PROJECT_ITEMS_JSON='{"items":[{"status":"Ready","content":{"number":1},"labels":["docs"]}]}'
-INFLIGHT_DIR=.claude/super-board/inflight
+INFLIGHT_DIR=.claude/drover/inflight
 WORKER_LOG_DIR="$PWD"
 dispatch_lane build 1
 '''
@@ -146,13 +146,13 @@ dispatch_lane build 1
     def test_standalone_missing_skills_creates_no_log_or_worktree(self):
         subprocess.run(['git','-C',str(self.root),'-c','user.name=Fixture','-c','user.email=fixture@example.com','commit','--allow-empty','-qm','fixture'],check=True)
         directory=self.root/'.claude/bin';directory.mkdir()
-        for name in ['super-board-github-read.py','super-board-skills-ready.py']:
+        for name in ['drover-github-read.py','drover-skills-ready.py']:
             shutil.copy2(KIT/'scripts'/name,directory/name)
         self.env.update(REPO_DIR=str(self.root),BASE_BRANCH=subprocess.check_output(['git','-C',str(self.root),'branch','--show-current'],text=True).strip())
-        result=subprocess.run(['bash',str(KIT/'skills/super-build/scripts/super-build-dispatch.sh'),'1'],cwd=self.root,env=self.env,text=True,capture_output=True)
+        result=subprocess.run(['bash',str(KIT/'skills/drover-build/scripts/drover-build-dispatch.sh'),'1'],cwd=self.root,env=self.env,text=True,capture_output=True)
         self.assertEqual(result.returncode,10,result.stderr)
-        self.assertFalse((self.root/'.planning/super-build-logs').exists())
-        self.assertFalse((self.root/'.claude/worktrees/issue-1').exists())
+        self.assertFalse((self.root/'.planning/drover-build-logs').exists())
+        self.assertFalse((self.root/'.drover/worktrees/issue-1').exists())
         self.assertTrue(all(c['tool']=='gh' and c['args'][:2]==['issue','view'] for c in self.calls()))
         self.preserved()
 
@@ -263,7 +263,7 @@ elif args[:2]==['issue','view']:
 elif args[:2]==['issue','edit'] and '--add-assignee' in args:pass
 else:sys.exit('unexpected gh call: '+str(args))
 """)
-        result = subprocess.run(['bash',str(KIT/'scripts/super-board-run.sh'),'fixture'],cwd=self.root,
+        result = subprocess.run(['bash',str(KIT/'scripts/drover-run.sh'),'fixture'],cwd=self.root,
                                 env=self.env,text=True,capture_output=True,timeout=15)
         self.assertEqual(result.returncode,10,result.stderr + result.stdout)
         deadline = __import__('time').monotonic()+3
@@ -279,7 +279,7 @@ else:sys.exit('unexpected gh call: '+str(args))
     def test_setup_fix_reports_missing_even_after_successful_installer(self):
         (self.root/'skills-lock.json').write_text('{"mattpocock/skills":true}')
         for command,extra in [('check',[]),('fix',['--no-helpers']),('fix',[])]:
-            result=subprocess.run([sys.executable,str(KIT/'scripts/super-board-setup.py'),command,'--root',str(self.root),'--pack',str(KIT),'--home',str(self.home),*extra],env=self.env,text=True,capture_output=True)
+            result=subprocess.run([sys.executable,str(KIT/'scripts/drover-setup.py'),command,'--root',str(self.root),'--pack',str(KIT),'--home',str(self.home),*extra],env=self.env,text=True,capture_output=True)
             self.assertEqual(result.returncode,1,result.stderr)
             output=json.loads(result.stdout)
             self.assertFalse(output['helper_skills']);self.assertFalse(output['green'])
@@ -295,7 +295,7 @@ else:sys.exit('unexpected gh call: '+str(args))
         self.full('claude')
         (self.root/'skills-lock.json').write_text('{"mattpocock/skills":true,"cloudflare/security-audit-skill":true}')
         for command,extra in [('check',[]),('fix',[])]:
-            result=subprocess.run([sys.executable,str(KIT/'scripts/super-board-setup.py'),command,'--root',str(self.root),'--pack',str(KIT),'--home',str(self.home),*extra],env=self.env,text=True,capture_output=True)
+            result=subprocess.run([sys.executable,str(KIT/'scripts/drover-setup.py'),command,'--root',str(self.root),'--pack',str(KIT),'--home',str(self.home),*extra],env=self.env,text=True,capture_output=True)
             output=json.loads(result.stdout)
             self.assertTrue(output['security_audit'],result.stdout)
             entry=next(e for e in output['helper_readiness']['entries'] if e['name']=='security-audit')

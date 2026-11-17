@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-SOURCE = Path(__file__).resolve().parents[1] / 'scripts/super-board-setup.py'
+SOURCE = Path(__file__).resolve().parents[1] / 'scripts/drover-setup.py'
 spec = importlib.util.spec_from_file_location('board_setup', SOURCE)
 setup = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(setup)
@@ -241,7 +241,7 @@ class UpgradeRecoveryTests(unittest.TestCase):
     def test_corrupt_pending_record_is_not_replaced(self):
         self.gh.fail = lambda a: a[:2] == ['issue','edit']
         self.invoke()
-        journal = next((self.root / '.claude/super-board/migrations').glob('*.json'))
+        journal = next((self.root / '.claude/drover/migrations').glob('*.json'))
         journal.write_text('{broken')
         self.gh.calls.clear(); self.gh.fail = None
         code, result = self.invoke()
@@ -320,7 +320,7 @@ class UpgradeRecoveryTests(unittest.TestCase):
     def test_semantically_corrupt_record_cannot_issue_writes(self):
         self.gh.fail = lambda a: a[:2] == ['issue','edit']
         self.invoke()
-        journal = next((self.root / '.claude/super-board/migrations').glob('*.json'))
+        journal = next((self.root / '.claude/drover/migrations').glob('*.json'))
         saved = json.loads(journal.read_text())
         saved['items'][0]['want'] = 'Done'
         journal.write_text(json.dumps(saved))
@@ -339,7 +339,7 @@ class UpgradeRecoveryTests(unittest.TestCase):
 
     def test_absolute_config_finds_same_recovery_record_from_another_directory(self):
         self.gh = GitHub()
-        destination = self.root / '.claude/super-board/configs/board.json'
+        destination = self.root / '.claude/drover/configs/board.json'
         destination.parent.mkdir(parents=True)
         self.config.rename(destination)
         self.config = destination
@@ -358,7 +358,7 @@ class UpgradeRecoveryTests(unittest.TestCase):
         import fcntl
         self.gh.fail = lambda a: a[:2] == ['issue','edit']
         self.invoke()
-        journal = next((self.root / '.claude/super-board/migrations').glob('*.json'))
+        journal = next((self.root / '.claude/drover/migrations').glob('*.json'))
         self.gh.fail = None; self.gh.calls.clear()
         with open(str(journal)+'.lock', 'a+b') as stream:
             fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -373,7 +373,7 @@ class UpgradeRecoveryTests(unittest.TestCase):
         self.gh.after = crash
         with self.assertRaises(KeyboardInterrupt): self.invoke()
         self.gh.after = None
-        journal = next((self.root / '.claude/super-board/migrations').glob('*.json'))
+        journal = next((self.root / '.claude/drover/migrations').glob('*.json'))
         journal.write_text('{}')
         self.gh.calls.clear()
         code, result = self.invoke()
