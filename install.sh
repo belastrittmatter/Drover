@@ -226,7 +226,7 @@ for skill in $PRIMARY_SKILLS $SECONDARY_SKILLS; do
   install_skill "$skill" "$SHARED/skills/$skill" || true
 done
 
-SCRIPTS="drover-project-verifier.py drover-skills-ready.py drover-verification-ready.py drover-github-read.py drover-collect-state.py drover-run.sh drover-gh-guard.sh drover-card.sh drover-status.py drover-wave-plan.sh drover-lane.sh drover-codex-lane.sh drover-codex-wave.sh drover-deps.sh drover-preflight.sh drover-merge-gate.sh drover-merge-policy.py drover-approval.py drover-env-check.sh drover-settings.py drover-setup.py drover-usage.sh drover-throttle.sh drover-host.sh drover-pr-body.sh drover-review-file-refactor.sh drover-qa-file-bug.sh drover-stop.sh drover-reasons.json"
+SCRIPTS="drover-project-verifier.py drover-skills-ready.py drover-verification-ready.py drover-github-read.py drover-collect-state.py drover-run.sh drover-gh-guard.sh drover-card.sh drover-status.py drover-wave-plan.sh drover-lane.sh drover-codex-lane.sh drover-codex-wave.sh drover-deps.sh drover-preflight.sh drover-merge-gate.sh drover-merge-policy.py drover-approval.py drover-env-check.sh drover-settings.py drover-setup.py drover-usage.sh drover-throttle.sh drover-host.sh drover-pr-body.sh drover-review-file-refactor.sh drover-qa-file-bug.sh drover-stop.sh drover-reasons.json drover-commit-style.py"
 for script in $SCRIPTS; do
   if [ -f "$REPO_ROOT/scripts/$script" ]; then
     copy_file "$REPO_ROOT/scripts/$script" "$SHARED/bin/$script"

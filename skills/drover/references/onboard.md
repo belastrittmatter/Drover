@@ -47,6 +47,7 @@ then re-run onboard.`
 | `python3 $SB/drover-setup.py check / fix --text` | 1 Checks |
 | `python3 $SB/drover-setup.py board-rank / board-migrate / names` | 1 (upgrade), 3 Board |
 | `python3 $SB/drover-setup.py branch` | 4 Branch |
+| `python3 $SB/drover-commit-style.py --base <base>` | 4 Branch (commit style, no question) |
 | `python3 $SB/drover-settings.py allow … --dry-run` | 5 Policies |
 | `python3 .claude/skills/drover-collect/scripts/collect_custom.py classify / ping / add` | 6 Bug sources |
 
@@ -256,6 +257,9 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │                  • main — every merge goes live (or just "main" with no deploy signal)
    │    staging found: • staging (Recommended) — already exists · • main — every merge goes live
    ├─ Create staging → Bash(git push origin main:staging) right away (the pick is the OK).
+   ├─ Commit style, no question: python3 $SB/drover-commit-style.py --base <base> → stage its
+   │    `commit_style` (conventional, bracket-tag, plain or other; fewer than 10 commits or no
+   │    clear majority gives conventional). Shown at step 7.
    └─ main kept with a deploy signal → step 5 defaults to "you merge everything", target_env "live".
 
 5. 🛡️ POLICIES — ONE AskUserQuestion call, two questions; details folded
@@ -333,6 +337,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │      Board    Ledgerly Roadmap #4 (+QA)    Branch   staging (new)
    │      Rules    safe defaults                Perms    7 lines
    │      Sources  sentry, github, prs, arch, linear
+   │      Commits  conventional (from the last 50 on staging)
    ├─ Existing or staged project verifier: list skill/map/runner paths and state
    │    `starter, not run` or the actual selected-feature proof. Preserve human-owned
    │    critical paths and flows; missing source leaves this optional helper absent.
@@ -340,7 +345,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    Change one thing → pick the step, walk only it, back here / Cancel — nothing written].
    ├─ Write, in order (each atomic; stop and report on the first failure — answers are kept):
    │    ├─ .claude/drover/configs/<slug>.json (committed): description, project, target
-   │    │    {type: repo | repo+url}, repo, base_branch, timezone, columns (the seven), labels,
+   │    │    {type: repo | repo+url}, repo, base_branch, timezone, commit_style, columns (the seven), labels,
    │    │    paths, merge_policy, migrations, collect (incl. custom), notifications {channel:
    │    │    "session", bot_identity}, worker_backend "workflow", host (always: `bash $SB/drover-host.sh`;
    │    │    on exit 65 ask claude/codex/opencode), verify_commands (non-blank project checks). No `variant`.

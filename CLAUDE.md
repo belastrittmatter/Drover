@@ -58,8 +58,8 @@ left alone; where no symlink can be made the file is copied. Settings and run st
 ```
 
 It also records an older install in
-`.claude/drover/upgrade.json`, prints grouped emoji output, and asks nothing:
-`drover onboard` asks the questions. Onboard's 🔍 Checks (`scripts/drover-setup.py`)
+`.claude/drover/upgrade.json`, prints grouped plain-text output, and asks nothing:
+`drover onboard` asks the questions. Onboard's Checks step (`scripts/drover-setup.py`)
 fixes must-haves and finishes upgrades with no question.
 
 ## Board shape (v3.0.0)
@@ -79,10 +79,10 @@ every project it is installed in.
 
 | Thing | Format |
 |---|---|
-| Commit | `<emoji> [type] scope: subject` + short bullets (✨ feat · 🐛 fix · 🔧 chore · ♻️ refactor · 🧪 test · ⚡ perf · 📝 docs · 👷 ci · 💄 ui · 🔒 security · ⏪ revert · 🚧 wip) |
+| Commit | this repo's `commit_style` is conventional: `<type>(<scope>): subject` + short bullets (feat · fix · chore · refactor · test · perf · docs · ci · ui · security · revert · wip); no emoji, no attribution lines |
 | PR body | marker blocks, one owner each: status · problem · solution · ac · history · visual · risk |
 | Ticket | Problem · Context · Fix · Acceptance Criteria · Risk · Blocked by (+ Evidence for bugs) |
-| Comment | `[role] [label] status` · Did · ✅ Done · ❌ Not done · Next · ≤ 8 lines |
+| Comment | `[role] [label] status` · Did · Done · Not done · Next · ≤ 8 lines |
 | PR author notes | Purpose · What changed · Why it matters, in native file/inline review comments; follow `skills/drover/references/pr-author-notes.md` |
 
 - NEVER rewrite a whole PR body: `scripts/drover-pr-body.sh` rewrites one block.

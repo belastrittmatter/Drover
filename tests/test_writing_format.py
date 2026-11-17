@@ -20,14 +20,19 @@ ROOT = Path(__file__).resolve().parent.parent
 REF = ROOT / "skills" / "drover" / "references"
 STANDARD = (REF / "writing-standard.md").read_text(encoding="utf-8")
 
-EMOJI = {
-    "feat": "✨", "fix": "🐛", "chore": "🔧", "refactor": "♻️", "test": "🧪", "perf": "⚡",
-    "docs": "📝", "ci": "👷", "ui": "💄", "security": "🔒", "revert": "⏪", "wip": "🚧",
+TYPES = "feat|fix|chore|refactor|test|perf|docs|ci|ui|security|revert|wip"
+# One subject regex per commit_style (writing-standard.md § 1). `other` copies the repo's examples.
+SUBJECT = {
+    "conventional": re.compile(rf"^({TYPES})(\([a-z0-9._/-]+\))?!?: \S"),
+    "bracket-tag": re.compile(rf"^\[({TYPES})\] [a-z0-9][a-z0-9._/-]*: \S"),
+    "plain": re.compile(r"^[A-Z][a-z]+ \S"),
 }
-SUBJECT = re.compile(
-    r"^(?P<emoji>✨|🐛|🔧|♻️|🧪|⚡|📝|👷|💄|🔒|⏪|🚧) \[(?P<type>feat|fix|chore|refactor|test|perf|docs|ci|ui|security|revert|wip)\] "
-    r"[a-z0-9][a-z0-9._/-]*: \S"
-)
+STYLE_EXAMPLES = {
+    "conventional": "fix(receipts): show a size error over 10 MB",
+    "bracket-tag": "[fix] receipts: show a size error over 10 MB",
+    "plain": "Show a size error for receipts over 10 MB",
+}
+_EMOJI_PROBE = re.compile("[\u2600-\u27bf\U0001F000-\U0001FAFF\ufe0f]")
 COMMENT_HEADER = re.compile(
     r"^\[(builder|qa|reviewer|collect|orchestrator)\] \[(blocker|issue|suggestion|nit|question|praise|report)\] \S"
 )
@@ -40,9 +45,8 @@ EVIDENCE_ROWS = [
 PR_BLOCKS = ["status", "problem", "solution", "ac", "history", "visual", "risk"]
 
 
-def subject_ok(s: str) -> bool:
-    m = SUBJECT.match(s)
-    return bool(m) and EMOJI[m["type"]] == m["emoji"] and len(s) <= 72
+def subject_ok(s: str, style: str) -> bool:
+    return bool(SUBJECT[style].match(s)) and len(s) <= 72 and not _EMOJI_PROBE.search(s)
 
 
 def fenced(text: str) -> list[str]:
@@ -51,46 +55,73 @@ def fenced(text: str) -> list[str]:
 
 # ── commit ───────────────────────────────────────────────────────────────────
 
-def test_subject_regex():
-    good = [
-        "🐛 [fix] receipts: show a size error over 10 MB",
-        "🔧 [chore] loop: close #42 — stream replies",
-        "🚧 [wip] loop: #42 partial — schema only",
-        "🧪 [test] drover-qa: iter 3 (2 bugs, 9 items, 1 PRs opened)",
-        "💄 [ui] reports: before/after screenshots",
-    ]
-    bad = [
-        "fix(receipts): show a size error",          # conventional commits
-        "🐛 fix receipts: show a size error",          # no brackets
-        "✨ [fix] receipts: show a size error",        # emoji does not match type
-        "🐛 [bugfix] receipts: show a size error",     # unknown type
-        "🐛 [fix] Receipts: show a size error",        # scope not lowercase
-        "🐛 [fix] receipts: " + "x" * 80,              # too long
-    ]
-    for s in good:
-        assert subject_ok(s), f"should pass: {s}"
-    for s in bad:
-        assert not subject_ok(s), f"should fail: {s}"
+def test_subject_regex_per_style():
+    good = {
+        "conventional": ["fix(receipts): show a size error over 10 MB", "feat: stream replies",
+                         "refactor(cart)!: drop the v1 totals", "test(drover-qa): iter 3 report"],
+        "bracket-tag": ["[fix] receipts: show a size error over 10 MB", "[ui] reports: before/after screenshots"],
+        "plain": ["Show a size error for receipts over 10 MB", "Add CSV export"],
+    }
+    bad = {
+        "conventional": [
+            "🐛 [fix] receipts: show a size error",       # upstream emoji format
+            "fix receipts: show a size error",            # no colon after the type
+            "bugfix(receipts): show a size error",        # unknown type
+            "fix(Receipts): show a size error",           # scope not lowercase
+            "fix(receipts): " + "x" * 80,                 # too long
+        ],
+        "bracket-tag": [
+            "🐛 [fix] receipts: show a size error",       # emoji prefix
+            "[bugfix] receipts: show a size error",       # unknown type
+            "[fix] Receipts: show a size error",          # scope not lowercase
+        ],
+        "plain": [
+            "show a size error",                          # not capitalized
+            "fix(receipts): show a size error",           # a prefix
+            "✨ Add CSV export",                           # emoji
+        ],
+    }
+    for style, subjects in good.items():
+        for s in subjects:
+            assert subject_ok(s, style), f"{style} should pass: {s}"
+    for style, subjects in bad.items():
+        for s in subjects:
+            assert not subject_ok(s, style), f"{style} should fail: {s}"
 
 
-def test_emoji_map_matches_standard():
-    rows = dict((t, e) for e, t in re.findall(r"^\| (\S+) \| `([a-z]+)` \|", STANDARD, flags=re.M))
-    assert rows == EMOJI, f"writing-standard.md emoji table drifted: {rows}"
+def test_style_table_matches_standard():
+    """writing-standard.md names each commit_style once with an example that passes its regex."""
+    rows = re.findall(r"^\| `([a-z-]+)`(?: \(default\))? \| .+? \| `([^`]+)` \|$", STANDARD, flags=re.M)
+    assert dict(rows) == STYLE_EXAMPLES, f"writing-standard.md style table drifted: {rows}"
+    for style, example in rows:
+        assert subject_ok(example, style), f"{style} example is off-standard: {example}"
+    assert "`other`" in STANDARD and "drover-commit-style.py" in STANDARD
+    for t in TYPES.split("|"):
+        assert f"`{t}`" in STANDARD, f"writing-standard.md lacks type {t}"
     claude_md = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
-    for t, e in EMOJI.items():
-        assert f"{e} {t}" in claude_md, f"CLAUDE.md writing table lacks '{e} {t}'"
+    assert "conventional" in claude_md, "CLAUDE.md writing table must name this repo's commit style"
 
 
-def test_standard_examples_are_valid_subjects():
+def test_standard_commit_examples_are_valid_subjects():
     seen = 0
     for block in fenced(STANDARD):
-        first = block.splitlines()[0] if block.strip() else ""
-        if re.match(r"^[^\s\[<]\S* \[[a-z]+\] ", first):
-            if re.match(r"^\S+ \[(bug|feat|ui|test|docs|refactor|security)\] ", first) and "## Problem" in block:
-                continue  # a ticket title, checked below
-            assert subject_ok(first), f"example subject is off-standard: {first}"
+        lines = block.splitlines()
+        first = lines[0] if lines else ""
+        if len(lines) > 2 and lines[1] == "" and lines[2].startswith("- ") and "## Problem" not in block \
+                and not first.startswith("<"):
+            assert subject_ok(first, "conventional"), f"example subject is off-standard: {first}"
             seen += 1
     assert seen >= 1, "expected a commit example in writing-standard.md"
+
+
+def test_no_attribution_lines():
+    """FR-CNV-5: no Co-Authored-By or generated-by footer in any shipped template."""
+    footer = re.compile(r"^\W*(Co-Authored-By:|Generated (with|by) )", re.I)
+    for p in list((ROOT / "skills").rglob("*.md")) + list((ROOT / "scripts").glob("*")) + list((ROOT / "workflows").glob("*.js")):
+        if "visual" in p.parts or not p.is_file():
+            continue
+        for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+            assert not footer.search(line), f"attribution line at {p.relative_to(ROOT)}:{n}: {line.strip()}"
 
 
 def test_dispatcher_reads_the_done_trailer_not_the_subject():
@@ -157,9 +188,12 @@ def test_bug_filer_matches_the_standard():
 
 
 def test_ticket_title_shape():
-    title = re.compile(r"^(🐛 \[bug\]|✨ \[feat\]|💄 \[ui\]|🧪 \[test\]|📝 \[docs\]|♻️ \[refactor\]|🔒 \[security\]) [a-z0-9][a-z0-9._/-]*: \S")
-    assert title.match("🐛 [bug] receipts: spinner never stops over 10 MB")
-    assert not title.match("🐛 Bug /imports — CSV upload silently drops rows")
+    title = re.compile(r"^\[(bug|feat|ui|test|docs|refactor|security)\] [a-z0-9][a-z0-9._/-]*: \S")
+    assert title.match("[bug] receipts: spinner never stops over 10 MB")
+    assert not title.match("🐛 [bug] receipts: spinner never stops over 10 MB")
+    assert not title.match("Bug /imports — CSV upload silently drops rows")
+    example = next(b for b in fenced(STANDARD) if "## Problem" in b and "## Blocked by" in b).splitlines()[0]
+    assert title.match(example), f"writing-standard.md ticket example title is off-standard: {example}"
     src = (ROOT / "scripts" / "drover-qa-file-bug.sh").read_text(encoding="utf-8")
     assert 'FULL_TITLE="${BADGE} ${SCOPE}: ${TITLE}"' in src
 
@@ -167,11 +201,11 @@ def test_ticket_title_shape():
 # ── comment ──────────────────────────────────────────────────────────────────
 
 def test_comment_header_regex():
-    assert COMMENT_HEADER.match("[qa] [report] ❌ failing · round 1")
-    assert COMMENT_HEADER.match("[reviewer] [blocker] 🛑 blocked · 🔐 missing key")
-    assert not COMMENT_HEADER.match("🔍 drover · QA fail · v1")
-    assert not COMMENT_HEADER.match("[QA] [report] ❌ failing")
-    assert not COMMENT_HEADER.match("[qa] [fyi] ❌ failing")
+    assert COMMENT_HEADER.match("[qa] [report] failing · round 1")
+    assert COMMENT_HEADER.match("[reviewer] [blocker] blocked [blocked:creds] missing Stripe test key")
+    assert not COMMENT_HEADER.match("drover · QA fail · v1")
+    assert not COMMENT_HEADER.match("[QA] [report] failing")
+    assert not COMMENT_HEADER.match("[qa] [fyi] failing")
 
 
 def test_comment_examples_follow_the_header():
@@ -192,6 +226,8 @@ def test_comment_examples_follow_the_header():
                 author_notes += 1
                 continue
             lines = [l for l in lines if not l.startswith("<!-- drover-review:report")]
+            if "## Problem" in block:
+                continue  # a ticket, its title is checked in test_ticket_title_shape
             if not lines or not re.match(r"^\[[a-z<]", lines[0]) or lines[0].startswith("[<"):
                 continue
             assert COMMENT_HEADER.match(lines[0]), f"bad comment header: {lines[0]}"
@@ -275,12 +311,12 @@ def test_history_is_folded_and_needs_you_sits_in_the_status_alert():
 def test_risk_names_door_and_blast_radius():
     """Risk carries the merge danger: a two-way or one-way door and a blast radius."""
     run_md = (REF / "run.md").read_text(encoding="utf-8")
-    std_risk = next(b for b in fenced(STANDARD) if b.startswith("## Risk\n🟢"))
+    std_risk = next(b for b in fenced(STANDARD) if b.startswith("## Risk\n**Low**"))
     run_risk = run_md[run_md.index("<!-- sb:risk -->\n## Risk"):run_md.index("<!-- /sb:risk -->")]
     for name, risk in (("writing-standard.md", std_risk), ("run.md", run_risk)):
         assert "**Door:**" in risk, f"{name} Risk lacks Door"
         assert "**Blast radius:**" in risk, f"{name} Risk lacks Blast radius"
-    assert "one-way door is never 🟢" in STANDARD
+    assert "one-way door is never Low" in STANDARD
 
 
 def test_status_alerts():

@@ -339,6 +339,8 @@ dispatch_lane() {
     review) prompt="Run drover-review on issue #${issue} for drover run. Read .claude/skills/drover/references/run.md → Reviewer lifecycle. Config: ${CONFIG_PATH}." ;;
     *) log "unknown lane: $lane"; return 1 ;;
   esac
+  # FR-CNV-2: the repo's commit style and three real subjects ride in every lane prompt.
+  prompt="$prompt $(python3 "$(dirname "$SB_GITHUB_READ")/drover-commit-style.py" --root "$PWD" --config "$CONFIG_PATH" --prompt 2>/dev/null || true)"
   prompt="First operation: run .claude/bin/drover-skills-ready.py --root '$PWD' --host claude --cards - --lane '$lane' --hydrate with $card as stdin. Halt on exit 10 before worktree creation or lifecycle writes; preserve claims and approval evidence. Load resolved paths and only declared fallbacks; recheck conditionals with --require before activation. $prompt"
   # Worker output goes to a per-worker log, not /dev/null (issue #13). Redirect at the
   # `claude` invocation itself — no wrapping subshell, no `exec` — so the wire to the

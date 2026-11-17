@@ -76,6 +76,13 @@
   // Onboard sets it to the machine's zone. Absent → the machine's local zone.
   "timezone": "America/Toronto",
 
+  // Commit subject and PR title style: "conventional" | "bracket-tag" | "plain" |
+  // "other". Onboard classifies the base branch's last 50 subjects
+  // (`drover-commit-style.py`); fewer than 10 or no clear majority →
+  // "conventional". Lane prompts carry it plus three real subjects. Absent →
+  // detected at dispatch. writing-standard.md § 1.
+  "commit_style": "conventional",
+
   // Names of the Status options on the project, always all seven (v3.0.0).
   // Aliases tolerated; canonicalized at read time. There is no Skipped column:
   // a card dropped on purpose is closed as not planned and moved to Done with a

@@ -17,6 +17,7 @@ export const meta = {
 //     lane: 'build' | 'qa' | 'review' — a Ready card labelled `qa` has lane 'qa'
 //     and skips the Builder; every other Ready card is built first (v3.0.0).
 //   tier: 'low' | 'medium' | 'high' (optional, default 'medium'),  // run model ladder
+//   commitStyle: the `drover-commit-style.py --prompt` line (optional; lanes run it when absent)
 // }
 // The harness can deliver `args` as a JSON-encoded string (the tool param is
 // untyped) — normalize before validating.
@@ -152,6 +153,7 @@ const lanePrompt = (lane, card) => [
   `move the project card yourself, clean up the worktree on exit. Config: ${input.configPath}.`,
   BOARD_IO(),
   `Commits, PR title, PR body blocks, comments: .claude/skills/drover/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/drover-pr-body.sh.`,
+  input.commitStyle || `Commit style: run python3 .claude/bin/drover-commit-style.py --config ${input.configPath} --prompt and write commit subjects and the PR title as its line says.`,
   ...(lane === 'review' ? REVIEW_MEMORY : []),
   ...(lane === 'qa' && card.status === 'Ready'
     ? [`This card is labelled qa: it skips Building. Move it Ready → QA yourself, create the issue branch from the base branch, and test what is already there (run.md → "qa cards").`]

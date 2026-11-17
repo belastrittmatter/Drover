@@ -115,6 +115,8 @@ ISSUE_BODY=$(printf '%s' "$ISSUE_JSON" | jq -r '.body')
 {
   printf 'First operation: repeat drover-skills-ready.py --root %s --host claude --cards - --lane build with %s as stdin. Halt on exit 10 before any lifecycle writes. Recheck conditional helpers with --require before use.\n' "$REPO_DIR" "$CARD_JSON"
   cat "$PREAMBLE"
+  # FR-CNV-2: the repo's commit style and three real subjects from the base branch.
+  printf '\n%s\n' "$(python3 "$SB_BIN/drover-commit-style.py" --root "$REPO_DIR" --base "$BASE_BRANCH" --prompt 2>/dev/null || true)"
   printf '\n# Issue #%s — %s\n\n' "$N" "$ISSUE_TITLE"
   printf '%s\n' "$ISSUE_BODY"
   printf '\n---\n\n'

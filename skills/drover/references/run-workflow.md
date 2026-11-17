@@ -250,8 +250,10 @@ Repeat until a done condition or halt gate fires:
    "Codex runs" above. The host check printing `claude` uses the Workflow tool; exit 65 or
    `opencode` never reaches Launch (see "Unknown host halts"). Workflow tool with
    `scriptPath: .claude/workflows/drover-wave.js` and
-   `args: { configPath, cards, humanApprovesMerge, tier }` (`cards` hydrated after the planner: each
-   carries `lane` and `labels`, and a `qa` card skips the Builder). Runs in the background; the
+   `args: { configPath, cards, humanApprovesMerge, tier, commitStyle }` (`cards` hydrated after the planner: each
+   carries `lane` and `labels`, and a `qa` card skips the Builder). `commitStyle` is the line
+   `python3 .claude/bin/drover-commit-style.py --config <config> --prompt` prints: the repo's
+   `commit_style` and three real subjects, which every lane prompt carries. Runs in the background; the
    orchestrator stays responsive. `humanApprovesMerge` comes from the config; when false the workflow serializes Review-lane agents (merge-race guard, execution side).
    `tier` is the run's model ladder: `'low'` when the user invoked
    `drover run --low` (haiku/sonnet/opus by card complexity), `'high'`
@@ -334,6 +336,7 @@ don't stall on prompts:
     "Bash(.claude/bin/drover-github-read.py:*)",
     "Bash(python3 .claude/bin/drover-verification-ready.py:*)",
     "Bash(python3 .claude/bin/drover-skills-ready.py:*)",
+    "Bash(python3 .claude/bin/drover-commit-style.py:*)",
     "Bash(bash .claude/bin/drover-usage.sh:*)",
     "Bash(bash .claude/bin/drover-throttle.sh:*)",
     "Bash(bash .claude/bin/drover-codex-lane.sh:*)",
