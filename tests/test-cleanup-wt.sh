@@ -36,6 +36,7 @@ g switch -q trunk
 g switch -q -c feat-old;      commit old.txt 1; g switch -q trunk
 g switch -q -c feat-today;    commit today.txt 1 "$(date +%Y-%m-%dT%H:%M:%S)"; g switch -q trunk
 g switch -q -c feat-dirty;    commit dirty.txt 1; g switch -q trunk; g merge -q --ff-only feat-dirty
+g switch -q -c feat-dirty2;   commit dirty2.txt 1; g switch -q trunk; g merge -q --ff-only feat-dirty2
 g switch -q -c feat-cur;      commit cur.txt 1; g switch -q trunk; g merge -q --ff-only feat-cur
 g switch -q -c feat-stray;    commit stray.txt 1; g switch -q trunk
 g switch -q -c feat-wtmerged; commit wtm.txt 1; g switch -q trunk; g merge -q --ff-only feat-wtmerged
@@ -45,8 +46,10 @@ g worktree add -q "$R/.drover/worktrees/wt-merged" feat-wtmerged
 g worktree add -q "$R/.drover/worktrees/wt-dirty"  feat-dirty
 g worktree add -q "$R/.drover/worktrees/wt-cur"    feat-cur
 g worktree add -q "$R/.claude/worktrees/wt-harness" feat-old
+g worktree add -q "$R/.claude/worktrees/wt-dirty2" feat-dirty2
 g worktree add -q "$T/repo-stray"                  feat-stray
 echo scratch > "$R/.drover/worktrees/wt-dirty/notes.txt"
+echo scratch2 > "$R/.claude/worktrees/wt-dirty2/notes2.txt"
 # Age the worktrees past the 24h "fresh" window.
 for d in "$R"/.git/worktrees/*; do touch -t 202001010000 "$d/gitdir" "$d/commondir"; done
 
@@ -76,6 +79,10 @@ kept feat-old; kept feat-today; kept feat-cur; kept trunk; kept staging
 kept feat-dirty
 g show feat-dirty:notes.txt | grep -q scratch || fail "wip commit should hold the dirty file"
 [ -d "$R/.claude/worktrees/wt-harness" ] || fail "an unmerged worktree under .claude/worktrees is not stray"
+# the same for a dirty merged worktree under the harness folder: work kept in a wip commit
+[ ! -d "$R/.claude/worktrees/wt-dirty2" ] || fail "dirty merged .claude/worktrees worktree should be removed after the wip commit"
+kept feat-dirty2
+g show feat-dirty2:notes2.txt | grep -q scratch2 || fail "wip commit should hold the dirty file under .claude/worktrees"
 # stray unmerged worktree: folder gone, branch kept
 [ ! -d "$T/repo-stray" ] || fail "stray worktree folder should be removed"
 kept feat-stray
