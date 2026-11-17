@@ -22,7 +22,7 @@ This optional helper adds repeatable feature checks inside existing lanes.
    write only with that save authorization. Keep `verify_commands` independent:
    a map does not turn browser work into every PR's required merge check.
 5. Inspect the saved map with the public helper below. Resolve the actual local
-   skill with `super-board-skills-ready.py --require verify-<app>` for the active
+   skill with `drover-skills-ready.py --require verify-<app>` for the active
    host before loading it. A folder or valid map alone proves no host readiness.
 
 Templates are unfinished scaffolds: the empty feature array must be replaced.
@@ -31,9 +31,9 @@ Onboard reports `starter, not run` until actual scenarios run with proof.
 ## Map inspection and selection
 
 ```bash
-python3 .claude/bin/super-board-project-verifier.py inspect \
+python3 .claude/bin/drover-project-verifier.py inspect \
   --root . --map .agents/skills/verify-app/references/feature-map.json
-python3 .claude/bin/super-board-project-verifier.py select \
+python3 .claude/bin/drover-project-verifier.py select \
   --root . --map .agents/skills/verify-app/references/feature-map.json \
   --changed - --feature cart.checkout
 ```
@@ -72,7 +72,7 @@ verifier cannot run, keep its ACs unverified until another valid check proves
 them. Resolve its skill for the current host before loading it, for example:
 
 ```bash
-python3 .claude/bin/super-board-skills-ready.py --root . --host codex \
+python3 .claude/bin/drover-skills-ready.py --root . --host codex \
   --cards cards.json --lane qa --require verify-app
 ```
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""super-board-settings.py — merge into .claude/settings.json without losing anything.
+"""drover-settings.py — merge into .claude/settings.json without losing anything.
 
-    super-board-settings.py hooks <settings.json> <snippet.json> [...] [--dry-run]
-    super-board-settings.py allow <settings.json> <rule> [<rule> ...]  [--dry-run]
+    drover-settings.py hooks <settings.json> <snippet.json> [...] [--dry-run]
+    drover-settings.py allow <settings.json> <rule> [<rule> ...]  [--dry-run]
 
 `hooks` adds each hook command from the snippets once per event + matcher
 (install.sh and onboard's protect-main step). `allow` adds permission rules to

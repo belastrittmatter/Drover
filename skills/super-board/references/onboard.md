@@ -8,7 +8,7 @@ Invoked as `/super-board onboard` (install.sh) or `/super-board:super-board onbo
 
 ## Host-visible skill checks
 
-Checks use `.claude/bin/super-board-skills-ready.py --profile setup --host
+Checks use `.claude/bin/drover-skills-ready.py --profile setup --host
 <claude|codex>` and show `helper_readiness`: exact files, declared fallbacks,
 optional skips and missing names. Setup checks the unconditional union; a
 selected card may need fewer helpers. Node or `skills-lock.json` never proves
@@ -34,7 +34,7 @@ only enabled entries applying to this project count.
 | Fix, don't ask | a must-have (skills, scripts, workflows, guard hooks, settings entries, old folders, config keys, labels, columns) is fixed with NO question and listed under "Fixed for you". Only system tools and sign-ins are asked — through Claude Code's own permission prompt on the exact command |
 | Save as you go | every answer is written to `.claude/super-board/onboard-answers.json` the moment it is given |
 | Write once | files in the repo (config, settings.json allow lines, docs) change only at step 7, after "Write everything". GitHub-side actions the user just picked (create or extend the board, create `staging`) run in their own step |
-| Secrets | NEVER read, grep, cat or source a dotenv file. Key names only, via `.claude/bin/super-board-env-check.sh` |
+| Secrets | NEVER read, grep, cat or source a dotenv file. Key names only, via `.claude/bin/drover-env-check.sh` |
 
 **Scripts.** `SB=.claude/bin` after an install. Plugin install before step 1 has run: the plugin's
 own copy, `PACK=$(dirname "$(find ~/.claude/plugins -path '*super-board*' -name install.sh -not -path
@@ -44,10 +44,10 @@ then re-run onboard.`
 
 | Script | Used in |
 |---|---|
-| `python3 $SB/super-board-setup.py check / fix --text` | 1 Checks |
-| `python3 $SB/super-board-setup.py board-rank / board-migrate / names` | 1 (upgrade), 3 Board |
-| `python3 $SB/super-board-setup.py branch` | 4 Branch |
-| `python3 $SB/super-board-settings.py allow … --dry-run` | 5 Policies |
+| `python3 $SB/drover-setup.py check / fix --text` | 1 Checks |
+| `python3 $SB/drover-setup.py board-rank / board-migrate / names` | 1 (upgrade), 3 Board |
+| `python3 $SB/drover-setup.py branch` | 4 Branch |
+| `python3 $SB/drover-settings.py allow … --dry-run` | 5 Policies |
 | `python3 .claude/skills/super-collect/scripts/collect_custom.py classify / ping / add` | 6 Bug sources |
 
 ---
@@ -131,12 +131,12 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
 ```
 0. SILENT DETECT (no questions, nothing printed but the start screen)
    ├─ answers file, .claude/super-board/configs/*.json → resume / re-run screens
-   ├─ manifests + README (board names), branches + deploy signals ($SB/super-board-setup.py branch)
+   ├─ manifests + README (board names), branches + deploy signals ($SB/drover-setup.py branch)
    ├─ migration dirs (supabase/migrations, prisma/migrations, drizzle, **/migrations/*.sql,
    │    db/migrate, alembic/versions) and migrate scripts in the manifest (db:migrate, …)
    ├─ collect signals: Sentry (@sentry/* / sentry-sdk in manifests, Sentry.init(, .sentryclirc),
    │    PostHog (posthog-js / posthog-node / posthog, posthog.init(, NEXT_PUBLIC_POSTHOG_* names);
-   │    key names: bash $SB/super-board-env-check.sh SENTRY_AUTH_TOKEN POSTHOG_PERSONAL_API_KEY
+   │    key names: bash $SB/drover-env-check.sh SENTRY_AUTH_TOKEN POSTHOG_PERSONAL_API_KEY
    ├─ verification commands: preserve valid `verify_commands`; otherwise inspect the owning
    │    project's documented checks and stage those commands. Unresolved checks are a setup
    │    halt. Never save placeholders or invent a universal runner.
@@ -148,7 +148,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
       's#.*zoneinfo/##', else timedatectl show -p Timezone --value, else "UTC". Shown at step 7.
 
 1. 🔍 CHECKS — nothing asked except system tools and sign-ins
-   ├─ python3 $SB/super-board-setup.py fix --host <actual-worker-host> --text
+   ├─ python3 $SB/drover-setup.py fix --host <actual-worker-host> --text
    │    Fixes with NO question, backed up first to .claude/super-board/backup/<ts>/:
    │    skills, .claude/bin scripts, workflows, guard hooks + settings.json entries (runs the
    │    pack's install.sh), removes old skill folders (super-refine, cleanup-wt, arch-loop),
@@ -175,7 +175,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    ├─ Re-check (`check --text`) after every install; move on only when it says all green.
    ├─ Workflow runtime: syntax-check the installed workflow (same command run.md uses):
    │      { echo '(async function(){'; sed 's/^export const meta/const meta/' \
-   │        .claude/workflows/super-board-wave.js; echo '})'; } | node --check --input-type=module
+   │        .claude/workflows/drover-wave.js; echo '})'; } | node --check --input-type=module
    │    Fails → fix re-copies it; still failing → 🛑 (error table). Remind once: dynamic
    │    workflows must be ON in /config.
    └─ OLDER SUPER-BOARD (the result says `upgraded: true`): same rule, no question. Header
@@ -188,7 +188,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
             ✓ labels mapped: build→feature · bug-fix→bug · qa-only→qa (14)
             ✓ Skipped column: 4 cards moved to Done, column removed
             ✓ re-checked: all green
-      The two board lines come from `python3 $SB/super-board-setup.py board-migrate --config
+      The two board lines come from `python3 $SB/drover-setup.py board-migrate --config
       <config>` — run it here when `gh auth status` already has the project scope, else in
       step 3 (it then prints them there). It adds missing columns, creates qa · bug · feature,
       maps old labels, labels every card `qa` on a board that was "qa-only", moves Skipped
@@ -228,9 +228,9 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    ├─ One checklist line, one labels line, no question about either:
    │      Columns: ✓ Backlog ✓ Ready ✓ Building ✓ QA ✓ Review ✓ Blocked ✓ Done
    │      Labels: feature · bug · qa (qa skips Building; no label = feature)
-   ├─ python3 $SB/super-board-setup.py board-rank --owner <owner>   (boards ranked by matching
+   ├─ python3 $SB/drover-setup.py board-rank --owner <owner>   (boards ranked by matching
    │    columns; `recommend` = the best with ≥ 4 of 7)
-   │  python3 $SB/super-board-setup.py names                         (two names from
+   │  python3 $SB/drover-setup.py names                         (two names from
    │    package.json / README / folder)
    ├─ AskUserQuestion "Which board?" (header "Board"):
    │    • Use <title> (#<n>) — <m> of 7 columns match, I'll add <missing> (Recommended)
@@ -248,7 +248,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    Second account chosen in step 2 → finish references/second-account.md now; verify bot access.
 
 4. 🌿 BRANCH
-   ├─ python3 $SB/super-board-setup.py branch → one line:
+   ├─ python3 $SB/drover-setup.py branch → one line:
    │      Found: main (deploys to production via Vercel), no staging.
    ├─ AskUserQuestion "Where should finished work merge?" (header "Branch"):
    │    no staging:   • Create staging from main (Recommended) — "nothing goes live until you
@@ -294,10 +294,10 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
        Session pooler string (port 5432) with special characters in the password URL-encoded,
        and a just-reset password takes ~20 s to reach the pooler — retry once before calling it wrong.
    Permission lines: the base list in run-workflow.md → "Mid-run permission prompts", plus the
-   merge lines when merge_policy.default is "auto" ("Bash(bash .claude/bin/super-board-merge-gate.sh:*)",
+   merge lines when merge_policy.default is "auto" ("Bash(bash .claude/bin/drover-merge-gate.sh:*)",
    "Bash(gh pr merge:*)"), one "Bash(<migrate command>)" per allowed env, "Bash(bash
-   .claude/bin/super-board-env-check.sh:*)" and the test runner. N counts what is NOT already in
-   settings.json: `super-board-settings.py allow .claude/settings.json <rules…> --dry-run`.
+   .claude/bin/drover-env-check.sh:*)" and the test runner. N counts what is NOT already in
+   settings.json: `drover-settings.py allow .claude/settings.json <rules…> --dry-run`.
 
 6. 📥 BUG SOURCES — tick sources; "Add another source" is the free-text box
    ├─ AskUserQuestion multiSelect "Where should I look for problems?" (header "Bug sources"):
@@ -342,22 +342,22 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    ├─ .claude/super-board/configs/<slug>.json (committed): description, project, target
    │    │    {type: repo | repo+url}, repo, base_branch, timezone, columns (the seven), labels,
    │    │    paths, merge_policy, migrations, collect (incl. custom), notifications {channel:
-   │    │    "session", bot_identity}, worker_backend "workflow", host (always: `bash $SB/super-board-host.sh`;
+   │    │    "session", bot_identity}, worker_backend "workflow", host (always: `bash $SB/drover-host.sh`;
    │    │    on exit 65 ask claude/codex/opencode), verify_commands (non-blank project checks). No `variant`.
    │    ├─ .claude/super-board/active ← <slug>
    │    ├─ .gitignore += .claude/super-board/active, onboard-answers.json, onboard-staged/,
    │    │    backup/, inflight/, migrations/, upgrade.json (all under .claude/super-board/)
-   │    ├─ settings.json: super-board-settings.py allow … ; protect main →
-   │    │    super-board-settings.py hooks .claude/settings.json <pack>/hooks/settings-protect-main.json
+   │    ├─ settings.json: drover-settings.py allow … ; protect main →
+   │    │    drover-settings.py hooks .claude/settings.json <pack>/hooks/settings-protect-main.json
    │    ├─ staged project verifier skill/map/scenarios/runner, if source-backed; then
    │    │    inspect the saved map and resolve the local skill for the actual host.
    │    └─ docs/agents/issue-tracker.md (a `## Ticket format` section from
    │       references/ticket-format.md: create, or replace only that section);
-   │       docs/super-board/PROJECT.md (a sub-agent drafts it from
+   │       docs/drover/PROJECT.md (a sub-agent drafts it from
    │       manifests + README + tree, no question; listed in the table as "PROJECT.md drafted")
    └─ Delete onboard-staged/; keep the answers file (re-runs use it).
 
-DONE — run `python3 $SB/super-board-verification-ready.py --config <saved config>`;
+DONE — run `python3 $SB/drover-verification-ready.py --config <saved config>`;
       exit 9 reports setup incomplete (repair checks before run; do not reinstall/rebase).
       Then self-check, then the ONE place that names the next command:
       ⏺ Bash(self-check)  ⎿  all good
@@ -380,7 +380,7 @@ answers are kept and it resumes at <step>".
 | 1 | Pack files not found (plugin) | `🛑 Can't find the super-board plugin files. Run ./install.sh <this-dir> from a checkout, then re-run onboard.` |
 | 1 | A tool install declined (git, gh) | `Without <tool> the board can't <why>. Your answers are saved — run <command>, then re-run onboard.` |
 | 1 | Node declined, or `npx skills add` fails | `⚠️ Required worker skills remain unavailable: <exact names>. Install for <host> and restart.` Setup stays red; dispatch halts before claims. |
-| 1 | Workflow still fails `node --check` after the re-copy | `🛑 .claude/workflows/super-board-wave.js is corrupt. Re-run ./install.sh <this-dir> — don't hand-edit it.` |
+| 1 | Workflow still fails `node --check` after the re-copy | `🛑 .claude/workflows/drover-wave.js is corrupt. Re-run ./install.sh <this-dir> — don't hand-edit it.` |
 | 1 | settings.json invalid JSON | `✋ .claude/settings.json is not valid JSON; I left it untouched. Fix it, then re-run — only the settings entries repeat.` |
 | 2 | Scope refused in the browser | `🔑 GitHub asked for project,read:project,repo and you said no. Without them I can't read or move cards. Re-run: gh auth refresh -s project,read:project,repo.` |
 | 2 | Repo create refused | `📦 GitHub refused to create the repo (org admin required, or the free-repo quota). Pick an existing repo, or create one in the web UI, then re-run.` |
@@ -417,7 +417,7 @@ remove a pending recovery record; use its saved state to reconcile a conflict be
 2. **Active pointer** — `.claude/super-board/active` holds exactly the slug + `\n`.
 3. **Board columns and labels** — `gh project field-list <n> --owner <o>` returns Backlog, Ready,
    Building, QA, Review, Blocked, Done (no Skipped); `gh label list` has qa, bug, feature.
-4. **Setup green** — `python3 .claude/bin/super-board-setup.py check` exits 0 (or only `needs`
+4. **Setup green** — `python3 .claude/bin/drover-setup.py check` exits 0 (or only `needs`
    the user declined).
 5. **Workflow runtime** — unless `worker_backend` is `"claude-p"`, the step-1 `node --check` passes.
 

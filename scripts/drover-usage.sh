@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-board-usage.sh — Claude plan-usage guard for the run loop.
+# drover-usage.sh — Claude plan-usage guard for the run loop.
 #
 # WHERE THE NUMBER COMES FROM
 #
@@ -35,8 +35,8 @@
 #   a stale reading UNDER the threshold proves nothing and reads `unknown`.
 #
 # Usage:
-#   <status-line json> | super-board-usage.sh record
-#   super-board-usage.sh check [--config <cfg.json>] [--threshold 95] [--max-age 900]
+#   <status-line json> | drover-usage.sh record
+#   drover-usage.sh check [--config <cfg.json>] [--threshold 95] [--max-age 900]
 #
 # Snapshot: $SB_USAGE_FILE, default ~/.claude/super-board/usage.json (usage is
 # per account, not per repo, so one file serves every board).
@@ -62,7 +62,7 @@ case "$MODE" in
     jq -n --argjson rl "$RL" '{recorded_at: now | floor, rate_limits: $rl}' > "$TMP" && mv "$TMP" "$FILE"
     exit 0 ;;
   check) ;;
-  *) echo "usage: super-board-usage.sh record | check [--config f] [--threshold N] [--max-age S]" >&2; exit 64 ;;
+  *) echo "usage: drover-usage.sh record | check [--config f] [--threshold N] [--max-age S]" >&2; exit 64 ;;
 esac
 
 THRESHOLD=""; MAX_AGE=900; CONFIG=""

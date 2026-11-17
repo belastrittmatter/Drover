@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""super-board-status.py — read-only live snapshot of the super-board pipeline.
+"""drover-status.py — read-only live snapshot of the super-board pipeline.
 
 Renders the richer status template defined in
 `.claude/skills/super-board/references/status.md` (fixed 80-col Kanban
@@ -27,7 +27,7 @@ Cross-platform: pure Python 3 stdlib + `gh` CLI. Works on macOS, Linux,
 Windows (PowerShell / CMD / Git Bash / WSL). No bash, no jq.
 
 Usage:
-  python .claude/bin/super-board-status.py [<config-slug>]
+  python .claude/bin/drover-status.py [<config-slug>]
 
 Exit codes:
   0  ok
@@ -73,7 +73,7 @@ COLLAPSED_TAIL = {"Backlog": "(not started, collapsed)", "Done": "(squash-merged
 
 
 # ───────────────────────────── manifest grammar ─────────────────────────────
-# The dispatcher's log format lives in `scripts/super-board-run.sh`. These
+# The dispatcher's log format lives in `scripts/drover-run.sh`. These
 # regexes are the contract between the two. When the dispatcher changes a
 # log line, update the regex here AND add a fixture to `tests/` so the
 # divergence can't sneak back in.
@@ -511,7 +511,7 @@ def main() -> int:
     cfg = json.loads(config_path.read_text())
     project_owner: str = cfg["project"]["owner"]
     project_number: int = int(cfg["project"]["number"])
-    runs_dir = cfg.get("paths", {}).get("runs_dir", "docs/super-board/runs")
+    runs_dir = cfg.get("paths", {}).get("runs_dir", "docs/drover/runs")
     run_date = datetime.date.today().isoformat()
     manifest_path = Path(runs_dir) / f"{run_date}-{config_slug}.md"
 

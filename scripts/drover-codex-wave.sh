@@ -31,7 +31,7 @@ if len(codex) != 1 or (codex[0].startswith('--codex=') and not codex[0].partitio
     parser.error('exactly one explicit --codex[=<non-empty-model>] is required')
 args = parser.parse_args([arg for arg in raw if arg not in codex])
 output_path = Path(args.output).resolve() if args.output else None
-launcher = Path(sys.argv[1]).resolve().with_name('super-board-lane.sh')
+launcher = Path(sys.argv[1]).resolve().with_name('drover-lane.sh')
 try:
     config_path = Path(args.config).resolve()
     config = json.loads(config_path.read_text())
@@ -59,7 +59,7 @@ try:
     pinned = codex[0].startswith('--codex=') or (isinstance(configured, str) and configured.strip())
 except (OSError, ValueError, subprocess.CalledProcessError) as error:
     parser.error(str(error))
-readiness = launcher.with_name('super-board-verification-ready.py')
+readiness = launcher.with_name('drover-verification-ready.py')
 if subprocess.run([sys.executable, str(readiness), '--config', str(config_path)]).returncode:
     result = json.dumps({'cards': [dict(number=c['number'], finalStatus='halted', lastLane='none',
                                        column=c['status'], detail='verification-readiness: repair verify_commands and restart explicitly',
@@ -69,7 +69,7 @@ if subprocess.run([sys.executable, str(readiness), '--config', str(config_path)]
     print(result)
     sys.exit(9)
 os.chdir(root)
-resolver_path = launcher.with_name('super-board-skills-ready.py')
+resolver_path = launcher.with_name('drover-skills-ready.py')
 try:
     spec = importlib.util.spec_from_file_location('skills_ready', resolver_path)
     resolver = importlib.util.module_from_spec(spec)
@@ -140,7 +140,7 @@ def grade(card):
     if card.get('complexity') in ['low', 'medium', 'high']:
         return card['complexity'], False
     prompt = (f"Read GitHub issue #{card['number']} (\"{card.get('title', '')}\") - body and all comments - with "
-              f".claude/bin/super-board-github-read.py --kind issue -- issue view {card['number']} --json number,title,body and "
+              f".claude/bin/drover-github-read.py --kind issue -- issue view {card['number']} --json number,title,body and "
               f"--kind comments -- api repos/{{owner}}/{{repo}}/issues/{card['number']}/comments --paginate --slurp. "
               'Grade complexity (low|medium|high) by the scope of change required. Read only: change no file, '
               'label, comment or board state. Exit 79 from the read helper means stop and return nothing.\n')

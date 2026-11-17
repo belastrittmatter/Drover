@@ -52,7 +52,7 @@ This board is the durable, machine-readable state for the loop. `docs/super-qa/q
 
 ### Project resolution
 
-Resolution order (used by `scripts/super-qa-file-bug.sh` and the orchestrator):
+Resolution order (used by `scripts/drover-qa-file-bug.sh` and the orchestrator):
 
 1. If `SUPER_QA_PROJECT_TITLE` is set, query `gh project list --owner $SUPER_QA_PROJECT_OWNER --format json` and pick the project whose title matches (case-insensitive).
 2. Otherwise default to title `Super Ultimate QA`.
@@ -62,7 +62,7 @@ If no matching project exists, the loop halts with a one-line error and instruct
 
 ### Filing semantics
 
-When the worker finds a red spec, it calls `scripts/super-qa-file-bug.sh`. The script:
+When the worker finds a red spec, it calls `scripts/drover-qa-file-bug.sh`. The script:
 
 - Creates the issue with `source:qa` label and full evidence body.
 - Adds the issue to the resolved **Super Ultimate QA** project.
@@ -146,7 +146,7 @@ entry under "Level 0".
 
 ## Findings land in clear GitHub Issues, NOT in markdown
 
-Every `[b]` cell triggers the worker to call `scripts/super-qa-file-bug.sh`.
+Every `[b]` cell triggers the worker to call `scripts/drover-qa-file-bug.sh`.
 The resulting Project card must be readable from the board without opening it.
 Do **not** use legacy `[VFL]`, `verify-fix`, or `severity:P*` wording in new issue titles.
 
@@ -232,7 +232,7 @@ If a screenshot/network/console artifact does not exist, explicitly write `not c
 
 ### Filing guardrails
 
-`super-qa-file-bug.sh` validates issue bodies before filing. It must reject weak tickets that are missing required sections or still contain placeholders like `TBD`, `<...>`, or `TODO:`. Do not bypass this with `SUPER_QA_ALLOW_WEAK_BODY=1` during normal autonomous runs. `--check-body` runs only these checks and exits (0, or the refusal code) without calling `gh`; super-collect's dry run uses it.
+`drover-qa-file-bug.sh` validates issue bodies before filing. It must reject weak tickets that are missing required sections or still contain placeholders like `TBD`, `<...>`, or `TODO:`. Do not bypass this with `SUPER_QA_ALLOW_WEAK_BODY=1` during normal autonomous runs. `--check-body` runs only these checks and exits (0, or the refusal code) without calling `gh`; super-collect's dry run uses it.
 
 Every filed issue must include:
 
@@ -522,7 +522,7 @@ QA's one security check. Run it on every PR, not only on security labels; with n
 2. Each finding it keeps is a QA failure, filed the normal way: one `❌ Not done` line
    (`security: <category> — <one line> · <file:line>`), one `[builder]` PR thread on that
    line, then the **Fail** exit (QA → Ready, `loop:rebuild-N`). A finding outside the
-   card's scope is filed with `super-qa-file-bug.sh` (`source:qa`, priority high) and still
+   card's scope is filed with `drover-qa-file-bug.sh` (`source:qa`, priority high) and still
    fails the card while the PR adds the hole.
 3. A finding you can show is wrong goes on the `✅ Done` line with the proof.
 4. No findings → `pr-security-review: 0 findings` on the `Did:` line.
@@ -557,7 +557,7 @@ The worker (per `references/iteration-preamble.md`) must load and follow:
 
 ## Coexistence with `/super-build`
 
-`super-qa-file-bug.sh` files bugs into the **Super Ultimate QA** project's `Bug` column. This is a separate board from `/super-build`'s standalone feature queue (`BUILD_LOOP_PROJECT`), so the two skills can run concurrently without column races:
+`drover-qa-file-bug.sh` files bugs into the **Super Ultimate QA** project's `Bug` column. This is a separate board from `/super-build`'s standalone feature queue (`BUILD_LOOP_PROJECT`), so the two skills can run concurrently without column races:
 
 - **Standalone `/super-build`** keeps reading `Ready` from its configured feature project. Untouched by `/super-qa`.
 - **`Bug` cards reach a builder** when someone moves them to `Ready`, or when `/super-build` runs with `BUILD_LOOP_SOURCE_COLUMN=Bug` against this board. Builds go to `QA` as PRs; nothing moves to `Done` without the Reviewer's merge gate.
@@ -584,7 +584,7 @@ Safety rails (enforced by the iteration preamble):
 └─ references/
    └─ iteration-preamble.md            ← worker contract (verbatim prompt)
 
-scripts/super-qa-file-bug.sh           ← files a red spec onto the QA board (installed to .claude/bin/)
+scripts/drover-qa-file-bug.sh           ← files a red spec onto the QA board (installed to .claude/bin/)
 
 docs/super-qa/
 ├─ README.md                           ← operator's guide
@@ -641,7 +641,7 @@ shipped code.
 
 When invoked by super-board (env `SUPER_BOARD_RUN=1` or invocation contains "super-board run"):
 
-- **GitHub budget** — every "move card" is `.claude/bin/super-board-card.sh --config <cfg> move <N> <Status>` (1 GraphQL point; `gh project item-list` / `field-list` cost ~100–200). Comments, labels and PR reads go over REST; [rate-limit-etiquette.md](../super-board/references/rate-limit-etiquette.md) → "Price list" has the calls.
+- **GitHub budget** — every "move card" is `.claude/bin/drover-card.sh --config <cfg> move <N> <Status>` (1 GraphQL point; `gh project item-list` / `field-list` cost ~100–200). Comments, labels and PR reads go over REST; [rate-limit-etiquette.md](../super-board/references/rate-limit-etiquette.md) → "Price list" has the calls.
 
 ### State protocol (same as super-build)
 - Read from issue + PR comments + PR review threads.
@@ -662,9 +662,9 @@ See `.claude/skills/super-board/references/run.md` → Tester (first pass — re
 for affected selection, host readiness, real assertions and fresh proof.
 3b. Run the **Test-gap check** (above) against the Builder's diff; its High gaps join the plan.
 3c. Run the **Security pass** (above) on the PR's diff. Any kept finding → Fail (step 7).
-4. Run tests. Capture evidence to `docs/super-board/runs/issue-<N>-qa-v<N>/`. **For any UI-affecting issue, capture at least one screenshot per AC** (Playwright `page.screenshot` or `browse --screenshot`). Save with descriptive names: `ac1-<short-desc>.png`, not `screenshot1.png`.
-5. **Commit the evidence directory** to the issue branch alongside test files (`git add docs/super-board/runs/issue-<N>-qa-v<N>/ && git commit && git push`). This is non-optional — without it, the inline image markdown in the issue comment won't render on GitHub.
-6. **Pass** → tick the PR's `ac` block with proof lines, write `visual` for UI, append a `history` row, rewrite `status` (`super-board-pr-body.sh`) → `[qa] [report] ✅` PR comment with results + evidence path → **issue comment with screenshot evidence** (see "Issue-comment evidence format" below) → move QA → Review. Clean up worktree.
+4. Run tests. Capture evidence to `docs/drover/runs/issue-<N>-qa-v<N>/`. **For any UI-affecting issue, capture at least one screenshot per AC** (Playwright `page.screenshot` or `browse --screenshot`). Save with descriptive names: `ac1-<short-desc>.png`, not `screenshot1.png`.
+5. **Commit the evidence directory** to the issue branch alongside test files (`git add docs/drover/runs/issue-<N>-qa-v<N>/ && git commit && git push`). This is non-optional — without it, the inline image markdown in the issue comment won't render on GitHub.
+6. **Pass** → tick the PR's `ac` block with proof lines, write `visual` for UI, append a `history` row, rewrite `status` (`drover-pr-body.sh`) → `[qa] [report] ✅` PR comment with results + evidence path → **issue comment with screenshot evidence** (see "Issue-comment evidence format" below) → move QA → Review. Clean up worktree.
 7. **Fail** → leave failing ACs unchecked with the reason, append a `history` row, rewrite `status` → `[qa] [report] ❌` PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" → issue comment with the failure screenshots → increment rebuild counter → move QA → Ready (label `loop:rebuild-N`). Clean up worktree.
 
 ### Optional project feature verifier

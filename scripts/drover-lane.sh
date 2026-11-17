@@ -31,7 +31,7 @@ class Codex:
     """`codex exec` with a bounded permission profile; the answer lands in --output-last-message."""
     name, label = 'codex', 'Codex'
     # Codex run ladders, the one copy: run tier x card complexity -> model.
-    # Mirrors the Claude LADDERS in workflows/super-board-wave.js. gpt-6.1-sol
+    # Mirrors the Claude LADDERS in workflows/drover-wave.js. gpt-6.1-sol
     # ties gpt-6-astra on DeepSWE v1.1 (75.2% vs 74.1-74.8%) at a fifth of the
     # price, so it carries the default; Astra takes hard cards and --high.
     LADDERS = {
@@ -50,9 +50,9 @@ class Codex:
                       str(run['root']): 'write', str(run['git_dir']): 'write', str(run['common_dir']): 'write'}
         grants = '{' + ', '.join(json.dumps(key) + '=' + json.dumps(value) for key, value in filesystem.items()) + '}'
         command = ['codex', 'exec', '-C', str(run['root']), '-c', 'approval_policy="never"',
-                   '-c', 'default_permissions="super-board-lane"',
-                   '-c', 'permissions.super-board-lane.filesystem=' + grants,
-                   '-c', 'permissions.super-board-lane.network.enabled=true',
+                   '-c', 'default_permissions="drover-lane"',
+                   '-c', 'permissions.drover-lane.filesystem=' + grants,
+                   '-c', 'permissions.drover-lane.network.enabled=true',
                    '--output-schema', str(run['schema_path']), '--output-last-message', str(run['output']), '-']
         if run['model'] and run['model'].strip():
             command[2:2] = ['-m', run['model']]
@@ -128,7 +128,7 @@ column = card['status']
 def result(status, detail):
     print(json.dumps({'status': status, 'column': column, 'detail': detail}))
 
-readiness = script_path.with_name('super-board-verification-ready.py')
+readiness = script_path.with_name('drover-verification-ready.py')
 def require_verification_ready():
     if subprocess.run([sys.executable, str(readiness), '--config', str(config_path)]).returncode:
         result('halted', 'verification-readiness: repair verify_commands; preserve claims, worktrees and card state, then restart explicitly')
@@ -145,12 +145,12 @@ try:
 except subprocess.CalledProcessError:
     fail(f'{backend.label} lane must start inside the target git repository')
 os.chdir(root)
-helper = script_path.with_name('super-board-github-read.py')
+helper = script_path.with_name('drover-github-read.py')
 if not helper.exists() or subprocess.run([sys.executable, str(helper), '--check']).returncode:
     result('halted', 'required GitHub reads halted or helper missing; preserve claims and worktrees')
     sys.exit(79)
 
-resolver_path = script_path.with_name('super-board-skills-ready.py')
+resolver_path = script_path.with_name('drover-skills-ready.py')
 try:
     spec = importlib.util.spec_from_file_location('skills_ready', resolver_path)
     resolver = importlib.util.module_from_spec(spec)
@@ -171,26 +171,26 @@ if not skills['ready']:
 skill = {'build': 'super-build', 'qa': 'super-qa', 'review': 'super-review'}[args.lane]
 section = {'build': 'Builder', 'qa': 'Tester', 'review': 'Reviewer'}[args.lane]
 prompt = f'''Run {skill} for issue #{card['number']} as a {backend.label} lane worker.
-First operation: recheck .claude/bin/super-board-skills-ready.py --root {root} --host {backend.name} --cards - --lane {args.lane} with the Card JSON below as a one-element stdin array, before worktree creation, classification or lifecycle writes. Exit 10 means status=halted, detail=skills-readiness:, preserve all state. Load resolved_path files and only declared fallback IDs from the report. Before activating any conditional helper, repeat with --require <exact-name>.
+First operation: recheck .claude/bin/drover-skills-ready.py --root {root} --host {backend.name} --cards - --lane {args.lane} with the Card JSON below as a one-element stdin array, before worktree creation, classification or lifecycle writes. Exit 10 means status=halted, detail=skills-readiness:, preserve all state. Load resolved_path files and only declared fallback IDs from the report. Before activating any conditional helper, repeat with --require <exact-name>.
 Resolved skill report: {json.dumps(skills)}
 Config: {config_path}
 Card: {json.dumps(card)}
 Read .claude/skills/{skill}/SKILL.md and .claude/skills/super-board/references/run.md → {section} lifecycle; follow all its board, branch, worktree, comments, test and merge requirements.
-Source .claude/bin/super-board-gh-guard.sh and use its quota checks. Required GitHub reads go through .claude/bin/super-board-github-read.py; a read that misses its --kind shape exits 64 for that call only and prints the valid form, so fix the read. A --kind diff read needs --meta <file> from a --kind metadata read first. Check --check before new writes, migrations and merges; exit 79 means status=halted, no more GitHub calls, preserve claims/worktree/card/approval. Never retry a mutation.
-Use .claude/bin/super-board-card.sh for board reads/moves and .claude/bin/super-board-pr-body.sh for owned PR blocks; follow writing-standard.md and pr-author-notes.md.
+Source .claude/bin/drover-gh-guard.sh and use its quota checks. Required GitHub reads go through .claude/bin/drover-github-read.py; a read that misses its --kind shape exits 64 for that call only and prints the valid form, so fix the read. A --kind diff read needs --meta <file> from a --kind metadata read first. Check --check before new writes, migrations and merges; exit 79 means status=halted, no more GitHub calls, preserve claims/worktree/card/approval. Never retry a mutation.
+Use .claude/bin/drover-card.sh for board reads/moves and .claude/bin/drover-pr-body.sh for owned PR blocks; follow writing-standard.md and pr-author-notes.md.
 Use your own worktree under .claude/worktrees/; never edit the main checkout. Clean up on ordinary exit, preserve work on halt/interruption.
 {backend.label} adaptation: do not launch Claude or other sub-agents. Perform preflight, classification, independent review and truth-check duties inline. This changes the execution host, never the evidence requirements, confidence threshold or merge policy.
 Return JSON: status=advanced|bounced|blocked|human-gate|failed|halted; column=current board column; detail=one line; prUrl/branch when known, otherwise null; priorFindings=review counts or null. A non-advanced exit ends this card's lane chain. On merge-gate exit 9, return status=halted with detail starting exactly "verification-readiness:"; preserve work and never bounce/retry.
 '''
 if args.lane == 'build':
-    prompt += '''Before creating any worktree or changing code, perform run.md's Builder pre-flight inline: call super-board-preflight.sh, judge its candidates semantically, and act on proceed/hold/sequence/skipped. Blind preflight leaves Ready and returns failed. Your own issue branch PR is not a duplicate. Read the issue and all comments; preserve qa/bug/feature labels. Existing docs/ux/tests/refactor/tech-debt rows keep their label chain: classify complexity without adding feature/bug. If truly untyped, classify feature or bug, re-run skills-ready on the proposed labelled card before adding that label, never qa. Then follow the Builder lifecycle.
+    prompt += '''Before creating any worktree or changing code, perform run.md's Builder pre-flight inline: call drover-preflight.sh, judge its candidates semantically, and act on proceed/hold/sequence/skipped. Blind preflight leaves Ready and returns failed. Your own issue branch PR is not a duplicate. Read the issue and all comments; preserve qa/bug/feature labels. Existing docs/ux/tests/refactor/tech-debt rows keep their label chain: classify complexity without adding feature/bug. If truly untyped, classify feature or bug, re-run skills-ready on the proposed labelled card before adding that label, never qa. Then follow the Builder lifecycle.
 '''
 elif args.lane == 'qa' and card['status'] == 'Ready':
     prompt += 'This qa-labelled Ready card skips Building: move Ready → QA and create the issue branch from the base; test the existing product per run.md qa cards.\n'
 elif args.lane == 'review':
     prompt += f'''The owner explicitly chose run {flag}: you may review and own the merge. First load the latest <!-- super-review:report -->; grade prior R-ids fixed/not fixed/no longer applies, bounce any not fixed and edit the same report in place. Form hypotheses from the issue AC and diff before reading the Builder narrative.
 Rerun the Tester's tests. When truth_gate triggers, apply super-review's fixed Adversarial mode brief inline in two distinct passes (code-grounder and historian); collect evidence and aggregate confidence against truth_threshold. Over-engineering is Should fix, never Blocker alone and never lowers confidence. Missing evidence fails closed.
-Merge ONLY through the unchanged .claude/bin/super-board-merge-gate.sh, pinning the exact head you reviewed at review pass using --expect-head "$HEAD" --config <config> --pr <N> --subject <title> --body-file <msg.md>. Never run bare gh pr merge or bypass the gate. Follow run.md Merge protocol and route every gate exit exactly: 2/5 rebase pass, 3 Blocked, 4 stay Review, 6 fresh review, 7/8 human gate with pinned approval-request; 9 verification-readiness means halt and preserve card/worktree/approval/claims until config repair and explicit restart, never a Build bounce or rebase retry. Respect human_approves_merge and merge_policy. Confirm MERGED <sha>, fetch base and prove merge-base --is-ancestor <sha> origin/<base> before closing issue or moving Done.
+Merge ONLY through the unchanged .claude/bin/drover-merge-gate.sh, pinning the exact head you reviewed at review pass using --expect-head "$HEAD" --config <config> --pr <N> --subject <title> --body-file <msg.md>. Never run bare gh pr merge or bypass the gate. Follow run.md Merge protocol and route every gate exit exactly: 2/5 rebase pass, 3 Blocked, 4 stay Review, 6 fresh review, 7/8 human gate with pinned approval-request; 9 verification-readiness means halt and preserve card/worktree/approval/claims until config repair and explicit restart, never a Build bounce or rebase retry. Respect human_approves_merge and merge_policy. Confirm MERGED <sha>, fetch base and prove merge-base --is-ancestor <sha> origin/<base> before closing issue or moving Done.
 '''
 
 counts = {key: {'type': 'integer'} for key in ['fixed', 'notFixed', 'noLongerApplies']}

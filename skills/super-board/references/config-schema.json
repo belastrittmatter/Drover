@@ -25,16 +25,16 @@
   // leftover `variant`; the wave planner refuses "qa-only" until it is gone.
 
   // Worker dispatch backend. "workflow" (default) drains waves in-session via
-  // the super-board-wave dynamic workflow (references/run-workflow.md);
+  // the drover-wave dynamic workflow (references/run-workflow.md);
   // requires dynamic workflows enabled in /config. "claude-p" is the legacy
-  // headless dispatcher (.claude/bin/super-board-run.sh) — explicit opt-in
+  // headless dispatcher (.claude/bin/drover-run.sh) — explicit opt-in
   // only; the dispatcher refuses to run (exit 78) unless set here.
   "worker_backend": "workflow",
 
   // Agent host this project runs on: "claude" | "codex" | "opencode". Separate from
   // worker_backend. Onboard and setup's fix ALWAYS write it (setup fills a missing key
   // from --host and never replaces a set one); setup's check flags any other value.
-  // `super-board-host.sh --config <this file>` uses it only when SUPER_BOARD_HOST and
+  // `drover-host.sh --config <this file>` uses it only when SUPER_BOARD_HOST and
   // every env sign (Codex ids, OPENCODE, CLAUDECODE) are absent. See docs/hosts.md.
   "host": "claude",
 
@@ -50,7 +50,7 @@
   "codex": {
     // Optional model name passed to `codex exec -m` for every card, over the
     // Codex ladder. `--codex=<model>` wins; absent/null lets the ladder pick
-    // (run tier x card grade, see scripts/super-board-codex-lane.sh).
+    // (run tier x card grade, see scripts/drover-codex-lane.sh).
     "model": null
   },
 
@@ -71,7 +71,7 @@
   "base_branch": "main",
 
   // IANA time zone for the times super-board writes (the PR body's Iteration
-  // history, via `super-board-pr-body.sh --time`). GitHub markdown cannot run
+  // history, via `drover-pr-body.sh --time`). GitHub markdown cannot run
   // JavaScript, so a time is fixed when a lane writes it — in this zone.
   // Onboard sets it to the machine's zone. Absent → the machine's local zone.
   "timezone": "America/Toronto",
@@ -93,8 +93,8 @@
   "paths": {
     // `null` when the project has no PROJECT.md.
     "project_md": null,
-    "pre_flight_md": "docs/super-board/pre-flight.md",
-    "runs_dir": "docs/super-board/runs"
+    "pre_flight_md": "docs/drover/pre-flight.md",
+    "runs_dir": "docs/drover/runs"
   },
 
   // When `true`, Reviewer marks the PR ready but does NOT squash-merge; a
@@ -104,13 +104,13 @@
   // "human" explicitly when every merge should require human approval.
   //
   // On the workflow backend, `false` ALSO requires
-  // "Bash(bash .claude/bin/super-board-merge-gate.sh:*)" and "Bash(gh pr merge:*)"
+  // "Bash(bash .claude/bin/drover-merge-gate.sh:*)" and "Bash(gh pr merge:*)"
   // in the session allowlist (onboard offers both as a diff) — without it every Reviewer stalls on an approval prompt
   // and nothing lands. See references/run-workflow.md → "Mid-run permission prompts".
   "human_approves_merge": false,
 
-  // Who merges what (v2.6.0). Evaluated by super-board-merge-gate.sh (via
-  // super-board-merge-policy.py) on every merge; `human_approves_merge: true`
+  // Who merges what (v2.6.0). Evaluated by drover-merge-gate.sh (via
+  // drover-merge-policy.py) on every merge; `human_approves_merge: true`
   // still overrides it and makes the Reviewer stop before the gate.
   // Absent → the defaults below apply.
   "merge_policy": {
@@ -243,7 +243,7 @@
   "truth_threshold": 70,
 
   // Shell commands proving the branch still BUILDS against the base branch as it
-  // is right now. Run by super-board-merge-gate.sh from the root of a scratch
+  // is right now. Run by drover-merge-gate.sh from the root of a scratch
   // worktree that already has the current base merged in, inside the merge lock,
   // immediately before the squash-merge. Any non-zero exit sends the card back
   // to Build for a rebase pass; it never Blocks.
@@ -257,7 +257,7 @@
   //
   // A fresh worktree has no node_modules, so install as part of the command.
   // Claude plan-usage guard (workflow backend). Before each wave the
-  // orchestrator runs super-board-usage.sh check; if the 5-hour or weekly
+  // orchestrator runs drover-usage.sh check; if the 5-hour or weekly
   // window is at or above this percentage, no new wave launches until it
   // resets. Default 95. See references/run-workflow.md → wave loop step 1.
   // Explicit `run --codex` skips this Claude-only guard.
@@ -266,7 +266,7 @@
   // What the orchestrator does while the usage guard pauses (exit 10).
   //   "none"  — (default) launch nothing; wait for the reset.
   //   "codex" — keep Build and QA moving one card at a time on Codex, headless
-  //             (super-board-codex-lane.sh without --codex). Review stays on
+  //             (drover-codex-lane.sh without --codex). Review stays on
   //             Claude: cards that reach Review wait there for the next Claude
   //             wave. The launcher refuses a fallback lane without this value.
   "usage_fallback": "none",
@@ -284,7 +284,7 @@
   //
   // It is also the GitHub-limit valve. A wave that hits the hourly GraphQL
   // limit steps it down for the next wave — unlimited → 3 → 2 → 1, floor 1 —
-  // written back here by super-board-throttle.sh (run-workflow.md → Reconcile).
+  // written back here by drover-throttle.sh (run-workflow.md → Reconcile).
   // One 14-card wave spent the whole 5000/hr bucket in ~40 minutes (2026-10-03).
   //
   // Wave width is decided by the dependency graph, not by this number: the

@@ -10,7 +10,7 @@ route  Resolves to-spec, to-tickets and implement-spec with the pack's skills-re
        route "backlog" with a printable reason: file straight into Backlog as before.
 doc    Writes ONE findings doc from the verifier's results: `file` and `needs-triage`
        findings grouped by `group` (else by source), everything else listed under
-       "Not in this doc". Default path docs/super-board/findings/collect-<date>.md;
+       "Not in this doc". Default path docs/drover/findings/collect-<date>.md;
        an existing file is never overwritten (-2, -3, …). Without --yes it prints the
        doc and writes nothing.
 fork   1–5 tickets → implement-spec (one session, no QA lane); 6+ → super-board Backlog.
@@ -30,23 +30,23 @@ from pathlib import Path
 CHAIN = ("to-spec", "to-tickets")
 SMALL = 5            # 1..SMALL tickets → /implement-spec
 KEEP = ("file", "needs-triage")
-DOC_DIR = "docs/super-board/findings"
+DOC_DIR = "docs/drover/findings"
 
 
 def resolver():
-    """Load super-board-skills-ready.py: installed .claude/bin, else the pack's scripts/."""
+    """Load drover-skills-ready.py: installed .claude/bin, else the pack's scripts/."""
     here = Path(__file__).resolve().parent
     bin_env = os.environ.get("SUPER_BOARD_BIN")
     dirs = ([Path(bin_env)] if bin_env else []) + [Path(".claude/bin"), here.parents[2] / "bin",
                                                    here.parents[2] / "scripts"]
     for d in dirs:
-        path = d / "super-board-skills-ready.py"
+        path = d / "drover-skills-ready.py"
         if path.is_file():
             spec = importlib.util.spec_from_file_location("sb_skills_ready", path)
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
             return mod
-    print("collect-handoff: cannot find super-board-skills-ready.py — set SUPER_BOARD_BIN or run install.sh",
+    print("collect-handoff: cannot find drover-skills-ready.py — set SUPER_BOARD_BIN or run install.sh",
           file=sys.stderr)
     sys.exit(2)
 

@@ -1,7 +1,7 @@
 # Agent hosts
 
 super-board runs inside an agent host: the CLI whose session types `/super-board run`.
-`scripts/super-board-host.sh` (installed as `.claude/bin/super-board-host.sh`) names it.
+`scripts/drover-host.sh` (installed as `.claude/bin/drover-host.sh`) names it.
 
 | Host value | Tested version | Start a run | Sign-in | Gaps |
 |---|---|---|---|---|
@@ -13,7 +13,7 @@ Every host also needs `gh`, `jq`, bash 3.2+ and Python 3.9+.
 
 ## How the host is picked
 
-`super-board-host.sh [--config <config.json>]` prints one value. First match wins:
+`drover-host.sh [--config <config.json>]` prints one value. First match wins:
 
 1. `SUPER_BOARD_HOST=claude|codex|opencode`, the manual override. Any other value exits 64.
 2. `CODEX_THREAD_ID` or `CODEX_SESSION_ID` → `codex`.
@@ -28,7 +28,7 @@ A live env sign beats the saved config, so a Codex lane started from a Claude-co
 board still answers `codex`.
 
 Onboard always writes `host` into `.claude/super-board/configs/<slug>.json`.
-`super-board-setup.py fix` adds a missing one from `--host`; `check` flags any other value.
+`drover-setup.py fix` adds a missing one from `--host`; `check` flags any other value.
 
 ## Evidence
 

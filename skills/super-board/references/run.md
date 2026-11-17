@@ -2,11 +2,11 @@
 
 **Scope:** the lane lifecycles (Builder, Tester, Reviewer) that both backends use, and the legacy `claude-p` runner (`worker_backend: "claude-p"`). The default in-session wave loop is in `run-workflow.md`.
 
-**Where the legacy runner runs:** headless. Spawned as a `nohup`-backgrounded process; the current Claude session exits immediately after dispatch. The runner script (`scripts/super-board-run.sh`) is a pure shell while-loop that dispatches one `claude -p` worker per lane and never holds Claude session state. Each `claude -p` worker is its own short-lived headless context — load this file at the start of every lane.
+**Where the legacy runner runs:** headless. Spawned as a `nohup`-backgrounded process; the current Claude session exits immediately after dispatch. The runner script (`scripts/drover-run.sh`) is a pure shell while-loop that dispatches one `claude -p` worker per lane and never holds Claude session state. Each `claude -p` worker is its own short-lived headless context — load this file at the start of every lane.
 
 ## Required GitHub reads can pause a run
 
-Use `.claude/bin/super-board-github-read.py` for required API evidence. It retries
+Use `.claude/bin/drover-github-read.py` for required API evidence. It retries
 one failed read at most twice (three total attempts); invalid queries or missing
 authority halt immediately. Exit **79** means stop dispatch and pause the current
 run. Never substitute an empty board, OPEN issue, full quota, or empty diff.
@@ -22,7 +22,7 @@ checkpoint limitations: [run-workflow.md](run-workflow.md#required-github-eviden
 **Super-board is an autonomous trader. The interactive Claude session that invokes `super-board run` is an orchestrator, NOT a worker.** Its only jobs are:
 
 1. Verify preconditions (see table below).
-2. Spawn the headless `nohup ./scripts/super-board-run.sh <slug> &` runner.
+2. Spawn the headless `nohup ./scripts/drover-run.sh <slug> &` runner.
 3. Report runner PID + log path back to the user.
 4. Exit.
 
@@ -52,7 +52,7 @@ Progress: ✅ onboard  →  ✅ lint  →  🤖 run (you are here)
 
 | Check | Action on fail |
 |---|---|
-| Usable verification commands | Run `python3 .claude/bin/super-board-verification-ready.py --config <config>`. Exit 9 halts setup before dispatch: configure the owning project's checks, then restart explicitly. |
+| Usable verification commands | Run `python3 .claude/bin/drover-verification-ready.py --config <config>`. Exit 9 halts setup before dispatch: configure the owning project's checks, then restart explicitly. |
 | Active config exists | Halt: "Run `super-board onboard` first." |
 | Project + required columns exist | Halt: "Project / columns missing. Run `super-board onboard` to repair." |
 | `gh auth` valid with required scopes | Halt: "Re-auth: `gh auth refresh -s project,read:project,repo`." |
@@ -64,7 +64,7 @@ Progress: ✅ onboard  →  ✅ lint  →  🤖 run (you are here)
 | Production-merge guard | If `base_branch == "main"` AND `human_approves_merge == false` AND `merge_policy.default != "human"` AND `merge_policy.allow_auto_on_production != true` AND production-detection signals fire (see onboard → base branch), halt with: `🛡 Refusing to start: would auto-merge to production main. Set merge_policy.default: "human", switch base_branch to staging, or re-run super-board onboard to opt in explicitly.` |
 | Orphan-worker scan (added 2026-05-22 after #381 worker storm) | `pgrep -f 'claude -p .*super-board run'` must return zero. If any super-board worker is already alive from a prior crashed run, halt with: `🛑 ${N} super-board workers already running. Stop them first: pkill -f 'claude -p .*super-board run'`. The dispatcher must never run while orphan workers exist — they will collide on assignee claims and produce duplicate PRs. |
 | Database reach | Run every `migrations.checks[env]` for an env in `allowed_envs` (read-only, e.g. `supabase migration list --db-url …`). On failure halt with its error: "Migrate URL for <env> does not connect — fix it before a wave builds work the gate cannot land." |
-| GraphQL rate-limit guard | Before each tick, `sb_gh_guard_check` (super-board-gh-guard.sh — it reads GraphQL's own `rateLimit`, because `gh api rate_limit` misreports the GraphQL bucket). If GraphQL remaining < 200, sleep until reset. Prevents the runner from dying mid-loop when the user has burned quota in another tool. |
+| GraphQL rate-limit guard | Before each tick, `sb_gh_guard_check` (drover-gh-guard.sh — it reads GraphQL's own `rateLimit`, because `gh api rate_limit` misreports the GraphQL bucket). If GraphQL remaining < 200, sleep until reset. Prevents the runner from dying mid-loop when the user has burned quota in another tool. |
 
 ## Lanes and label routing
 
@@ -78,8 +78,8 @@ label picks its path — three labels, no per-board variant:
 | `qa` | Ready → QA → Review → Done | test what already exists; skips Building |
 | none | as `feature` | the classifier adds `feature` or `bug`; it never adds `qa` |
 
-`super-board-wave-plan.sh` puts `lane` (`build` / `qa` / `review`) and `labels` on every picked
-card; `super-board-wave.js` sends a `qa` card from Ready straight to the Tester. The legacy runner
+`drover-wave-plan.sh` puts `lane` (`build` / `qa` / `review`) and `labels` on every picked
+card; `drover-wave.js` sends a `qa` card from Ready straight to the Tester. The legacy runner
 reads the label of the top Ready card the same way (`card_lane`).
 
 ```
@@ -102,7 +102,7 @@ Reviewer:  Review → Done
 **`qa` cards.** The Tester moves the card Ready → QA itself, creates `issue-<N>-<slug>` from the
 base branch, and tests what is already there against the ACs. Tests it writes are committed to
 that branch; a PR opens only when there is something to merge (tests, evidence). A failure it
-cannot fix with tests alone is filed as a `bug` card (`super-qa-file-bug.sh`) and named in the
+cannot fix with tests alone is filed as a `bug` card (`drover-qa-file-bug.sh`) and named in the
 handoff — the `qa` card still moves on to Review with the findings. The Reviewer reviews the QA
 report and any test diff.
 
@@ -137,10 +137,10 @@ There is **exactly one branch per issue** and **exactly one PR per issue**. All 
 
 Format: `writing-standard.md` § 2. Title = the commit subject format
 (`✨ [feat] chat: stream replies`). The body is marker blocks; each lane rewrites only its own
-with `.claude/bin/super-board-pr-body.sh --pr <P> --block <name> --expect-head <sha>
+with `.claude/bin/drover-pr-body.sh --pr <P> --block <name> --expect-head <sha>
 (--body-file | --append-file) <md>`. The script refuses (exit 6) when the PR head moved since you
 read it — re-read, then redo the edit. Builder opens the PR with every block filled
-(`super-board-pr-body.sh --skeleton` prints the empty markers).
+(`drover-pr-body.sh --skeleton` prints the empty markers).
 
 | Block | Builder | Tester | Reviewer |
 |---|---|---|---|
@@ -189,7 +189,7 @@ read it — re-read, then redo the edit. Builder opens the PR with every block f
 
 | Lane | Done | Time | Details |
 |---|---|---|---|
-| 🔨 builder | ✅ | <super-board-pr-body.sh --time> | draft · `<sha>` |
+| 🔨 builder | ✅ | <drover-pr-body.sh --time> | draft · `<sha>` |
 
 </details>
 <!-- /sb:history -->
@@ -204,7 +204,7 @@ read it — re-read, then redo the edit. Builder opens the PR with every block f
 
 History rows by lane: `🔨 builder` · `🔍 qa` (`❌ v1` / `✅ v2`, details = evidence folder) ·
 `🧐 reviewer` (`❌ bounced` / `✅ merged`, details = finding ids or `squash <sha>`). Time comes
-from `super-board-pr-body.sh --time --config <cfg>` (config `timezone`).
+from `drover-pr-body.sh --time --config <cfg>` (config `timezone`).
 
 Status card lines: `> [!NOTE]` + `🔨 Building` / `⏳ In QA` / `⏳ In review · round N` ·
 `> [!TIP]` + `✅ Merged · <sha>` · `> [!WARNING]` + `🛑 Blocked · <reason>`. Each names the AC
@@ -248,10 +248,10 @@ cards, before `runLane('build')`. Legacy `claude-p` backend: the Builder runs it
 in a sub-agent, before touching a worktree.
 
 ```
-[ ] source .claude/bin/super-board-gh-guard.sh; sb_gh_guard_check 200
-[ ] build the in-flight list: .claude/bin/super-board-card.sh --config <cfg> items (one call) → [{number,title,status}] for
+[ ] source .claude/bin/drover-gh-guard.sh; sb_gh_guard_check 200
+[ ] build the in-flight list: .claude/bin/drover-card.sh --config <cfg> items (one call) → [{number,title,status}] for
     Building / QA / Review / Ready cards; save it to a temp file
-[ ] bash .claude/bin/super-board-preflight.sh --repo <owner/name> --issues <N[,M…]> \
+[ ] bash .claude/bin/drover-preflight.sh --repo <owner/name> --issues <N[,M…]> \
          --inflight <file> [--files <paths you expect to touch>]
 [ ] judge each card: the script's verdict, then its `candidates` (near-misses) semantically
 [ ] act on the outcome below, then return one verdict per card
@@ -337,7 +337,7 @@ for affected feature selection, actual host readiness and new run-owned proof.
 Record uncovered/stale optional coverage alongside ordinary issue AC checks.
 4b. **Test-gap check** (super-qa → "Test-gap check (after build)"): map every AC to unit / component / e2e tests, hunt edge cases, write the High gaps red-first. A High gap that needs app code changed → Fail (step 7) with the gap list. Medium/Low go in the handoff under `Test gaps (not written)`.
 4c. **Security pass** (super-qa → "Security pass (every PR)"): run `pr-security-review` on the PR's diff against its base. Each kept finding is a failing check → Fail (step 7) with a `[builder]` thread on its file:line. Skill missing → Block.
-5. Run the tests. Capture evidence to `docs/super-board/runs/issue-<N>-qa-v<N>/`. For UI/visual ACs, capture screenshots at the standard viewports (1920×1080 desktop, 1024×768 tablet, 375×667 mobile). Commit the screenshots to the issue branch BEFORE writing the comment (the markdown image URLs depend on the files being present on the branch).
+5. Run the tests. Capture evidence to `docs/drover/runs/issue-<N>-qa-v<N>/`. For UI/visual ACs, capture screenshots at the standard viewports (1920×1080 desktop, 1024×768 tablet, 375×667 mobile). Commit the screenshots to the issue branch BEFORE writing the comment (the markdown image URLs depend on the files being present on the branch).
 6. **Pass** → commit test files + screenshots to same branch + push → tick the `ac` block with proof lines, write `visual` for UI, append a `history` row, rewrite `status` → `[qa] [report] ✅` PR comment with results + evidence path **+ inline screenshot embeds** (see "Screenshot embed format" below) → issue comment with the SAME inline screenshot embeds → move card QA → Review. Clean up worktree.
 7. **Fail** → leave failing ACs unchecked with the reason, append a `history` row, rewrite `status` → `[qa] [report] ❌` PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" **+ inline screenshot embeds of the broken state** → issue comment with the same inline screenshots (showing what's wrong) → increment rebuild counter → move card QA → Ready (label `loop:rebuild-N`). Clean up worktree.
 
@@ -348,9 +348,9 @@ Inline screenshots in the GitHub comment using raw-URL markdown so they render d
 ```markdown
 | Viewport | Screenshot |
 |---|---|
-| Desktop 1920×1080 | ![desktop](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/super-board/runs/issue-<N>-qa-v<V>/desktop.png) |
-| Tablet 1024×768  | ![tablet](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/super-board/runs/issue-<N>-qa-v<V>/tablet.png) |
-| Mobile 375×667   | ![mobile](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/super-board/runs/issue-<N>-qa-v<V>/mobile.png) |
+| Desktop 1920×1080 | ![desktop](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/drover/runs/issue-<N>-qa-v<V>/desktop.png) |
+| Tablet 1024×768  | ![tablet](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/drover/runs/issue-<N>-qa-v<V>/tablet.png) |
+| Mobile 375×667   | ![mobile](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/drover/runs/issue-<N>-qa-v<V>/mobile.png) |
 ```
 
 Substitution rules:
@@ -460,7 +460,7 @@ on the base branch**.
 5. Merge through the gate, never with a bare `gh pr merge`. Record the head you
    reviewed when review passes, and hand it to the gate:
      HEAD=$(gh pr view <N> --json headRefOid -q .headRefOid)   # at the moment review passes
-     bash .claude/bin/super-board-merge-gate.sh --config <config> --pr <N> --expect-head "$HEAD" \
+     bash .claude/bin/drover-merge-gate.sh --config <config> --pr <N> --expect-head "$HEAD" \
        --subject "<PR title>" --body-file <msg.md>
    <msg.md> = the PR's commit bullets, deduplicated, plus `Closes #<issue>` (writing-standard.md § 1).
    The gate takes the merge mutex, checks the PR head is still $HEAD, merges the CURRENT
@@ -559,8 +559,8 @@ Local tests: npx playwright test e2e/streaming
 
 | Viewport | Screenshot |
 |---|---|
-| Desktop 1920×1080 | ![desktop](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/super-board/runs/issue-42-qa-v1/desktop.png) |
-| Mobile 375×667 | ![mobile](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/super-board/runs/issue-42-qa-v1/mobile.png) |
+| Desktop 1920×1080 | ![desktop](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/drover/runs/issue-42-qa-v1/desktop.png) |
+| Mobile 375×667 | ![mobile](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/drover/runs/issue-42-qa-v1/mobile.png) |
 ```
 
 A pass uses the same table with screenshots of the **working** UI per AC.
@@ -635,7 +635,7 @@ The dispatcher MUST also:
 3. **Cap one worker per lane** — track `BUILD_PID` / `QA_PID` / `REVIEW_PID`; do not dispatch to a lane whose prior PID is still alive.
 4. **Reap stale locks each tick** — `reap_finished_locks` removes any lock whose PID no longer exists.
 5. **Orphan-scan on startup** — refuse to start if any `claude -p .*super-board run` worker is already running from a prior crashed dispatcher.
-6. **One board read per tick** — `super-board-card.sh items` once per tick, not per column lookup (~1 GraphQL point per 100 cards).
+6. **One board read per tick** — `drover-card.sh items` once per tick, not per column lookup (~1 GraphQL point per 100 cards).
 
 The three locks (assignee, in-flight file, lane PID) are defense in depth: any one of them alone has a race window; together they make a duplicate dispatch effectively impossible.
 
@@ -685,7 +685,7 @@ usual template — and, per §4, a `blocked-by:` line.
 
 ### The wave-start sweep
 
-Before planning any wave, `super-board-wave-plan.sh` reports five lists the orchestrator must act on
+Before planning any wave, `drover-wave-plan.sh` reports five lists the orchestrator must act on
 **before** launching:
 
 - **`sweep`** — `Blocked` cards whose blockers have all closed. Move each to `Ready` and comment
@@ -742,7 +742,7 @@ The loop exits cleanly when:
 ## Run manifest
 
 ```
-docs/super-board/runs/<YYYY-MM-DD>-<slug>.md
+docs/drover/runs/<YYYY-MM-DD>-<slug>.md
 ```
 
 Records: config used, columns, target, per-card history (claim → completion → next column with evidence links), halt gates, final counts, per-lane wall-clock, resume command.
@@ -760,9 +760,9 @@ Records: config used, columns, target, per-card history (claim → completion �
 
 Workers share the dispatcher's gh-auth token bucket. The dispatcher's `gh_rate_guard` does NOT protect worker traffic. Every worker MUST follow `rate-limit-etiquette.md` (in this directory):
 
-- Move and read cards with `.claude/bin/super-board-card.sh --config <cfg> move <issue> <Status>` / `status <issue>` — 1 GraphQL point. Every "move card X → Y" in the lifecycles above means this call. Comments, labels and PR reads go over REST (`rate-limit-etiquette.md` → "Price list").
+- Move and read cards with `.claude/bin/drover-card.sh --config <cfg> move <issue> <Status>` / `status <issue>` — 1 GraphQL point. Every "move card X → Y" in the lifecycles above means this call. Comments, labels and PR reads go over REST (`rate-limit-etiquette.md` → "Price list").
 
-- Source `scripts/super-board-gh-guard.sh` at worker start.
+- Source `scripts/drover-gh-guard.sh` at worker start.
 - Call `sb_gh_guard_check 200` before any burst of gh calls (thread reads, sub-agent spawn, exit verification).
 - Adversarial sub-agents are capped at 50 gh calls each — prefer `git blame` (local) over `gh api graphql`.
 - Final PR handoff comment MUST include `gh-quota-on-exit: graphql=<n>/5000 rest=<n>/5000` (use `sb_gh_guard_summary`).
@@ -773,7 +773,7 @@ Workers share the dispatcher's gh-auth token bucket. The dispatcher's `gh_rate_g
 Before releasing the claim assignee and exiting, every worker MUST verify:
 
 - [ ] Issue comment AND PR comment both written (per "Commenting cadence" above).
-- [ ] Card column move's mutation returned success. **Trust the exit code of `super-board-card.sh move`** — a re-read of the board was the per-worker quota tax (`rate-limit-etiquette.md` §3). If the mutation returned non-zero, preserve its unknown outcome, leave the assignee in place, and pause the run locally. Reconcile the remote card state before any repeat; never blindly retry a write or depend on a successful halt comment.
+- [ ] Card column move's mutation returned success. **Trust the exit code of `drover-card.sh move`** — a re-read of the board was the per-worker quota tax (`rate-limit-etiquette.md` §3). If the mutation returned non-zero, preserve its unknown outcome, leave the assignee in place, and pause the run locally. Reconcile the remote card state before any repeat; never blindly retry a write or depend on a successful halt comment.
 - [ ] Claim assignee released (`gh issue edit --remove-assignee <bot_identity>`) and the descriptive `loop:in-*` label removed.
 - [ ] On failure handoff: `root-cause-hash:` line is present in the PR handoff comment (per "Root-cause hash" above).
 - [ ] On Block/Skip exit: the full template from `block-template.md` is populated on BOTH the issue and the PR (if a PR exists); the reason emoji is one of the nine in the vocabulary table (🔐 💳 🔑 ❓ 🛡 🧑 🤷 📦 🎨).
@@ -799,7 +799,7 @@ Suspected causes:
 
 Different from the multi-attempt-move issue above: there the worker exited without moving the card; here the worker moved the card but didn't exit.
 
-**Auto-remediation (now implemented in `super-board-run.sh` as anti-zombie control #7):**
+**Auto-remediation (now implemented in `drover-run.sh` as anti-zombie control #7):**
 
 Every tick — both cheap and expensive — `sweep_lane_zombies` runs `check_lane_zombie` for each lane. For each lane whose PID is alive AND whose claimed issue's current column is NOT in the lane's expected source set:
 

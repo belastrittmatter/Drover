@@ -26,7 +26,7 @@ import subprocess
 import sys
 import time
 
-spec = importlib.util.spec_from_file_location('github_read', Path(__file__).with_name('super-board-github-read.py'))
+spec = importlib.util.spec_from_file_location('github_read', Path(__file__).with_name('drover-github-read.py'))
 gh = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gh)
 

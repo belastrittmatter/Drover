@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests super-board-preflight.sh — the check that runs before any card goes
+# Tests drover-preflight.sh — the check that runs before any card goes
 # Ready → Building. `gh` is a stub on PATH that serves fixtures and logs calls.
 #
 # The rule it pins: two agents must never build the same thing, and nothing that
@@ -7,7 +7,7 @@
 # duplicate — it is a sequencing problem, and must not hold the card.
 set -euo pipefail
 cd "$(dirname "$0")"
-PRE="$(pwd)/../scripts/super-board-preflight.sh"
+PRE="$(pwd)/../scripts/drover-preflight.sh"
 
 fail() { echo "FAIL: $1" >&2; exit 1; }
 

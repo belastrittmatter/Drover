@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# super-collect-file.sh — file one collected item onto the super-board project,
+# drover-collect-file.sh — file one collected item onto the super-board project,
 # into the holding column only. Dry-run unless --yes.
 #
 # This is a router, not a third filer. Bugs, features and recurring-problem fixes go
-# through super-qa-file-bug.sh; refactors through super-review-file-refactor.sh.
+# through drover-qa-file-bug.sh; refactors through drover-review-file-refactor.sh.
 # What it adds on top of them:
 #   1. a repo-wide fingerprint dedupe (theirs only see their own source label),
 #   2. holding-column resolution BEFORE dispatch — both filers fall back toward
@@ -18,11 +18,11 @@
 #      architecture `arch|<module>|<problem>`.
 #
 # Usage:
-#   super-collect-file.sh --config <cfg.json> --type bug|feature|refactor|fix \
+#   drover-collect-file.sh --config <cfg.json> --type bug|feature|refactor|fix \
 #     --source sentry|posthog|github|prs|architecture|custom --title "<one line>" --body-file <md> \
 #     --fingerprint "<stable key>" [--priority high|medium|low] [--area <a>] \
 #     [--label <l>]... [--yes]          # e.g. --label needs-triage --label ux
-#   super-collect-file.sh --config <cfg.json> --adopt <issue#> --type bug|feature|refactor [--yes]
+#   drover-collect-file.sh --config <cfg.json> --adopt <issue#> --type bug|feature|refactor [--yes]
 #
 # Stdout: dry-run → one `would-file|duplicate|recurrence|would-adopt` plan line;
 #         --yes   → the issue number (new, existing on a dedupe hit, or adopted).
@@ -90,20 +90,20 @@ if [ -z "$BIN" ]; then
   # Installed: .claude/skills/super-collect/scripts → .claude/bin. Pack: skills/… → scripts/.
   ROOT3=$(cd "$(dirname "$0")/../../.." 2>/dev/null && pwd)
   for d in ".claude/bin" "$ROOT3/bin" "$ROOT3/scripts"; do
-    [ -x "$d/super-qa-file-bug.sh" ] && { BIN="$d"; break; }
+    [ -x "$d/drover-qa-file-bug.sh" ] && { BIN="$d"; break; }
   done
 fi
-[ -n "$BIN" ] || die "cannot find super-qa-file-bug.sh — set SUPER_BOARD_BIN or run install.sh" 70
+[ -n "$BIN" ] || die "cannot find drover-qa-file-bug.sh — set SUPER_BOARD_BIN or run install.sh" 70
 
 # Router-owned duplicate/adopt writes share the same halt as the child filers.
-GITHUB_READ="$BIN/super-board-github-read.py"
+GITHUB_READ="$BIN/drover-github-read.py"
 python3 "$GITHUB_READ" --check || exit $?
 REPO_NAME="${REPO_FLAG[1]:-}"
 if [ -z "$REPO_NAME" ]; then
   REPO_NAME=$(python3 "$GITHUB_READ" --kind scalar -- repo view --json nameWithOwner --jq .nameWithOwner) || exit $?
 fi
 case "$REPO_NAME" in */*) ;; *) die "cannot resolve owner/name for collector" 70;; esac
-STATE="$BIN/super-board-collect-state.py"
+STATE="$BIN/drover-collect-state.py"
 LOCK_KEY=$(printf '%s' "$REPO_NAME" | python3 -c 'import hashlib,sys; print(hashlib.sha256(sys.stdin.read().lower().encode()).hexdigest())')
 if [ "${SB_COLLECT_LOCK_HELD:-}" != "$LOCK_KEY" ]; then
   exec python3 "$STATE" --repo "$REPO_NAME" --lock -- "$0" "${ORIGINAL_ARGS[@]}"
@@ -115,7 +115,7 @@ if [ -n "$BODY_FILE" ]; then
 fi
 
 # --- body sections ----------------------------------------------------------
-# The ticket format is writing-standard.md § 3. super-qa-file-bug.sh enforces the
+# The ticket format is writing-standard.md § 3. drover-qa-file-bug.sh enforces the
 # full bug shape (lettered steps, the 12-row Evidence table). Features and
 # recurring-problem fixes are not repro-shaped, so they get their own minimum here
 # and the QA filer's repro check is bypassed for them. Refactors: the review filer.
@@ -133,7 +133,7 @@ need_checklist() {
 }
 if [ -z "$ADOPT" ]; then
   case "$TYPE" in
-    bug) "$BIN/super-qa-file-bug.sh" --title "$TITLE" --body-file "$BODY_FILE" --check-body || exit $? ;;
+    bug) "$BIN/drover-qa-file-bug.sh" --title "$TITLE" --body-file "$BODY_FILE" --check-body || exit $? ;;
     feature)  need_sections "Problem" "Context" "Fix" "Acceptance Criteria" "Risk"; need_checklist ;;
     fix)      need_sections "Problem" "Context" "Evidence" "Fix" "Acceptance Criteria" "Risk"; need_checklist ;;
     refactor) need_sections "Problem" "Context" "Fix" ;;
@@ -223,7 +223,7 @@ fi
 if [ "$YES" -ne 1 ]; then
   # A bug's full shape is the QA filer's check; run it now so the plan never says
   # would-file for a body --yes would refuse with 66.
-  if [ "$TYPE" = bug ]; then "$BIN/super-qa-file-bug.sh" --title "$TITLE" --body-file "$BODY_FILE" --check-body || exit $?; fi
+  if [ "$TYPE" = bug ]; then "$BIN/drover-qa-file-bug.sh" --title "$TITLE" --body-file "$BODY_FILE" --check-body || exit $?; fi
   if [ -n "$CLOSED_HIT" ]; then echo "recurrence|#${CLOSED_HIT}|${TYPE}|${TITLE}|${HOLD}"
   else echo "would-file|${TYPE}|${TITLE}|${HOLD}"; fi
   exit 0
@@ -246,13 +246,13 @@ trap 'rm -f "$BODY_TMP"' EXIT
 ERR=$(mktemp)
 case "$TYPE" in
   refactor)
-    OUT=$("$BIN/super-review-file-refactor.sh" --config "$CONFIG" --title "$TITLE" \
+    OUT=$("$BIN/drover-review-file-refactor.sh" --config "$CONFIG" --title "$TITLE" \
       --body-file "$BODY_TMP" --fingerprint "$FP" --column "$HOLD" ${AREA:+--area "$AREA"} 2>"$ERR"); RC=$? ;;
   *)
     case "$TYPE" in bug) KIND=bug; WEAK=0 ;; feature) KIND=feature; WEAK=1 ;; fix) KIND=tech-debt; WEAK=1 ;; esac
     OUT=$(SUPER_QA_PROJECT_OWNER="$OWNER" SUPER_QA_PROJECT_TITLE="$PTITLE" \
       SUPER_QA_TARGET_OPTION_NAME="$HOLD" SUPER_QA_ALLOW_WEAK_BODY="$WEAK" SUPER_QA_REPO="$REPO_NAME" \
-      "$BIN/super-qa-file-bug.sh" --title "$TITLE" --body-file "$BODY_TMP" --kind "$KIND" \
+      "$BIN/drover-qa-file-bug.sh" --title "$TITLE" --body-file "$BODY_TMP" --kind "$KIND" \
       --priority "$PRIORITY" --fingerprint "$FP" ${AREA:+--area "$AREA"} 2>"$ERR"); RC=$? ;;
 esac
 cat "$ERR" >&2; rm -f "$ERR"

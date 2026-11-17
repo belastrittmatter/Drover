@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests scripts/super-qa-file-bug.sh. Deterministic, no network: `gh` is a stub
+# Tests scripts/drover-qa-file-bug.sh. Deterministic, no network: `gh` is a stub
 # on PATH. Covers the enum guards, the body guardrails that keep unactionable
 # tickets off the board, project resolution, fingerprint dedupe, and the exit-71
 # contract (issue number reaches stdout even when the board promote fails).
@@ -9,7 +9,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/super-qa-file-bug.sh"
+SCRIPT="$REPO_ROOT/scripts/drover-qa-file-bug.sh"
 WORK="$(mktemp -d)"
 export SB_GITHUB_RETRY_DELAY=0 SB_GITHUB_HALT_FILE="$WORK/halt.json"
 trap 'rm -rf "$WORK"' EXIT

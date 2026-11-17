@@ -15,7 +15,7 @@
 #
 # Layout: .agents/{skills/<skill>,bin,workflows,hooks} hold the files. Each host
 # folder (.claude/ always; .codex/ and .opencode/ when that folder already exists,
-# a config "host" key names it, super-board-host.sh reports it, or --hosts asks)
+# a config "host" key names it, drover-host.sh reports it, or --hosts asks)
 # gets one link per skill under skills/ and one link per file under bin/,
 # workflows/ and hooks/. Nothing that is not super-board's is touched. Where a
 # link cannot be made (Windows without symlink rights) the file is copied.
@@ -84,7 +84,7 @@ for p in sorted(glob.glob(os.path.join(sys.argv[1], "*.json"))):
         print(h)
 PY
 ); do add_host "$h"; done
-[ "$(bash "$REPO_ROOT/scripts/super-board-host.sh" 2>/dev/null || true)" != codex ] || add_host codex
+[ "$(bash "$REPO_ROOT/scripts/drover-host.sh" 2>/dev/null || true)" != codex ] || add_host codex
 
 QUIET="${SUPER_BOARD_QUIET_NEXT:-}"
 PACK_VERSION="$(tr -d '[:space:]' < "$REPO_ROOT/VERSION" 2>/dev/null || echo '?')"
@@ -226,14 +226,14 @@ for skill in $PRIMARY_SKILLS $SECONDARY_SKILLS; do
   install_skill "$skill" "$SHARED/skills/$skill" || true
 done
 
-SCRIPTS="super-board-project-verifier.py super-board-skills-ready.py super-board-verification-ready.py super-board-github-read.py super-board-collect-state.py super-board-run.sh super-board-gh-guard.sh super-board-card.sh super-board-status.py super-board-wave-plan.sh super-board-lane.sh super-board-codex-lane.sh super-board-codex-wave.sh super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-merge-policy.py super-board-approval.py super-board-env-check.sh super-board-settings.py super-board-setup.py super-board-usage.sh super-board-throttle.sh super-board-host.sh super-board-pr-body.sh super-review-file-refactor.sh super-qa-file-bug.sh super-board-stop.sh"
+SCRIPTS="drover-project-verifier.py drover-skills-ready.py drover-verification-ready.py drover-github-read.py drover-collect-state.py drover-run.sh drover-gh-guard.sh drover-card.sh drover-status.py drover-wave-plan.sh drover-lane.sh drover-codex-lane.sh drover-codex-wave.sh drover-deps.sh drover-preflight.sh drover-merge-gate.sh drover-merge-policy.py drover-approval.py drover-env-check.sh drover-settings.py drover-setup.py drover-usage.sh drover-throttle.sh drover-host.sh drover-pr-body.sh drover-review-file-refactor.sh drover-qa-file-bug.sh drover-stop.sh"
 for script in $SCRIPTS; do
   if [ -f "$REPO_ROOT/scripts/$script" ]; then
     copy_file "$REPO_ROOT/scripts/$script" "$SHARED/bin/$script"
     chmod +x "$SHARED/bin/$script"
   fi
 done
-WORKFLOWS="super-board-wave.js ui-refine-loop.js"
+WORKFLOWS="drover-wave.js ui-refine-loop.js"
 for wf in $WORKFLOWS; do
   if [ -f "$REPO_ROOT/workflows/$wf" ]; then
     copy_file "$REPO_ROOT/workflows/$wf" "$SHARED/workflows/$wf"
@@ -277,8 +277,8 @@ else
   echo "   ✓ skills, scripts and workflows → .agents/ (linked from $LINKED)"
 fi
 
-SETTINGS_PY="$REPO_ROOT/scripts/super-board-settings.py"
-# Stdlib-only merge (scripts/super-board-settings.py): keeps every existing key
+SETTINGS_PY="$REPO_ROOT/scripts/drover-settings.py"
+# Stdlib-only merge (scripts/drover-settings.py): keeps every existing key
 # and hook, adds each guard command once per event + matcher, backs the file up
 # before writing, and leaves an invalid settings.json untouched (exit 2).
 # Prints one summary word for the settings line; the helper's own lines (an

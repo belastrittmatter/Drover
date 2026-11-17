@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-board-gh-guard.sh — worker-side rate-limit etiquette.
+# drover-gh-guard.sh — worker-side rate-limit etiquette.
 #
 # Sourced by super-board workers (Builder / Tester / Reviewer) before any
 # burst of gh calls. The dispatcher's gh_rate_guard only protects the
@@ -10,7 +10,7 @@
 # "0 remaining".
 #
 # Usage from a worker:
-#   source scripts/super-board-gh-guard.sh
+#   source scripts/drover-gh-guard.sh
 #   sb_gh_guard_check 200     # sleep until reset if GraphQL remaining < 200
 #   sb_gh_budget_spend 5      # decrement worker-local call budget; halt if 0
 #   sb_gh_guard_summary       # log remaining quota; safe to call frequently
@@ -24,7 +24,7 @@ SB_GH_GUARD_STATE_FILE="${SB_GH_GUARD_STATE_FILE:-${TMPDIR:-/tmp}/super-board-gh
 
 # This file's own path: BASH_SOURCE under bash, the %x prompt escape under zsh.
 if [ -n "${BASH_SOURCE[0]:-}" ]; then _sb_guard_src="${BASH_SOURCE[0]}"; else eval '_sb_guard_src="${(%):-%x}"'; fi
-SB_GITHUB_READ="$(cd "$(dirname "$_sb_guard_src")" && pwd)/super-board-github-read.py"; unset _sb_guard_src
+SB_GITHUB_READ="$(cd "$(dirname "$_sb_guard_src")" && pwd)/drover-github-read.py"; unset _sb_guard_src
 sb_gh_required_read() { local kind="$1"; shift; python3 "$SB_GITHUB_READ" --kind "$kind" -- "$@"; }
 sb_gh_halt_check() { python3 "$SB_GITHUB_READ" --check; }
 

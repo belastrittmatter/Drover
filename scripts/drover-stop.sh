@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-board-stop.sh — graceful shutdown of an in-flight super-board run.
+# drover-stop.sh — graceful shutdown of an in-flight super-board run.
 #
 # What it does:
 #   1. Find every in-flight worker (lock files under .claude/super-board/inflight/).
@@ -8,7 +8,7 @@
 #      (with last commit, lane, and resume hint) — so context survives the kill.
 #   3. Release the GitHub assignee mutex on each claimed issue.
 #   4. SIGTERM → 1s → SIGKILL the worker PIDs.
-#   5. Kill the legacy dispatcher loop (super-board-run.sh).
+#   5. Kill the legacy dispatcher loop (drover-run.sh).
 #   6. Remove in-flight locks. Leave worktrees in place (Builder can resume).
 #   7. Print summary + resume command.
 #
@@ -25,7 +25,7 @@
 #                                from the "stopped" comment context.
 #
 # Usage:
-#   scripts/super-board-stop.sh [<config-slug>]
+#   scripts/drover-stop.sh [<config-slug>]
 #
 # Exit codes:
 #   0  clean stop (or nothing to stop)
@@ -55,7 +55,7 @@ fi
 BOT_LOGIN=$(jq -r '.notifications.bot_identity // .bot_identity // ""' "$CONFIG_PATH")
 INFLIGHT_DIR=".claude/super-board/inflight"
 RUN_DATE=$(date +%Y-%m-%d)
-RUN_MANIFEST="docs/super-board/runs/${RUN_DATE}-${CONFIG_SLUG}.md"
+RUN_MANIFEST="docs/drover/runs/${RUN_DATE}-${CONFIG_SLUG}.md"
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # ───────────────────────────── helpers ─────────────────────────────
@@ -164,7 +164,7 @@ if [ -d "$INFLIGHT_DIR" ]; then
   done
 fi
 
-DISPATCHER_PIDS=$(pgrep -f 'super-board-run\.sh' 2>/dev/null || true)
+DISPATCHER_PIDS=$(pgrep -f 'drover-run\.sh' 2>/dev/null || true)
 ORPHAN_WORKERS=$(pgrep -f 'claude -p .*super-board' 2>/dev/null || true)
 CODEX_WAVE_MARKER=".claude/super-board/codex-wave.pid"
 CODEX_WAVE_PID=""
@@ -177,7 +177,7 @@ if [ -f "$CODEX_WAVE_MARKER" ]; then
   if kill -0 "$CODEX_WAVE_PID" 2>/dev/null; then
     # Refuse a reused PID, or an unavailable process identity, rather than
     # signal an unrelated process and release a still-running wave's claims.
-    if ! ps -p "$CODEX_WAVE_PID" -o args= 2>/dev/null | grep -q 'super-board-codex-wave'; then
+    if ! ps -p "$CODEX_WAVE_PID" -o args= 2>/dev/null | grep -q 'drover-codex-wave'; then
       log "🛑 cannot identify Codex wave PID $CODEX_WAVE_PID; preserve claims and inspect $CODEX_WAVE_MARKER"
       exit 1
     fi

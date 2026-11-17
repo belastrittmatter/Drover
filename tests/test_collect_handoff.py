@@ -85,8 +85,8 @@ class Handoff(unittest.TestCase):
     # doc -----------------------------------------------------------------
     def test_doc_groups_verified_findings_and_lists_drops(self):
         p = self.run_cli("doc", "--findings", str(self.findings), "--since", "14d", "--date", "2026-10-27", "--yes")
-        path = self.root / "docs/super-board/findings/collect-2026-10-27.md"
-        self.assertEqual(p.stdout.strip(), "docs/super-board/findings/collect-2026-10-27.md")
+        path = self.root / "docs/drover/findings/collect-2026-10-27.md"
+        self.assertEqual(p.stdout.strip(), "docs/drover/findings/collect-2026-10-27.md")
         text = path.read_text()
         self.assertTrue(text.startswith("# Findings · 2026-10-27"))
         self.assertIn("## checkout", text)
@@ -104,13 +104,13 @@ class Handoff(unittest.TestCase):
     def test_doc_dry_run_prints_and_writes_nothing(self):
         p = self.run_cli("doc", "--findings", str(self.findings), "--date", "2026-10-27")
         self.assertIn("## checkout", p.stdout)
-        self.assertIn("would write docs/super-board/findings/collect-2026-10-27.md", p.stderr)
+        self.assertIn("would write docs/drover/findings/collect-2026-10-27.md", p.stderr)
         self.assertFalse((self.root / "docs").exists())
 
     def test_doc_never_overwrites_an_earlier_run(self):
         self.run_cli("doc", "--findings", str(self.findings), "--date", "2026-10-27", "--yes")
         p = self.run_cli("doc", "--findings", str(self.findings), "--date", "2026-10-27", "--yes")
-        self.assertEqual(p.stdout.strip(), "docs/super-board/findings/collect-2026-10-27-2.md")
+        self.assertEqual(p.stdout.strip(), "docs/drover/findings/collect-2026-10-27-2.md")
 
     def test_doc_with_nothing_verified_is_refused(self):
         self.findings.write_text(json.dumps([f for f in FINDINGS if f["verdict"].startswith("drop")]))
@@ -133,7 +133,7 @@ class Handoff(unittest.TestCase):
     def test_skill_names_the_chain_and_the_doc_path(self):
         text = SKILL.read_text()
         for needle in ("/to-spec", "/to-tickets", "/implement-spec", "collect_handoff.py",
-                       "docs/super-board/findings/collect-<YYYY-MM-DD>.md", "1–5 tickets", "6+ tickets"):
+                       "docs/drover/findings/collect-<YYYY-MM-DD>.md", "1–5 tickets", "6+ tickets"):
             self.assertIn(needle, text)
 
 

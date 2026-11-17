@@ -12,8 +12,8 @@ Worktree cleanup (`hooks/cleanup-wt.py`) is a hook, not a skill.
 
 1. Verify preconditions (clean git, no orphan workers, GraphQL quota, etc.).
 2. Dispatch per the config's `worker_backend`:
-   - `"workflow"` (default) — stay in-session and run the wave loop in `skills/super-board/references/run-workflow.md`: plan a wave, claim assignees, launch the `super-board-wave` dynamic workflow, reconcile, repeat. Lane agents inside the workflow do all product work.
-   - `"claude-p"` (legacy, explicit opt-in only) — spawn the headless runner `nohup .claude/bin/super-board-run.sh <slug> &`, report PID + log path, exit. The runner refuses to start (exit 78) unless the config sets this value.
+   - `"workflow"` (default) — stay in-session and run the wave loop in `skills/super-board/references/run-workflow.md`: plan a wave, claim assignees, launch the `drover-wave` dynamic workflow, reconcile, repeat. Lane agents inside the workflow do all product work.
+   - `"claude-p"` (legacy, explicit opt-in only) — spawn the headless runner `nohup .claude/bin/drover-run.sh <slug> &`, report PID + log path, exit. The runner refuses to start (exit 78) unless the config sets this value.
 3. Report back to the user (dispatch confirmation, or one status line per wave).
 
 The orchestrator MUST NOT:
@@ -29,9 +29,9 @@ If a problem surfaces during the run, the orchestrator's reply is: "I saw X. Wan
 
 Workers (`super-build`, `super-qa`, `super-review`) share the dispatcher's `gh` token bucket. They MUST:
 
-- Required GitHub reads use `.claude/bin/super-board-github-read.py`; exit 79 stops the run.
+- Required GitHub reads use `.claude/bin/drover-github-read.py`; exit 79 stops the run.
 - Check its `--check` before GitHub writes, migrations, merges, and new dispatch; preserve work when halted.
-- Source `.claude/bin/super-board-gh-guard.sh` (`scripts/` in this repo) at worker start.
+- Source `.claude/bin/drover-gh-guard.sh` (`scripts/` in this repo) at worker start.
 - Call `sb_gh_guard_check 200` before any burst of `gh` calls.
 - Prefer local `git blame` / `git log` over `gh api graphql` for any sub-agent that doesn't need fresh state.
 - Cap adversarial sub-agents at 50 gh calls each. If a sub-agent runs out, it returns `confidence: insufficient_data` rather than burning the shared quota.
@@ -45,7 +45,7 @@ See `skills/super-board/references/rate-limit-etiquette.md` for the full discipl
 once into the target project's shared `.agents/` tree, then links each host folder into it: one
 link per skill under `skills/`, one per file under `bin/`, `workflows/`, `hooks/`. `.claude/` is
 always linked; `.codex/` and `.opencode/` only when that folder already exists, a config `host`
-key names it, `super-board-host.sh` reports it, or `--hosts` asks. A real-directory `.claude/`
+key names it, `drover-host.sh` reports it, or `--hosts` asks. A real-directory `.claude/`
 install is replaced by links on upgrade; a user's own links and anything not super-board's are
 left alone; where no symlink can be made the file is copied. Settings and run state stay in `.claude/`.
 
@@ -53,21 +53,21 @@ left alone; where no symlink can be made the file is copied. Settings and run st
 .agents/
 ├── skills/<all nine>/...
 ├── hooks/guard-*.py, cleanup-wt.py   (wired into settings.json; --no-hooks skips)
-├── workflows/super-board-wave.js, ui-refine-loop.js
-└── bin/super-board-*.sh (incl. pr-body), super-board-*.py (status, merge-policy, settings, setup), super-qa-file-bug.sh, super-review-file-refactor.sh
+├── workflows/drover-wave.js, ui-refine-loop.js
+└── bin/super-board-*.sh (incl. pr-body), super-board-*.py (status, merge-policy, settings, setup), drover-qa-file-bug.sh, drover-review-file-refactor.sh
 ```
 
 It also records an older install in
 `.claude/super-board/upgrade.json`, prints grouped emoji output, and asks nothing:
-`super-board onboard` asks the questions. Onboard's 🔍 Checks (`scripts/super-board-setup.py`)
+`super-board onboard` asks the questions. Onboard's 🔍 Checks (`scripts/drover-setup.py`)
 fixes must-haves and finishes upgrades with no question.
 
 ## Board shape (v3.0.0)
 
 Columns are always Backlog · Ready · Building · QA · Review · Blocked · Done — no Skipped, no
 per-board `variant`. Labels `qa` · `bug` · `feature` route cards: `qa` skips Building, everything
-else (and no label) is built. Change routing in `scripts/super-board-wave-plan.sh`,
-`workflows/super-board-wave.js` and `run.md` → "Lanes and label routing" together.
+else (and no label) is built. Change routing in `scripts/drover-wave-plan.sh`,
+`workflows/drover-wave.js` and `run.md` → "Lanes and label routing" together.
 
 Skills call the dispatcher scripts as `.claude/bin/<script>`.
 
@@ -85,7 +85,7 @@ every project it is installed in.
 | Comment | `[role] [label] status` · Did · ✅ Done · ❌ Not done · Next · ≤ 8 lines |
 | PR author notes | Purpose · What changed · Why it matters, in native file/inline review comments; follow `skills/super-board/references/pr-author-notes.md` |
 
-- NEVER rewrite a whole PR body: `scripts/super-board-pr-body.sh` rewrites one block.
+- NEVER rewrite a whole PR body: `scripts/drover-pr-body.sh` rewrites one block.
 - ALWAYS change a format in `writing-standard.md` first, then the templates and `tests/test_writing_format.py`.
 
 ## Release checks

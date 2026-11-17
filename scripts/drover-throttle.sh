@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-board-throttle.sh — step the wave width down after a wave hits GitHub's hourly limit.
+# drover-throttle.sh — step the wave width down after a wave hits GitHub's hourly limit.
 #
 # WHY. On 2026-10-03 one 14-card wave spent the whole 5000/hr GraphQL bucket in about 40
 # minutes; every later `gh issue/pr/project` call failed until the reset. The owner's rule:
@@ -9,14 +9,14 @@
 # WHAT COUNTS AS A HIT. Either signal is enough:
 #   - GraphQL remaining is 0, or
 #   - the wave's lane results mention a rate-limit failure (`--results`, any text or JSON).
-# The reading is `gh api rate_limit` passed through sb_gh_quota_merge (super-board-gh-guard.sh),
+# The reading is `gh api rate_limit` passed through sb_gh_quota_merge (drover-gh-guard.sh),
 # which swaps in GraphQL's own `rateLimit` numbers: REST's `rate_limit` misreports the GraphQL
 # bucket (measured 2026-10-04: REST said used=2 while GraphQL said used=930). Neither read
 # costs quota. The failure text is still trusted over any reading: right after a reset
 # `rate_limit` has been seen reporting 4999 while calls still failed.
 #
 # Usage:
-#   super-board-throttle.sh --config <cfg.json> [--results <file>] [--rate <rate_limit.json>] [--dry-run]
+#   drover-throttle.sh --config <cfg.json> [--results <file>] [--rate <rate_limit.json>] [--dry-run]
 #
 # Stdout, one JSON line:
 #   {"hit":true,"why":"graphql remaining 0","from":3,"to":2,"wrote":true}
@@ -39,8 +39,8 @@ done
 if [ -n "$RATE" ]; then
   PAYLOAD=$(cat "$RATE")
 else
-  # shellcheck source=super-board-gh-guard.sh
-  . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-gh-guard.sh"
+  # shellcheck source=drover-gh-guard.sh
+  . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/drover-gh-guard.sh"
   PAYLOAD=$(sb_gh_quota_merge "$(gh api rate_limit 2>/dev/null || echo '{}')")
 fi
 REMAINING=$(printf '%s' "$PAYLOAD" | jq -r '.resources.graphql.remaining // "unknown"' 2>/dev/null || echo unknown)

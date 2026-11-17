@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""super-board-merge-policy.py — decide who merges a PR and which migrations run.
+"""drover-merge-policy.py — decide who merges a PR and which migrations run.
 
-Called by super-board-merge-gate.sh inside the merge lock. Pure function of the
+Called by drover-merge-gate.sh inside the merge lock. Pure function of the
 config, the PR metadata and the diff; no network, no side effects.
 
-    super-board-merge-policy.py --config <cfg.json> --meta <pr.json> --diff <file>
+    drover-merge-policy.py --config <cfg.json> --meta <pr.json> --diff <file>
 
 `--meta` is `gh pr view --json labels,files,additions,deletions,body`.
 `--diff` is `gh pr diff` (only ADDED lines are searched for keywords).

@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""super-board-setup.py — the deterministic half of `/super-board onboard`.
+"""drover-setup.py — the deterministic half of `/super-board onboard`.
 
 Onboard asks the questions; this script finds things out and fixes the must-haves,
 so step 1 (Checks) can say "Fixed for you" without asking anything.
 
-    super-board-setup.py check   [--root DIR] [--pack DIR]            what is missing / old (read-only)
-    super-board-setup.py fix     [--root DIR] [--pack DIR] [--no-helpers] [--dry-run]
+    drover-setup.py check   [--root DIR] [--pack DIR]            what is missing / old (read-only)
+    drover-setup.py fix     [--root DIR] [--pack DIR] [--no-helpers] [--dry-run]
                                                                        apply every must-have, then re-check
-    super-board-setup.py migrate-config <config.json> [--dry-run]     old config keys → v3 keys
-    super-board-setup.py names   [--root DIR]                          two board-name suggestions
-    super-board-setup.py branch  [--root DIR]                          branches, deploy source, recommendation
-    super-board-setup.py board-rank    --owner O                       the user's boards, best column match first
-    super-board-setup.py board-migrate (--config C | --owner O --number N --repo R) [--qa-all] [--prune-empty] [--root DIR] [--dry-run]
+    drover-setup.py migrate-config <config.json> [--dry-run]     old config keys → v3 keys
+    drover-setup.py names   [--root DIR]                          two board-name suggestions
+    drover-setup.py branch  [--root DIR]                          branches, deploy source, recommendation
+    drover-setup.py board-rank    --owner O                       the user's boards, best column match first
+    drover-setup.py board-migrate (--config C | --owner O --number N --repo R) [--qa-all] [--prune-empty] [--root DIR] [--dry-run]
                                                                        columns + labels + Skipped → Done
 
 Every command prints one JSON object. `--text` on check/fix prints the short ✓ lists the
@@ -59,7 +59,7 @@ import subprocess
 import sys
 
 COLUMNS = ["Backlog", "Ready", "Building", "QA", "Review", "Blocked", "Done"]
-HOSTS = ("claude", "codex", "opencode")  # config `host`; super-board-host.sh accepts the same
+HOSTS = ("claude", "codex", "opencode")  # config `host`; drover-host.sh accepts the same
 LABELS = {
     "qa": ("0e8a16", "Test what exists; skips Building (super-board)"),
     "bug": ("d73a4a", "Something is broken; built, tested, reviewed (super-board)"),
@@ -73,12 +73,12 @@ OLD_LABELS = {
 }
 SKILLS = ["super-board", "super-build", "super-qa", "super-review", "super-collect", "visual", "git-sync", "ui-refine-loop", "pr-security-review"]
 OLD_SKILL_DIRS = ["super-refine", "cleanup-wt", "arch-loop"]
-BIN = ["super-board-project-verifier.py", "super-board-skills-ready.py", "super-board-host.sh", "super-board-codex-wave.sh", "super-board-lane.sh", "super-board-codex-lane.sh", "super-board-verification-ready.py", "super-board-github-read.py", "super-board-collect-state.py", "super-board-run.sh", "super-board-gh-guard.sh", "super-board-card.sh", "super-board-status.py", "super-board-wave-plan.sh",
-       "super-board-deps.sh", "super-board-preflight.sh", "super-board-merge-gate.sh",
-       "super-board-merge-policy.py", "super-board-approval.py", "super-board-env-check.sh",
-       "super-board-settings.py", "super-board-setup.py", "super-board-usage.sh", "super-board-pr-body.sh",
-       "super-review-file-refactor.sh", "super-qa-file-bug.sh", "super-board-stop.sh"]
-WORKFLOWS = ["super-board-wave.js", "ui-refine-loop.js"]
+BIN = ["drover-project-verifier.py", "drover-skills-ready.py", "drover-host.sh", "drover-codex-wave.sh", "drover-lane.sh", "drover-codex-lane.sh", "drover-verification-ready.py", "drover-github-read.py", "drover-collect-state.py", "drover-run.sh", "drover-gh-guard.sh", "drover-card.sh", "drover-status.py", "drover-wave-plan.sh",
+       "drover-deps.sh", "drover-preflight.sh", "drover-merge-gate.sh",
+       "drover-merge-policy.py", "drover-approval.py", "drover-env-check.sh",
+       "drover-settings.py", "drover-setup.py", "drover-usage.sh", "drover-pr-body.sh",
+       "drover-review-file-refactor.sh", "drover-qa-file-bug.sh", "drover-stop.sh"]
+WORKFLOWS = ["drover-wave.js", "ui-refine-loop.js"]
 HELPERS_CMD = "npx -y skills@latest add mattpocock/skills --skill '*' -a claude-code -y"
 # Cloudflare's standalone whole-repo audit. Optional: installed by default, never
 # required by a lane, so a missing copy is a note, not a red check.
@@ -175,7 +175,7 @@ def find_pack(explicit=None):
 
 
 def helper_readiness(root, host="claude", home=None, catalog=None):
-    command = [sys.executable, os.path.join(os.path.dirname(__file__), "super-board-skills-ready.py"),
+    command = [sys.executable, os.path.join(os.path.dirname(__file__), "drover-skills-ready.py"),
                "--root", root, "--host", host, "--profile", "setup"]
     if home:
         command += ["--home", home]
@@ -318,7 +318,7 @@ def check(root, pack, host="claude", home=None, catalog=None):
     for p in sorted(glob.glob(os.path.join(claude, "super-board", "configs", "*.json"))):
         cfg = load_json(p)
         ready = subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__),
-                                "super-board-verification-ready.py"), "--config", p],
+                                "drover-verification-ready.py"), "--config", p],
                                capture_output=True, text=True)
         if ready.returncode:
             verification[os.path.relpath(p, root)] = ready.stderr.strip()
@@ -491,7 +491,7 @@ def text_report(res):
             [f"config {c} uses old keys" for c in res.get("configs", {})] + ([] if res.get("git") else ["not a git repo"])
         lines += [f"  ✗ {r}" for r in red]
         if red:
-            lines.append("  → fix: super-board-setup.py fix")
+            lines.append("  → fix: drover-setup.py fix")
     for entry in res.get("helper_readiness", {}).get("entries", []):
         if entry["status"] == "missing":
             lines.append(f"  ✗ missing {entry['name']} for {res['helper_readiness']['host']}; install it in that host and restart")

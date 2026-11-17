@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-board-merge-gate.sh — take the merge mutex, prove the branch still works
+# drover-merge-gate.sh — take the merge mutex, prove the branch still works
 # against the base as it is RIGHT NOW, then merge. Release either way.
 #
 # WHY THIS EXISTS, MEASURED
@@ -46,7 +46,7 @@
 # reading GitHub. Configure the owning project's checks; this gate invents none.
 #
 # Usage:
-#   super-board-merge-gate.sh --config <config.json> --pr <number>
+#   drover-merge-gate.sh --config <config.json> --pr <number>
 #                             [--expect-head <sha>] [--subject <title>] [--body-file <md>]
 #                             [--lock-timeout 1800] [--stale-after 5400] [--dry-run]
 #
@@ -111,7 +111,7 @@ set -euo pipefail
 # Fixed read commands: a malformed payload is GitHub's, so it halts (#32).
 export SB_GITHUB_READ_STRICT=1
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-GITHUB_READ="$HERE/super-board-github-read.py"
+GITHUB_READ="$HERE/drover-github-read.py"
 
 CONFIG=""; PR=""; LOCK_TIMEOUT=1800; STALE_AFTER=""; DRY=0; EXPECT_HEAD=""; SUBJECT=""; MSG_FILE=""
 while [ $# -gt 0 ]; do
@@ -143,7 +143,7 @@ if [ -z "$STALE_AFTER" ]; then
 fi
 
 CONFIG_JSON=$(cat "$CONFIG")
-printf '%s\n' "$CONFIG_JSON" | python3 "$HERE/super-board-verification-ready.py" --config -
+printf '%s\n' "$CONFIG_JSON" | python3 "$HERE/drover-verification-ready.py" --config -
 BASE=$(echo "$CONFIG_JSON" | jq -r '.base_branch // "main"')
 REPO=$(echo "$CONFIG_JSON" | jq -r '.repo.remote // ""' | sed -E 's#^https?://github\.com/##; s#\.git$##')
 REPO_PATH=$(echo "$CONFIG_JSON" | jq -r '.repo.path // "."')
@@ -231,14 +231,14 @@ fi
 
 # ---- merge policy + migration plan ----------------------------------------
 # One read of the PR's labels, paths, size and body plus its diff, classified by
-# super-board-merge-policy.py (beside this script). Unreadable → human: a policy
+# drover-merge-policy.py (beside this script). Unreadable → human: a policy
 # the gate cannot evaluate must not default to "merge".
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # Outside $SCRATCH: `git worktree add` below needs that directory empty.
 META=$(mktemp); DIFF=$(mktemp)
 python3 "$GITHUB_READ" --kind metadata -- pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,files,additions,deletions,changedFiles,body > "$META"
 python3 "$GITHUB_READ" --kind diff --meta "$META" -- pr diff "$PR" ${REPO:+--repo "$REPO"} > "$DIFF"
-PLAN=$(python3 "$HERE/super-board-merge-policy.py" --config "$CONFIG" --meta "$META" --diff "$DIFF") || {
+PLAN=$(python3 "$HERE/drover-merge-policy.py" --config "$CONFIG" --meta "$META" --diff "$DIFF") || {
   echo "human-gate: policy — could not classify the PR (unreadable metadata)"
   say "merge policy could not be evaluated — a human merges this one"; exit 7; }
 
@@ -246,13 +246,13 @@ PLAN=$(python3 "$HERE/super-board-merge-policy.py" --config "$CONFIG" --meta "$M
 # and policy/commands. Re-read trusted approval evidence; never mint it here.
 APPROVED=false
 approval_check() {
-  APPROVAL=$(python3 "$HERE/super-board-approval.py" --repo "$REPO" --pr "$PR" \
+  APPROVAL=$(python3 "$HERE/drover-approval.py" --repo "$REPO" --pr "$PR" \
     --head "$HEAD_SHA" --plan "$PLAN") || APPROVAL='{"approved":false}'
   python3 "$GITHUB_READ" --check || exit $?
   APPROVED=$(echo "$APPROVAL" | jq -r '.approved // false')
 }
 approval_request() {
-  python3 "$HERE/super-board-approval.py" --request --repo "$REPO" --pr "$PR" \
+  python3 "$HERE/drover-approval.py" --request --repo "$REPO" --pr "$PR" \
     --head "$HEAD_SHA" --plan "$PLAN"
 }
 HUMAN=$(echo "$PLAN" | jq -r '.human[] | "human-gate: \(.category) — \(.why)"')
@@ -327,7 +327,7 @@ if [ "$APPROVED" = true ]; then
   # Code remains pinned; body-declared human steps and config can change without
   # a commit. Reclassify them too instead of reusing the old approval scope.
   python3 "$GITHUB_READ" --kind metadata -- pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,files,additions,deletions,changedFiles,body > "$META"
-  PLAN=$(python3 "$HERE/super-board-merge-policy.py" --config "$CONFIG" --meta "$META" --diff "$DIFF") || {
+  PLAN=$(python3 "$HERE/drover-merge-policy.py" --config "$CONFIG" --meta "$META" --diff "$DIFF") || {
     say "human approval scope could not be refreshed"; exit 7; }
   approval_check
   if [ "$APPROVED" != true ]; then

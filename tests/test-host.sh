@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Tests super-board-host.sh — which agent host runs this shell, else exit 65 so the run
+# Tests drover-host.sh — which agent host runs this shell, else exit 65 so the run
 # asks for a host instead of guessing.
 set -euo pipefail
 KIT=$(cd "$(dirname "$0")/.." && pwd)
-S="$KIT/scripts/super-board-host.sh"
+S="$KIT/scripts/drover-host.sh"
 fail() { echo "FAIL: $1" >&2; exit 1; }
 # A clean env, so the test answers the same inside Claude Code, Codex or CI.
 host() { env -i PATH="$PATH" "$@" bash "$S"; }
@@ -54,4 +54,4 @@ for f in none missing; do
 done
 rc=0; cfg "$T/bad.json" >/dev/null 2>&1 || rc=$?
 [ "$rc" = 64 ] || fail "a bad config host exits 64, got $rc"
-echo "PASS: super-board-host"
+echo "PASS: drover-host"

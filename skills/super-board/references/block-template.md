@@ -64,7 +64,7 @@ same rule: **prose above for the human, one parseable line below for the loop.**
 Write the numbers alone. **Never `blocked-by: none — but #26 must merge first`**: a line that says
 none and then names an issue is read as *no blocker* by the sweep and as *one blocker* by a human,
 and the sweep is the one that acts. That exact shape shipped on a real board and is the reason
-`super-board-deps.sh` refuses to guess at it.
+`drover-deps.sh` refuses to guess at it.
 
 The same rule governs the issue body's `## Blocked by` section, which is where the sweep looks when
 a card has no block comment yet. Bullets of the form `- #N — why`, or a single `- None.` — nothing
@@ -132,7 +132,7 @@ Example (what the person sees on GitHub):
 > ▸ Why, and what I checked
 
 The `Reason tag:` and `blocked-by: -` lines stay (inside the fold): the planner reads them
-(`super-board-deps.sh` → `needsYou`, `humanGated`). The issue and the PR get the `needs-you` label.
+(`drover-deps.sh` → `needsYou`, `humanGated`). The issue and the PR get the `needs-you` label.
 
 **The checklist commands are exact.** Copy them from the gate's `needs-you: <command>` lines;
 never paraphrase ("run the migration on prod"). A placeholder such as `<your live migrate command>`

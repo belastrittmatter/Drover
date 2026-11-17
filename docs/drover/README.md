@@ -62,7 +62,7 @@ merge with a hand-off; a card labelled `qa` skips Building.
 Stop at any step: the answers are saved, and the next run shows them and continues. Testing a
 live site with no repo is not a board: `/super-qa <url>`. The full screen-by-screen contract is
 `skills/super-board/references/onboard.md`; the deterministic half is
-`scripts/super-board-setup.py`.
+`scripts/drover-setup.py`.
 
 **Labels.** Every board has the same seven columns. Three labels route a card: `qa` goes Ready →
 QA → Review → Done (test what exists), `bug` and `feature` go through Building first, and a card
@@ -83,7 +83,7 @@ card dropped on purpose is closed as not planned and moved to Done with a 🤷 c
 - Plugin install: the command is `/super-board:super-board onboard`, and its 🔍 Checks step installs the missing scripts, workflows and hooks.
 - Bug sources take any extra source in onboard — a link, app name, API URL, MCP server or command — proven readable (read-only) before it is saved; `/super-collect` runs it like the built-ins.
 - Testing a live site with no repo is not a board: `/super-qa <url>` runs on its own.
-- To enable the usage check, add `printf '%s' "$input" | bash <repo>/.claude/bin/super-board-usage.sh record` to your status-line script.
+- To enable the usage check, add `printf '%s' "$input" | bash <repo>/.claude/bin/drover-usage.sh record` to your status-line script.
 - Cards need acceptance criteria: QA grades against them, and `lint` tells you which are missing.
 
 ## Skills
@@ -107,7 +107,7 @@ Lane lifecycles are identical in both.
 |---|---|---|
 | Runs as | in-session dynamic workflow waves | headless `claude -p` workers |
 | Needs | dynamic workflows on in `/config` | nothing extra |
-| Reference | `skills/super-board/references/run-workflow.md` | `scripts/super-board-run.sh` |
+| Reference | `skills/super-board/references/run-workflow.md` | `scripts/drover-run.sh` |
 
 The legacy dispatcher refuses to run (exit 78) unless the config sets it.
 
@@ -124,7 +124,7 @@ closed: 3 on a chained board, 19 on a wide one. It also **sweeps `Blocked`**: a 
 issue that has since closed comes back to `Ready` on its own. A dependency line it cannot read
 confidently is never treated as free; it is flagged for a human.
 
-**Usage guard.** Before each wave the orchestrator runs `super-board-usage.sh check`. At or over
+**Usage guard.** Before each wave the orchestrator runs `drover-usage.sh check`. At or over
 `usage_pause_pct` (default 95) of the 5-hour or weekly window it launches no new wave, lets the
 running one finish and posts a resume note. It needs the status line to record usage (pack README
 → Setup notes), works on Pro/Max only, and an unknown reading never halts a run.
@@ -158,7 +158,7 @@ needed a human before the loop started.
 ## The six agentic patterns, mapped
 
 ```
-  workflows/super-board-wave.js   the conductor: owns the patterns
+  workflows/drover-wave.js   the conductor: owns the patterns
   skills/super-{build,qa,review}  the sheet music: one lane agent each
   the prompt it spawns            "Run super-build on #N, follow run.md exactly"
 ```
@@ -329,7 +329,7 @@ Missing, unreadable or stale evidence is a hold for a person, never a pass.
 
 ```
   skills/<name>/   SKILL.md (agent prompt) · README.md · references/ · scripts/
-  workflows/       super-board-wave.js, ui-refine-loop.js
+  workflows/       drover-wave.js, ui-refine-loop.js
   scripts/         dispatcher, planner, merge gate, usage check, filers
   hooks/           guard hooks, cleanup-wt, settings snippets
   tests/           bash/python tests, no network: bash tests/test-*.sh

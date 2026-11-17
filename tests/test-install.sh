@@ -36,7 +36,7 @@ T=$(mktemp -d)
 for s in $ALL_SKILLS; do
   [ -f "$T/.claude/skills/$s/SKILL.md" ] || fail "plain layout: $s/SKILL.md missing"
 done
-for w in super-board-wave.js ui-refine-loop.js; do
+for w in drover-wave.js ui-refine-loop.js; do
   [ -f "$T/.claude/workflows/$w" ] || fail "workflow $w was not installed"
 done
 rm -rf "$T"
@@ -123,7 +123,7 @@ for flags in '--protect-main' '--no-hooks --protect-main'; do
   for group in scripts workflows hooks; do
     diff -qr "../$group" "$PACK/$group" >/dev/null || fail "linked helper refresh changed source $group"
   done
-  for file in bin/super-board-run.sh workflows/super-board-wave.js hooks/guard-protected-push.py; do
+  for file in bin/drover-run.sh workflows/drover-wave.js hooks/guard-protected-push.py; do
     [ -L "$T/.claude/$file" ] || fail "linked helper refresh replaced $file"
     [ -s "$T/.claude/$file" ] || fail "linked helper refresh emptied $file"
   done
@@ -168,14 +168,14 @@ rm -rf "$T"
 #     whose script was never installed fails only when a user reaches for it.
 T=$(mktemp -d)
 "$INSTALL" "$T" >/dev/null 2>&1
-for s in super-board-run.sh super-board-stop.sh super-board-wave-plan.sh \
-         super-board-lane.sh super-board-codex-lane.sh super-board-codex-wave.sh super-board-card.sh super-board-throttle.sh super-board-host.sh \
-         super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-usage.sh super-board-pr-body.sh \
-         super-review-file-refactor.sh super-qa-file-bug.sh; do
+for s in drover-run.sh drover-stop.sh drover-wave-plan.sh \
+         drover-lane.sh drover-codex-lane.sh drover-codex-wave.sh drover-card.sh drover-throttle.sh drover-host.sh \
+         drover-deps.sh drover-preflight.sh drover-merge-gate.sh drover-usage.sh drover-pr-body.sh \
+         drover-review-file-refactor.sh drover-qa-file-bug.sh; do
   [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed, or is not executable"
 done
 # The Codex shim runs the shared launcher installed beside it.
-[ -x "$T/.agents/bin/super-board-lane.sh" ] && [ -e "$T/.agents/bin/super-board-codex-lane.sh" ] || fail "super-board-lane.sh must sit next to its codex shim in .agents/bin"
+[ -x "$T/.agents/bin/drover-lane.sh" ] && [ -e "$T/.agents/bin/drover-codex-lane.sh" ] || fail "drover-lane.sh must sit next to its codex shim in .agents/bin"
 rm -rf "$T"
 
 # 6 — guard hooks: scripts copied, settings merged into an existing file without
@@ -286,7 +286,7 @@ rm -rf "$T"
 T=$(mktemp -d); printf '# AGENTS.md\n- mine\n' > "$T/AGENTS.md"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1
 [ "$(cat "$T/AGENTS.md")" = "$(printf '# AGENTS.md\n- mine')" ] || fail "install must not add a block uninvited"
-for s in super-board-skills-ready.py super-board-host.sh super-board-codex-wave.sh super-board-codex-lane.sh super-board-env-check.sh super-board-merge-policy.py super-board-settings.py super-board-setup.py; do
+for s in drover-skills-ready.py drover-host.sh drover-codex-wave.sh drover-codex-lane.sh drover-env-check.sh drover-merge-policy.py drover-settings.py drover-setup.py; do
   [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed"
 done
 rm -rf "$T"
@@ -294,15 +294,15 @@ rm -rf "$T"
 # 13 — shared layout: the files live once under .agents/; .claude/ reaches them through
 #      links. No .codex/ or .opencode/ unless that host is configured, detected or asked for.
 resolves() { # <target> <host> — host paths reach the .agents/ copy
-  for p in skills/super-board/SKILL.md skills/git-sync/SKILL.md bin/super-board-host.sh workflows/super-board-wave.js; do
+  for p in skills/super-board/SKILL.md skills/git-sync/SKILL.md bin/drover-host.sh workflows/drover-wave.js; do
     [ "$1/.$2/$p" -ef "$1/.agents/$p" ] || fail "$2: $p does not resolve to .agents/$p"
   done
 }
 T=$(mktemp -d)
 OUT=$("$INSTALL" "$T" 2>&1)
 [ -d "$T/.agents/skills/super-board" ] && [ ! -L "$T/.agents/skills/super-board" ] || fail "fresh: .agents/skills/super-board should be a real directory"
-[ -f "$T/.agents/bin/super-board-host.sh" ] && [ ! -L "$T/.agents/bin/super-board-host.sh" ] || fail "fresh: .agents/bin should hold real files"
-[ -x "$T/.agents/bin/super-board-run.sh" ] || fail "fresh: .agents/bin scripts must be executable"
+[ -f "$T/.agents/bin/drover-host.sh" ] && [ ! -L "$T/.agents/bin/drover-host.sh" ] || fail "fresh: .agents/bin should hold real files"
+[ -x "$T/.agents/bin/drover-run.sh" ] || fail "fresh: .agents/bin scripts must be executable"
 resolves "$T" claude
 [ -L "$T/.claude/skills/super-board" ] || fail "fresh: .claude/skills/super-board should be a link"
 [ "$(readlink "$T/.claude/skills/super-board")" = "../../.agents/skills/super-board" ] || fail "fresh: links must be relative, got $(readlink "$T/.claude/skills/super-board")"
@@ -348,12 +348,12 @@ mkdir -p "$T/.claude/skills/super-board" "$T/.claude/skills/super-qa" "$T/.claud
 echo "1.8.2" > "$T/.claude/skills/super-board/VERSION"; echo old > "$T/.claude/skills/super-board/SKILL.md"
 echo old > "$T/.claude/skills/super-board/stale-file.md"
 echo mine > "$T/.claude/skills/other-skill/SKILL.md"
-echo old > "$T/.claude/bin/super-board-run.sh"; echo mine > "$T/.claude/bin/mine.sh"
-echo old > "$T/.claude/workflows/super-board-wave.js"; echo mine > "$T/.claude/hooks/my-hook.py"
+echo old > "$T/.claude/bin/drover-run.sh"; echo mine > "$T/.claude/bin/mine.sh"
+echo old > "$T/.claude/workflows/drover-wave.js"; echo mine > "$T/.claude/hooks/my-hook.py"
 echo old > "$T/.claude/hooks/guard-secrets.py"
 "$INSTALL" "$T" >/dev/null 2>&1 || fail "upgrade from a real-directory install failed"
 resolves "$T" claude
-for p in skills/super-board skills/super-qa bin/super-board-run.sh workflows/super-board-wave.js hooks/guard-secrets.py; do
+for p in skills/super-board skills/super-qa bin/drover-run.sh workflows/drover-wave.js hooks/guard-secrets.py; do
   [ -L "$T/.claude/$p" ] || fail "upgrade: .claude/$p should now be a link into .agents/"
 done
 [ ! -e "$T/.agents/skills/super-board/stale-file.md" ] || fail "upgrade: stale files must not carry over"
@@ -389,7 +389,7 @@ ln -s ../.agents/skills "$T/.claude/skills"; ln -s ../.agents/bin "$T/.claude/bi
 plant_decoys "$T"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1 || fail "whole-folder link layout failed"
 [ -d "$T/.agents/skills/super-board" ] && [ ! -L "$T/.agents/skills/super-board" ] || fail "whole-folder link: skill turned into a self-link"
-[ -f "$T/.claude/skills/super-board/SKILL.md" ] && [ -x "$T/.claude/bin/super-board-run.sh" ] || fail "whole-folder link: files missing"
+[ -f "$T/.claude/skills/super-board/SKILL.md" ] && [ -x "$T/.claude/bin/drover-run.sh" ] || fail "whole-folder link: files missing"
 decoys_intact "$T" || fail "whole-folder link: DECOYS DESTROYED"
 rm -rf "$T"
 
@@ -398,7 +398,7 @@ T=$(mktemp -d); FAKE=$(mktemp -d)
 printf '#!/bin/sh\nexit 1\n' > "$FAKE/ln"; chmod +x "$FAKE/ln"
 for run in 1 2; do
   OUT=$(PATH="$FAKE:$PATH" "$INSTALL" "$T" 2>&1) || fail "no-symlink install failed: $OUT"
-  [ -f "$T/.claude/skills/super-board/SKILL.md" ] && [ -x "$T/.claude/bin/super-board-host.sh" ] \
+  [ -f "$T/.claude/skills/super-board/SKILL.md" ] && [ -x "$T/.claude/bin/drover-host.sh" ] \
     && [ -f "$T/.claude/hooks/guard-secrets.py" ] || fail "no-symlink install: .claude paths missing"
   cmp -s "$T/.claude/skills/super-board/SKILL.md" "$T/.agents/skills/super-board/SKILL.md" || fail "no-symlink: copy differs"
 done

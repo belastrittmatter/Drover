@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 KIT = Path(__file__).resolve().parents[1]
-CLI = KIT / 'scripts/super-board-skills-ready.py'
+CLI = KIT / 'scripts/drover-skills-ready.py'
 CORE = ['super-board','super-build','super-qa','super-review','super-collect','visual','git-sync','ui-refine-loop','pr-security-review']
 
 class Readiness(unittest.TestCase):

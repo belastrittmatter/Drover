@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests super-board-card.sh against a fake gh. No network.
+# Tests drover-card.sh against a fake gh. No network.
 #
 # The point of the helper is cost: a card move used to be item-list (~203
 # points on a 131-card board) + field-list (101) + item-edit. These tests pin
@@ -7,7 +7,7 @@
 # plus the mutation — and that a stale option id is recovered, not mis-moved.
 set -euo pipefail
 cd "$(dirname "$0")"
-CARD="$PWD/../scripts/super-board-card.sh"
+CARD="$PWD/../scripts/drover-card.sh"
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 fail() { echo "FAIL: $1" >&2; exit 1; }
 pass=0; ok() { pass=$((pass + 1)); echo "  ✅ $1"; }

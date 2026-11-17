@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-build-dispatch.sh — dispatch a single GitHub issue to a headless `claude -p` worker.
+# drover-build-dispatch.sh — dispatch a single GitHub issue to a headless `claude -p` worker.
 #
 # Contract (per .claude/skills/super-build/SKILL.md):
 #   - Arg: issue number N
@@ -97,15 +97,15 @@ fi
 
 # Compose the worker prompt: preamble + issue body + working-dir footer
 SB_BIN="$REPO_DIR/.claude/bin"
-ISSUE_JSON=$(python3 "$SB_BIN/super-board-github-read.py" --kind issue -- issue view "$N" --json number,title,body 2>&1) || {
+ISSUE_JSON=$(python3 "$SB_BIN/drover-github-read.py" --kind issue -- issue view "$N" --json number,title,body 2>&1) || {
   echo "error: gh issue view #$N failed:" >&2
   echo "$ISSUE_JSON" >&2
   exit 79
 }
-LABELS_JSON=$(python3 "$SB_BIN/super-board-github-read.py" --kind json -- issue view "$N" --json labels) || exit $?
+LABELS_JSON=$(python3 "$SB_BIN/drover-github-read.py" --kind json -- issue view "$N" --json labels) || exit $?
 CARD_JSON=$(printf '%s' "$ISSUE_JSON" | jq -c --argjson labels "$LABELS_JSON" '[{number:.number,status:"Ready",body:.body,labels:($labels.labels // [])}]')
 SKILLS_RC=0
-printf '%s' "$CARD_JSON" | python3 "$SB_BIN/super-board-skills-ready.py" --root "$REPO_DIR" --host claude --cards - --lane build || SKILLS_RC=$?
+printf '%s' "$CARD_JSON" | python3 "$SB_BIN/drover-skills-ready.py" --root "$REPO_DIR" --host claude --cards - --lane build || SKILLS_RC=$?
 [ "$SKILLS_RC" -eq 0 ] || exit "$SKILLS_RC"
 mkdir -p "$LOG_DIR"
 
@@ -113,7 +113,7 @@ ISSUE_TITLE=$(printf '%s' "$ISSUE_JSON" | jq -r '.title')
 ISSUE_BODY=$(printf '%s' "$ISSUE_JSON" | jq -r '.body')
 
 {
-  printf 'First operation: repeat super-board-skills-ready.py --root %s --host claude --cards - --lane build with %s as stdin. Halt on exit 10 before any lifecycle writes. Recheck conditional helpers with --require before use.\n' "$REPO_DIR" "$CARD_JSON"
+  printf 'First operation: repeat drover-skills-ready.py --root %s --host claude --cards - --lane build with %s as stdin. Halt on exit 10 before any lifecycle writes. Recheck conditional helpers with --require before use.\n' "$REPO_DIR" "$CARD_JSON"
   cat "$PREAMBLE"
   printf '\n# Issue #%s — %s\n\n' "$N" "$ISSUE_TITLE"
   printf '%s\n' "$ISSUE_BODY"

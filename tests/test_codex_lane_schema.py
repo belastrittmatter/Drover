@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pin the Codex lane's --output-schema to STAGE_SCHEMA in workflows/super-board-wave.js.
+"""Pin the Codex lane's --output-schema to STAGE_SCHEMA in workflows/drover-wave.js.
 
 Two hosts, one lane-result contract: the status enum and field names must match.
 Offline; reads both sources, runs nothing but node on the extracted object literal.
@@ -14,7 +14,7 @@ KIT = Path(__file__).resolve().parent.parent
 
 
 def lane_schema():
-    text = (KIT / 'scripts/super-board-lane.sh').read_text()
+    text = (KIT / 'scripts/drover-lane.sh').read_text()
     source = text.split("<<'PY'\n", 1)[1].rsplit('\nPY', 1)[0]
     wanted = {'counts', 'properties', 'schema'}
     nodes = [node for node in ast.parse(source).body if isinstance(node, ast.Assign)
@@ -25,9 +25,9 @@ def lane_schema():
 
 
 def stage_schema():
-    text = (KIT / 'workflows/super-board-wave.js').read_text()
+    text = (KIT / 'workflows/drover-wave.js').read_text()
     match = re.search(r'^const STAGE_SCHEMA = (\{.*?^\})$', text, re.S | re.M)
-    assert match, 'STAGE_SCHEMA not found in workflows/super-board-wave.js'
+    assert match, 'STAGE_SCHEMA not found in workflows/drover-wave.js'
     out = subprocess.check_output(['node', '-e', 'process.stdout.write(JSON.stringify(' + match.group(1) + '))'],
                                   text=True)
     return json.loads(out)

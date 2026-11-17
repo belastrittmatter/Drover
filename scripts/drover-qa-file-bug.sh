@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-qa-file-bug.sh — file one Super QA finding as a GitHub issue on the
+# drover-qa-file-bug.sh — file one Super QA finding as a GitHub issue on the
 # Super Ultimate QA project board.
 #
 # The QA loop runs unattended, so this is the carved exception to "ask before
@@ -15,7 +15,7 @@
 # format in skills/super-board/references/writing-standard.md § 3.
 #
 # Usage:
-#   super-qa-file-bug.sh --title "<one-line>" --body-file <path.md> \
+#   drover-qa-file-bug.sh --title "<one-line>" --body-file <path.md> \
 #     [--kind bug|feature|ux|tests|docs|tech-debt] \
 #     [--priority high|medium|low] \
 #     [--category functional|visual|network|console|i18n|a11y|data|testability] \
@@ -144,7 +144,7 @@ if [ -z "$FINGERPRINT" ]; then
     | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-|-$//g')"
 fi
 
-GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-github-read.py"
+GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/drover-github-read.py"
 python3 "$GITHUB_READ" --check || exit $?
 
 # --- project resolution -----------------------------------------------------

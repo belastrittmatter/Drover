@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests super-board-merge-gate.sh — the merge mutex and the freshness gate.
+# Tests drover-merge-gate.sh — the merge mutex and the freshness gate.
 # Scenarios 1-7 stop at or before the first `gh pr view`. Scenarios 8-13 run past
 # it against a local bare `origin` and a `gh` stub on PATH, to pin the head guard.
 #
@@ -10,7 +10,7 @@
 # merge at a time, and the proof happens under the lock.
 set -euo pipefail
 cd "$(dirname "$0")"
-GATE="../scripts/super-board-merge-gate.sh"
+GATE="../scripts/drover-merge-gate.sh"
 
 fail() { echo "FAIL: $1" >&2; exit 1; }
 
@@ -314,12 +314,12 @@ teardown
 T15=$(mktemp -d); printf '%s' "$(meta "" src/x.ts)" > "$T15/m.json"
 for c in '{"host":"claude"}' '{}' '{"host":"claude","merge_policy":{}}' '{"host":"opencode","merge_policy":{"default":"auto"}}'; do
   echo "$c" > "$T15/c.json"
-  python3 ../scripts/super-board-merge-policy.py --config "$T15/c.json" --meta "$T15/m.json" --diff /dev/null \
+  python3 ../scripts/drover-merge-policy.py --config "$T15/c.json" --meta "$T15/m.json" --diff /dev/null \
     | jq -e '.human == []' >/dev/null || fail "config $c should leave a small clean PR ungated"
 done
 for c in '{"host":"codex"}' '{"host":"opencode","merge_policy":{"auto_max_lines":0}}'; do
   echo "$c" > "$T15/c.json"
-  python3 ../scripts/super-board-merge-policy.py --config "$T15/c.json" --meta "$T15/m.json" --diff /dev/null \
+  python3 ../scripts/drover-merge-policy.py --config "$T15/c.json" --meta "$T15/m.json" --diff /dev/null \
     | jq -e '.human | length == 1 and .[0].category == "default"' >/dev/null \
     || fail "config $c should add one default human entry"
 done
@@ -521,7 +521,7 @@ echo "$OUT" | grep -q "would migrate staging" || fail "a dry run should say what
 teardown
 
 # 25 — the glob dialect: **/ spans zero or more directories; * stays in one segment.
-P="../scripts/super-board-merge-policy.py"
+P="../scripts/drover-merge-policy.py"
 pol() { printf '%s' "$1" > "$T25/m.json"; python3 "$P" --config "$T25/c.json" --meta "$T25/m.json" --diff /dev/null; }
 T25=$(mktemp -d); echo '{"base_branch":"staging","migrations":{"globs":["**/migrations/*.sql"]}}' > "$T25/c.json"
 pol "$(meta "" migrations/1.sql)"          | jq -e '.migrations == ["migrations/1.sql"]' >/dev/null || fail "**/ should match zero directories"

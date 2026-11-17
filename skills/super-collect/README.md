@@ -2,7 +2,7 @@
 
 Finds problems in one project, checks each one, and writes one findings doc. Matt Pocock's
 `/to-spec` turns that doc into a spec and `/to-tickets` turns the spec into tickets. Then 1–5
-tickets go to `/implement-spec`; 6+ go to the super-board Backlog. See [routing](../../docs/super-board/routing.md).
+tickets go to `/implement-spec`; 6+ go to the super-board Backlog. See [routing](../../docs/drover/routing.md).
 
 ## What It Does
 
@@ -14,10 +14,10 @@ tickets go to `/implement-spec`; 6+ go to the super-board Backlog. See [routing]
   duplicate. Unclear ones are filed with `needs-triage`, never silently dropped.
 - Reports a source it cannot reach as `unavailable`, never `empty`: the Sentry and PostHog
   fetchers print `{"status":"unavailable","error":…}` and exit 2.
-- Writes the findings doc to `docs/super-board/findings/collect-<YYYY-MM-DD>.md`, grouped by
+- Writes the findings doc to `docs/drover/findings/collect-<YYYY-MM-DD>.md`, grouped by
   root cause (`scripts/collect_handoff.py`).
 - No `/to-spec` or `/to-tickets` installed, or `--direct`: files each finding through
-  `super-qa-file-bug.sh` and `super-review-file-refactor.sh`, always into the holding column,
+  `drover-qa-file-bug.sh` and `drover-review-file-refactor.sh`, always into the holding column,
   and says why. Nothing reaches `Ready` until `super-board lint` says so.
 
 ## Usage

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests the Builder pre-flight wiring in workflows/super-board-wave.js. No gh
+# Tests the Builder pre-flight wiring in workflows/drover-wave.js. No gh
 # calls: the script body runs under node with agent/pipeline/log stubbed, and the
 # pre-flight agent's verdicts are scripted per card.
 #
@@ -9,7 +9,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-node - ../workflows/super-board-wave.js <<'JS'
+node - ../workflows/drover-wave.js <<'JS'
 const fs = require('fs')
 const src = fs.readFileSync(process.argv[2], 'utf8').replace(/^export const meta/m, 'const meta')
 const AsyncFunction = (async () => {}).constructor

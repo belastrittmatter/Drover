@@ -420,7 +420,7 @@ def report(root, host, cards=None, profile=None, lane=None, require=(), home=Non
 
 
 def hydrate(cards, root):
-    helper = Path(__file__).with_name('super-board-github-read.py')
+    helper = Path(__file__).with_name('drover-github-read.py')
     def read_issue(number, kind, fields):
         process = subprocess.run([sys.executable, str(helper), '--kind', kind, '--', 'issue', 'view', str(number),
                                   '--json', fields], cwd=root, text=True, capture_output=True)

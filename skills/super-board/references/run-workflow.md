@@ -2,7 +2,7 @@
 
 The DEFAULT backend (v1.6.0+): used when the active config sets
 `"worker_backend": "workflow"` or omits the key. The legacy bash dispatcher
-(`.claude/bin/super-board-run.sh`, see `run.md`) runs only on explicit
+(`.claude/bin/drover-run.sh`, see `run.md`) runs only on explicit
 `"worker_backend": "claude-p"`; this file ONLY changes who dispatches
 workers. Lane lifecycles, branch/PR model, comment cadence, Block
 templates, halt gates, and done conditions are all inherited from `run.md`
@@ -15,13 +15,13 @@ overriding `worker_backend`. Use it when Claude's remaining usage is low or to t
 `--codex --low` / `--codex --high` pick the Codex ladder the same way the tier flags
 pick Claude's (flag, else config `model_tier`, else medium); pass it as `--tier`.
 A cheap router (`gpt-6-luna`) grades each Ready card low/medium/high, and the lane
-launcher's `Codex.LADDERS` table (`super-board-lane.sh`) maps tier × grade to `-m <model>`; a card entering past
+launcher's `Codex.LADDERS` table (`drover-lane.sh`) maps tier × grade to `-m <model>`; a card entering past
 Ready takes its tier's medium cell. `--codex=<model>`, else optional `codex.model`,
 pins one model for every card and skips the router.
 Keep this run choice in each wave and resume command; skip only the Claude usage guard.
 
 **Inside Codex, plain `run` is `--codex`.** Your tool list has no Workflow tool, or
-`bash .claude/bin/super-board-host.sh --config <config-path>` prints `codex` → run as `--codex` (tier flags and
+`bash .claude/bin/drover-host.sh --config <config-path>` prints `codex` → run as `--codex` (tier flags and
 `--codex=<model>` still apply); it counts as explicit `--codex`, Review included.
 Say so once, in the first wave report: `🔁 codex host — running as --codex`. Never improvise a Claude workflow wave in Codex.
 
@@ -30,8 +30,8 @@ Say so once, in the first wave report: `🔁 codex host — running as --codex`.
 `⛔ unknown host — set SUPER_BOARD_HOST=claude|codex and re-run`. Never guess a backend.
 
 After the same plan and claim steps, launch this command as a background task:
-`bash .claude/bin/super-board-codex-wave.sh --config <config-path> --cards <claimed-cards.json> --codex[=<model>] --tier <low|medium|high> --output <wave-result.json>`.
-The helper starts one `super-board-lane.sh --backend codex` per card/lane, cards in parallel,
+`bash .claude/bin/drover-codex-wave.sh --config <config-path> --cards <claimed-cards.json> --codex[=<model>] --tier <low|medium|high> --output <wave-result.json>`.
+The helper starts one `drover-lane.sh --backend codex` per card/lane, cards in parallel,
 each advancing Build → QA → Review only after a successful handoff (QA labels skip Build).
 Concurrency uses positive `max_workers`, otherwise `max(1, min(16, cpus - 2))`.
 Pre-flight/classification and truth-check run inline; there are no Claude sub-agents.
@@ -44,12 +44,12 @@ use the lane launcher's sandbox settings, including an external submodule git di
 
 ## Required GitHub evidence and a paused run
 
-Required reads use `.claude/bin/super-board-github-read.py --kind <shape> -- <gh args>`.
+Required reads use `.claude/bin/drover-github-read.py --kind <shape> -- <gh args>`.
 Three total attempts means the first attempt plus two retries of that same read;
 unrelated successful calls do not reset its failures. Invalid GraphQL queries,
 authentication, and permission errors stop immediately. Do not retry mutations.
 A payload that misses an agent-facing `--kind` shape (`READ_SHAPES` in
-`workflows/super-board-wave.js`) exits 64 for that call only, printing the valid
+`workflows/drover-wave.js`) exits 64 for that call only, printing the valid
 form; it never halts the run. Fixed-command scripts set `SB_GITHUB_READ_STRICT=1`.
 
 Exit **79**, a workflow result with `halted: true`, or a failed `--check` ends this
@@ -87,19 +87,19 @@ The interactive session that runs this backend is the orchestrator. It:
 
 Run the same preconditions as `run.md` §Preconditions, minus PID checks:
 1. Config exists and validates against `config-schema.json`. Run
-   `python3 .claude/bin/super-board-verification-ready.py --config <config>`; exit 9
+   `python3 .claude/bin/drover-verification-ready.py --config <config>`; exit 9
    stops before dispatch until the owning project's verification commands are configured.
    Preserve work; repair setup and restart explicitly, never bounce to Build.
 2. Production-merge guard: refuse `base_branch: main` + `human_approves_merge:
-   false` when deploy markers exist (same rule as super-board-run.sh).
+   false` when deploy markers exist (same rule as drover-run.sh).
 3. Worktree check: if legacy `.worktrees/issue-*` exists, halt for inspection/move
    as described in run.md. Scan only board worktrees under `.claude/worktrees/`;
    when their named branch is gone use `git worktree remove` without force. Preserve
    detached, dirty, locked, unregistered, and unrelated folders.
 4. For Claude waves, `node --check` passes on a wrapped copy of
-   `.claude/workflows/super-board-wave.js` (catches a broken script before
+   `.claude/workflows/drover-wave.js` (catches a broken script before
    burning tokens):
-   `{ echo '(async function(){'; sed 's/^export const meta/const meta/' .claude/workflows/super-board-wave.js; echo '})'; } | node --check --input-type=module`
+   `{ echo '(async function(){'; sed 's/^export const meta/const meta/' .claude/workflows/drover-wave.js; echo '})'; } | node --check --input-type=module`
    With `--codex`, instead require `codex` on PATH and `bash -n` on both Codex launcher scripts.
 5. Wave marker FIRST, then the legacy check (lock-before-look closes the
    TOCTOU window where both backends pass each other's checks at once):
@@ -113,11 +113,11 @@ Run the same preconditions as `run.md` §Preconditions, minus PID checks:
       Remove the lock when the run ends or stops. The legacy dispatcher
       refuses to start (and halts mid-run) while it exists.
    b. THEN verify no legacy run is active: BOTH
-      `pgrep -f 'super-board-run.sh'` (the legacy dispatcher idles between
+      `pgrep -f 'drover-run.sh'` (the legacy dispatcher idles between
       dispatches with zero workers alive) and
       `pgrep -f 'claude -p .*super-board run'` are empty, AND `/workflows`
-      shows no running super-board-wave, AND no `super-board-codex-wave.sh` or
-      `super-board-codex-lane.sh` process belongs to this repo. If a legacy run is detected,
+      shows no running drover-wave, AND no `drover-codex-wave.sh` or
+      `drover-codex-lane.sh` process belongs to this repo. If a legacy run is detected,
       remove the lock just created and stop — the legacy run won.
 6. Crash-recovery sweep (the workflow backend's equivalent of the legacy
    reaper): with no wave running, strip `bot_identity` from any
@@ -135,23 +135,23 @@ Run the same preconditions as `run.md` §Preconditions, minus PID checks:
 
 Repeat until a done condition or halt gate fires:
 
-1. **Rate guard** — `sb_gh_guard_check 200` (super-board-gh-guard.sh; `gh api rate_limit` misreports GraphQL); if GraphQL remaining < 200, wait for
+1. **Rate guard** — `sb_gh_guard_check 200` (drover-gh-guard.sh; `gh api rate_limit` misreports GraphQL); if GraphQL remaining < 200, wait for
    reset (same thresholds as run.md). A failing `gh` call outranks the reading:
    right after a reset the REST reading has shown 4999 while calls still failed.
    With GraphQL dry, the orchestrator's own writes go over REST, a separate
    quota: `gh api repos/<o>/<r>/issues/<n>/comments -f body=…` for a comment,
    `gh api -X DELETE repos/<o>/<r>/issues/<n>/assignees -f 'assignees[]=<bot>'`
    to release a claim. Board moves have no REST route; they wait for the reset.
-   **Usage guard** (Claude waves only; skip for `--codex`, explicit or host-switched) — `bash .claude/bin/super-board-usage.sh check --config <config-path>`
+   **Usage guard** (Claude waves only; skip for `--codex`, explicit or host-switched) — `bash .claude/bin/drover-usage.sh check --config <config-path>`
    (Claude 5-hour and weekly plan usage; threshold `usage_pause_pct`, default 95):
    - exit 0 → launch.
    - exit 10 with `usage_fallback: "codex"` → resolve the selected remaining
      chain for `--host codex` before fallback claims; missing helpers halt with
      `skills-readiness:` and preserve state. Build/QA may use
-     `super-board-codex-lane.sh` WITHOUT `--codex`; Review remains refused.
+     `drover-codex-lane.sh` WITHOUT `--codex`; Review remains refused.
      Fallback never grants merge ownership; use explicit `run --codex` for all lanes.
      Plan as usual, take the `build` and `qa` cards (`review` cards wait), and for ONE
-     card at a time claim it, run `bash .claude/bin/super-board-codex-lane.sh --config
+     card at a time claim it, run `bash .claude/bin/drover-codex-lane.sh --config
      <config-path> --card '<card JSON>' --lane <build|qa>`, read its JSON exit like a lane
      result, then reconcile (step 5). Re-run the usage check between cards; on exit 0
      return to normal waves. The report line says `🔁 codex fallback`. Without
@@ -172,20 +172,20 @@ Repeat until a done condition or halt gate fires:
    the only scriptable source of plan usage (`/usage` is interactive; `ccusage`
    reports tokens and cost, not % of plan). It reaches the script only if the
    user's status-line command records it; add one line after it reads stdin:
-   `printf '%s' "$input" | bash <repo>/.claude/bin/super-board-usage.sh record`.
+   `printf '%s' "$input" | bash <repo>/.claude/bin/drover-usage.sh record`.
    Pro/Max only (API-key sessions have no `rate_limits`); it refreshes on this
    session's own turns. Claude Code's built-in pause at 100% remains the
    backstop — the guard exists so a wave does not start that the limit would
    cut off mid-lane. The legacy `claude-p` dispatcher does not run this guard.
 2. **Plan the wave** —
-   `bash .claude/bin/super-board-wave-plan.sh --config <config-path>` →
+   `bash .claude/bin/drover-wave-plan.sh --config <config-path>` →
    Exit 9 is a verification-readiness halt: preserve work and claims, repair the
    owning project's `verify_commands`, then restart explicitly. No GitHub recovery probe,
    rebase, Build bounce, or automatic retry.
    **Skill readiness before any wave writes.** Hydrate every selected issue body
-   read-only with `.claude/bin/super-board-github-read.py --kind issue -- issue
+   read-only with `.claude/bin/drover-github-read.py --kind issue -- issue
    view <N> --json number,title,body`. Keep number, status, labels and literal body
-   in a JSON array file. Run `python3 .claude/bin/super-board-skills-ready.py
+   in a JSON array file. Run `python3 .claude/bin/drover-skills-ready.py
    --root <repo-root> --host <claude|codex> --cards <cards.json>` for the actual
    worker host before sweep/resume/refresh/flag/stranded actions or Claim.
    Exit 10 names missing helpers: halt, preserve all state, repair the exact
@@ -224,9 +224,9 @@ Repeat until a done condition or halt gate fires:
    worker` / `✅ Done: card moved to Ready · branch <name> kept` / `Next: builder`
    (writing-standard.md § 4). The next Builder continues on the branch.
    **Builder pre-flight.** No card goes Ready → Building unchecked. The wave's first phase
-   (`Pre-flight` in `super-board-wave.js`, before `runLane('build')`) runs one cheap sub-agent per
+   (`Pre-flight` in `drover-wave.js`, before `runLane('build')`) runs one cheap sub-agent per
    batch of up to 5 Ready cards: already merged? already in progress (open PR or another card)?
-   same files as an open PR? unclear? It runs `super-board-preflight.sh`, posts the Block template
+   same files as an open PR? unclear? It runs `drover-preflight.sh`, posts the Block template
    and moves held/sequenced cards to Blocked itself (run.md → "Builder pre-flight"). The summary
    reports those as `preflight:blocked`; `preflight:failed` means pre-flight was blind and the card
    stays in Ready for the next wave. Sequenced cards carry a `blocked-by:` line, so this same sweep
@@ -249,7 +249,7 @@ Repeat until a done condition or halt gate fires:
 4. **Launch** — With `--codex`, or no Workflow tool, or the host check printing `codex`, use
    "Codex runs" above. The host check printing `claude` uses the Workflow tool; exit 65 or
    `opencode` never reaches Launch (see "Unknown host halts"). Workflow tool with
-   `scriptPath: .claude/workflows/super-board-wave.js` and
+   `scriptPath: .claude/workflows/drover-wave.js` and
    `args: { configPath, cards, humanApprovesMerge, tier }` (`cards` hydrated after the planner: each
    carries `lane` and `labels`, and a `qa` card skips the Builder). Runs in the background; the
    orchestrator stays responsive. `humanApprovesMerge` comes from the config; when false the workflow serializes Review-lane agents (merge-race guard, execution side).
@@ -266,10 +266,10 @@ Repeat until a done condition or halt gate fires:
    for EVERY card in the wave, release the assignee
    (`gh issue edit <n> --remove-assignee <bot_identity>`, idempotent).
    Append one line per card to the run manifest
-   `docs/super-board/runs/<date>-<slug>.md`:
+   `docs/drover/runs/<date>-<slug>.md`:
    `| #N | <lanesRun> | <finalStatus> | <column> | <detail> |`.
    Then the GitHub-limit step-down: save the returned `cards` to a temp file and run
-   `bash .claude/bin/super-board-throttle.sh --config <config-path> --results <file>`.
+   `bash .claude/bin/drover-throttle.sh --config <config-path> --results <file>`.
    `hit: true` (GraphQL at 0, or a lane failed on the limit) has already written
    `max_workers` one lower into the config — unlimited → 3 → 2 → 1, floor 1 — so the
    next wave and the next run start narrower. Raising it again is the owner's call.
@@ -305,7 +305,7 @@ a marker owned by another or uncertain run; preserve it.
 - Stop: `x` on the run in `/workflows` (or TaskStop), then release assignees
   for in-flight cards and post "stopped mid-flight" comments (same protocol
   as `references/stop.md`). Remove `.claude/super-board/inflight/workflow-wave.lock`.
-- Codex stop: with GitHub available, run `bash .claude/bin/super-board-stop.sh <slug>`; it validates the wave PID and allows SIGTERM to cancel child lanes before releasing claims. Apply the same claim/comment/lock protocol to ALL selected claimed cards, including queued cards. During a GitHub halt, send SIGTERM only to the verified wave PID, wait for child cancellation, and preserve claims without GitHub writes.
+- Codex stop: with GitHub available, run `bash .claude/bin/drover-stop.sh <slug>`; it validates the wave PID and allows SIGTERM to cancel child lanes before releasing claims. Apply the same claim/comment/lock protocol to ALL selected claimed cards, including queued cards. During a GitHub halt, send SIGTERM only to the verified wave PID, wait for child cancellation, and preserve claims without GitHub writes.
 - Resume: just run again — board state is the only state. A workflow stopped
   mid-wave can also be resumed in-session via `resumeFromRunId` (completed
   lane agents return cached results).
@@ -324,28 +324,28 @@ don't stall on prompts:
     "Bash(gh pr view:*)", "Bash(gh pr diff:*)", "Bash(gh pr checks:*)", "Bash(gh pr comment:*)",
     "Bash(gh pr create:*)", "Bash(gh pr ready:*)", "Bash(gh project item-edit:*)",
     "Bash(gh project item-list:*)", "Bash(gh api:*)", "Bash(git worktree:*)",
-    "Bash(.claude/bin/super-board-card.sh:*)",
+    "Bash(.claude/bin/drover-card.sh:*)",
     "Bash(git checkout:*)", "Bash(git add:*)", "Bash(git commit:*)",
     "Bash(git push:*)", "Bash(git pull:*)", "Bash(git fetch:*)", "Bash(git blame:*)",
     "Bash(mkdir:*)", "Bash(pgrep:*)", "Bash(node --check:*)",
-    "Bash(bash .claude/bin/super-board-wave-plan.sh:*)",
-    "Bash(bash .claude/bin/super-board-preflight.sh:*)",
-    "Bash(python3 .claude/bin/super-board-github-read.py:*)",
-    "Bash(.claude/bin/super-board-github-read.py:*)",
-    "Bash(python3 .claude/bin/super-board-verification-ready.py:*)",
-    "Bash(python3 .claude/bin/super-board-skills-ready.py:*)",
-    "Bash(bash .claude/bin/super-board-usage.sh:*)",
-    "Bash(bash .claude/bin/super-board-throttle.sh:*)",
-    "Bash(bash .claude/bin/super-board-codex-lane.sh:*)",
-    "Bash(bash .claude/bin/super-board-codex-wave.sh:*)",
-    "Bash(bash .claude/bin/super-board-host.sh:*)",
-    "Bash(bash .claude/bin/super-board-pr-body.sh:*)", "Bash(gh pr edit:*)",
-    "Bash(bash .claude/bin/super-board-stop.sh:*)",
+    "Bash(bash .claude/bin/drover-wave-plan.sh:*)",
+    "Bash(bash .claude/bin/drover-preflight.sh:*)",
+    "Bash(python3 .claude/bin/drover-github-read.py:*)",
+    "Bash(.claude/bin/drover-github-read.py:*)",
+    "Bash(python3 .claude/bin/drover-verification-ready.py:*)",
+    "Bash(python3 .claude/bin/drover-skills-ready.py:*)",
+    "Bash(bash .claude/bin/drover-usage.sh:*)",
+    "Bash(bash .claude/bin/drover-throttle.sh:*)",
+    "Bash(bash .claude/bin/drover-codex-lane.sh:*)",
+    "Bash(bash .claude/bin/drover-codex-wave.sh:*)",
+    "Bash(bash .claude/bin/drover-host.sh:*)",
+    "Bash(bash .claude/bin/drover-pr-body.sh:*)", "Bash(gh pr edit:*)",
+    "Bash(bash .claude/bin/drover-stop.sh:*)",
     plus your project's test runners (e.g. "Bash(npm test:*)", "Bash(npx playwright:*)").
 
 `tests/test_run_allowlist.py` fails when pre-flight or a lane calls a `.claude/bin`
 script this list does not cover. The read helper is listed in both forms: scripts call
-`python3 .claude/bin/super-board-github-read.py`, lane prompts call it directly.
+`python3 .claude/bin/drover-github-read.py`, lane prompts call it directly.
 
 **Headless runs (`claude -p "/super-board run"`).** Supported only where Claude Code may
 write the project's `.claude/` folder without a prompt. `.claude/` is a protected path:
@@ -364,7 +364,7 @@ Merging is NOT in the base list. On a board whose `merge_policy.default` is
 `"auto"`, `super-board onboard` offers the merge lines as a diff to approve
 up front (onboard → Permissions), so the first overnight run does not stall:
 
-    "Bash(bash .claude/bin/super-board-merge-gate.sh:*)", "Bash(gh pr merge:*)",
+    "Bash(bash .claude/bin/drover-merge-gate.sh:*)", "Bash(gh pr merge:*)",
     plus one line per configured migrate command in `migrations.commands`
     for the envs in `migrations.allowed_envs`.
 

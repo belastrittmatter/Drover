@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Gate tests for scripts/super-board-run.sh — closed-issue guard (#10) and the
+# Gate tests for scripts/drover-run.sh — closed-issue guard (#10) and the
 # landed-work halt gate (#8). Deterministic, no network: `gh` is a stub on PATH
 # and the board is a JSON fixture. Runs in well under 2s.
 #
@@ -51,7 +51,7 @@ export CLOSED_ISSUES="" SB_GITHUB_RETRY_DELAY=0 SB_GITHUB_HALT_FILE="$STUB_DIR/h
 # ── Load the dispatcher's helpers without starting a run.
 export SB_LIB_ONLY=1
 # shellcheck disable=SC1091
-. "$REPO_ROOT/scripts/super-board-run.sh"
+. "$REPO_ROOT/scripts/drover-run.sh"
 # The dispatcher sets -e for its own run; the tests deliberately call functions that
 # return non-zero as their verdict, so drop it after sourcing.
 set +e

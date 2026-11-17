@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-board-env-check.sh — say which env keys exist, never what they hold.
+# drover-env-check.sh — say which env keys exist, never what they hold.
 #
 # Onboarding needs to know whether SENTRY_AUTH_TOKEN, POSTHOG_PERSONAL_API_KEY
 # or a migration DB URL is set. The guard-secrets hook (rightly) denies `grep`,
@@ -10,7 +10,7 @@
 # call to it (see hooks/guard-secrets.py → ENV_CHECK).
 #
 # Usage:
-#   super-board-env-check.sh [--file <dotenv>] KEY [KEY ...]
+#   drover-env-check.sh [--file <dotenv>] KEY [KEY ...]
 #
 # --file defaults to the first that exists of .env.local, .env (in the CWD).
 # Accepts `KEY=…` and `export KEY=…`; a commented line does not count.

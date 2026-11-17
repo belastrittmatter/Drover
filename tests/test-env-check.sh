@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Tests super-board-env-check.sh — key names in, present/empty/missing out, and
+# Tests drover-env-check.sh — key names in, present/empty/missing out, and
 # never a byte of any value on stdout or stderr.
 set -euo pipefail
 cd "$(dirname "$0")"
-EC="$PWD/../scripts/super-board-env-check.sh"
+EC="$PWD/../scripts/drover-env-check.sh"
 fail() { echo "FAIL: $1" >&2; exit 1; }
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 SECRET="sk_$(printf 'live')_$(printf 'abc123')"

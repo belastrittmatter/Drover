@@ -1,11 +1,11 @@
 ---
 name: super-build
-description: Builder lane of the super-board pipeline — takes a `Ready` GitHub Project card into its own per-issue git worktree, makes the smallest safe change test-first (TDD, `ponytail` simplest-first, official docs first for third-party APIs, upgrades and auth/billing), opens a draft PR and hands it to QA and Review through the board; it never merges — merges go through the Reviewer's merge gate. Inside `super-board run` it runs as a lane agent in the in-session wave workflow (`workflows/super-board-wave.js`, no worker cap unless `max_workers` is set); standalone headless `claude -p` dispatch is legacy opt-in. Use when the user says "Super Build", "run the build loop", "/super-build", or invokes the skill.
+description: Builder lane of the super-board pipeline — takes a `Ready` GitHub Project card into its own per-issue git worktree, makes the smallest safe change test-first (TDD, `ponytail` simplest-first, official docs first for third-party APIs, upgrades and auth/billing), opens a draft PR and hands it to QA and Review through the board; it never merges — merges go through the Reviewer's merge gate. Inside `super-board run` it runs as a lane agent in the in-session wave workflow (`workflows/drover-wave.js`, no worker cap unless `max_workers` is set); standalone headless `claude -p` dispatch is legacy opt-in. Use when the user says "Super Build", "run the build loop", "/super-build", or invokes the skill.
 ---
 
 # Super Build — Builder lane and legacy headless GitHub-Project executor
 
-Inside `super-board run`, Super Build is the Builder lane: a lane agent in the in-session wave workflow (`workflows/super-board-wave.js`) that follows "super-board integration" below. Run on its own, `/super-build` is the **legacy headless path (opt-in)**: you are the orchestrator, the source of truth is the **`Ready` column of the configured GitHub Project board**, and your job is to dispatch every issue in `Ready` (in board order) as a headless `claude -p` worker in its own git worktree, open a PR for each finished branch, and move its card to `QA` so the Tester and Reviewer take it from there. Super Build never merges — merging happens only through the Reviewer's merge gate (`scripts/super-board-merge-gate.sh`).
+Inside `super-board run`, Super Build is the Builder lane: a lane agent in the in-session wave workflow (`workflows/drover-wave.js`) that follows "super-board integration" below. Run on its own, `/super-build` is the **legacy headless path (opt-in)**: you are the orchestrator, the source of truth is the **`Ready` column of the configured GitHub Project board**, and your job is to dispatch every issue in `Ready` (in board order) as a headless `claude -p` worker in its own git worktree, open a PR for each finished branch, and move its card to `QA` so the Tester and Reviewer take it from there. Super Build never merges — merging happens only through the Reviewer's merge gate (`scripts/drover-merge-gate.sh`).
 
 **Curation contract:** the human moves cards into `Ready` when they should be worked. The loop never reads `Backlog`, `In Progress`, or `Done` cards. If `Ready` is empty, the loop reports "queue empty" and exits cleanly — no error.
 
@@ -17,7 +17,7 @@ Super Build is the canonical builder. Do not use a separate `build-feature` work
 
 Super Build may implement, test, commit, push, open PRs, and move project cards to `QA`. It never merges, closes issues, or moves cards to `Done` — the Reviewer does that through the merge gate. It should not invent new product scope beyond the issue body. If the issue needs product/design/security judgment, apply the human-gate or WIP-partial path instead of guessing.
 
-**GitHub budget** — every "move card" is `.claude/bin/super-board-card.sh --config <cfg> move <N> <Status>` (1 GraphQL point; `gh project item-list` / `field-list` cost ~100–200). Comments, labels and PR reads go over REST; [rate-limit-etiquette.md](../super-board/references/rate-limit-etiquette.md) → "Price list" has the calls.
+**GitHub budget** — every "move card" is `.claude/bin/drover-card.sh --config <cfg> move <N> <Status>` (1 GraphQL point; `gh project item-list` / `field-list` cost ~100–200). Comments, labels and PR reads go over REST; [rate-limit-etiquette.md](../super-board/references/rate-limit-etiquette.md) → "Price list" has the calls.
 
 ## Configuration
 
@@ -52,11 +52,11 @@ Source column is `Ready` (override with `BUILD_LOOP_SOURCE_COLUMN`):
 ```bash
 SOURCE_COLUMN="${BUILD_LOOP_SOURCE_COLUMN:-Ready}"
 
-.claude/bin/super-board-card.sh --owner "$BUILD_LOOP_OWNER" --number "$BUILD_LOOP_PROJECT" items \
+.claude/bin/drover-card.sh --owner "$BUILD_LOOP_OWNER" --number "$BUILD_LOOP_PROJECT" items \
   | jq --arg col "$SOURCE_COLUMN" '.items[] | select(.status == $col and .content.type == "Issue")'
 ```
 
-`super-board-card.sh items` is the `gh project item-list` shape for ~1 GraphQL point per 100 cards (item-list spends 101) — without bodies.
+`drover-card.sh items` is the `gh project item-list` shape for ~1 GraphQL point per 100 cards (item-list spends 101) — without bodies.
 
 For each Ready item:
 - Capture `content.number` (issue #), `content.title` and `labels`; read the body over REST: `gh api repos/{owner}/{repo}/issues/<N> --jq .body`.
@@ -72,9 +72,9 @@ If `Ready` is empty: print `📭 Project board "Ready" column is empty — nothi
 
 ### 1b. Resolve the selected worker skills before locks
 
-Hydrate each selected issue through `super-board-github-read.py --kind issue --
+Hydrate each selected issue through `drover-github-read.py --kind issue --
 issue view <N> --json number,title,body`. Save a JSON array with number, Ready
-status, labels and literal body. Run `.claude/bin/super-board-skills-ready.py
+status, labels and literal body. Run `.claude/bin/drover-skills-ready.py
 --root <repo> --host claude --cards <cards.json> --lane build` before label
 creation, stale-lock recovery, comments or dispatch. Exit 10 halts and names the
 missing helpers. Preserve existing claims and worktrees. No automatic helper
@@ -109,11 +109,11 @@ gh issue comment N --body "🤖 Dispatched by /super-build — worker spinning u
 
 c. **Dispatch:**
 ```bash
-bash .claude/skills/super-build/scripts/super-build-dispatch.sh N
+bash .claude/skills/super-build/scripts/drover-build-dispatch.sh N
 ```
 …via Bash with `run_in_background: true`. Capture each shell ID.
 
-The dispatcher (this skill's `scripts/super-build-dispatch.sh`) handles:
+The dispatcher (this skill's `scripts/drover-build-dispatch.sh`) handles:
 - `git worktree add -b loop/issue-N .claude/worktrees/issue-N <base-branch>`
 - `gh issue view N --json title,body,labels` to compose the worker prompt
 - prepend `references/worker-preamble.md` + append working-directory footer
@@ -269,7 +269,7 @@ Triggered when card returns to Ready/Building with `loop:rebuild-N` label.
    ```
 3. Address any new failure feedback from Tester's latest ❌ comment.
 4. Commit + push to same branch. Verify ALL `[builder]` threads are resolved before exit.
-5. Refresh [PR author notes](../super-board/references/pr-author-notes.md), rewrite your PR body blocks (`super-board-pr-body.sh`), post `[builder] [report]` PR + issue comments. Move card Ready/Building → QA.
+5. Refresh [PR author notes](../super-board/references/pr-author-notes.md), rewrite your PR body blocks (`drover-pr-body.sh`), post `[builder] [report]` PR + issue comments. Move card Ready/Building → QA.
 
 ### Docs before outside-tool code (every ticket)
 Before writing code, decide whether the ticket touches any of:

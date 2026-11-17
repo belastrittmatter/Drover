@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 KIT = Path(__file__).resolve().parents[1]
-CLI = KIT / 'scripts/super-board-project-verifier.py'
+CLI = KIT / 'scripts/drover-project-verifier.py'
 
 
 class ProjectVerifier(unittest.TestCase):
@@ -142,7 +142,7 @@ class ProjectVerifier(unittest.TestCase):
         process = subprocess.run(['bash', str(KIT / 'install.sh'), '--no-hooks', str(self.root)],
                                  capture_output=True, text=True)
         self.assertEqual(process.returncode, 0, process.stderr)
-        installed = self.root / '.claude/bin/super-board-project-verifier.py'
+        installed = self.root / '.claude/bin/drover-project-verifier.py'
         process = subprocess.run([sys.executable, str(installed), 'inspect', '--root', str(self.root),
                                   '--map', self.map], capture_output=True, text=True)
         self.assertEqual(process.returncode, 0, process.stderr or process.stdout)

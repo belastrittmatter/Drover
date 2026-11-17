@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests scripts/super-board-setup.py — onboard's 🔍 Checks, the upgrade path, config
+# Tests scripts/drover-setup.py — onboard's 🔍 Checks, the upgrade path, config
 # migration, board names, branch detection, and the GitHub board ranking / migration.
 # Offline: `gh` is a stateful stub on PATH (board state in a JSON file, every call
 # logged), install.sh comes from this checkout, helper skills are skipped.
@@ -8,7 +8,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PACK="$PWD"
-SETUP="$PACK/scripts/super-board-setup.py"
+SETUP="$PACK/scripts/drover-setup.py"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 fail() { echo "FAIL: $1" >&2; exit 1; }
@@ -26,12 +26,12 @@ OUT=$(python3 "$SETUP" fix --root "$T" --no-helpers || true)
 echo "$OUT" | q '.fixed | index("super-board skills, scripts and board engine installed")' || fail "fix should install: $OUT"
 echo "$OUT" | q '.fixed | index("git repo created (git init)")' || fail "fix should git init: $OUT"
 echo "$OUT" | q '.missing == [] and .git == true and .upgraded == false' || fail "re-check after fix should have nothing missing: $OUT"
-[ -x "$T/.claude/bin/super-board-setup.py" ] || fail "the setup script installs itself into .claude/bin"
+[ -x "$T/.claude/bin/drover-setup.py" ] || fail "the setup script installs itself into .claude/bin"
 TXT=$(python3 "$SETUP" check --root "$T" --text || true)
 echo "$TXT" | grep -q "✓ super-board skills, scripts and board engine present" || fail "text report should list what is present: $TXT"
 
 # 1b — missing safety helpers must trigger a repair even on a current installation.
-for helper in super-board-approval.py super-board-github-read.py super-board-project-verifier.py; do
+for helper in drover-approval.py drover-github-read.py drover-project-verifier.py; do
   rm "$T/.claude/bin/$helper"
   OUT=$(python3 "$SETUP" check --root "$T" || true)
   echo "$OUT" | q --arg helper "script $helper" '.missing | index($helper)' \

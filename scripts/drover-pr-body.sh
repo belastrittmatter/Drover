@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# super-board-pr-body.sh — rewrite ONE marker block of a PR body, idempotently.
+# drover-pr-body.sh — rewrite ONE marker block of a PR body, idempotently.
 #
 # The PR body is a set of marker blocks (writing-standard.md § 2). Each lane owns
 # some of them. Rewriting the whole body from memory clobbers the blocks another
 # lane wrote since you read it; this script touches only the block you name.
 #
-#   super-board-pr-body.sh --pr <N> --block <name> --expect-head <sha> \
+#   drover-pr-body.sh --pr <N> --block <name> --expect-head <sha> \
 #                          (--body-file <md> | --append-file <md>) [--repo o/r] [--dry-run]
-#   super-board-pr-body.sh --skeleton          # empty body with every marker, in order (history folded)
-#   super-board-pr-body.sh --time [--config <cfg.json>]   # "Oct 2, 10:02 EDT" in config timezone
+#   drover-pr-body.sh --skeleton          # empty body with every marker, in order (history folded)
+#   drover-pr-body.sh --time [--config <cfg.json>]   # "Oct 2, 10:02 EDT" in config timezone
 #
 # Blocks, in body order: redcheck status problem solution ac history visual risk.
 # A block that is missing is inserted at its place in that order.
@@ -74,7 +74,7 @@ SRC="${BODY_FILE:-$APPEND_FILE}"
 [ -r "$SRC" ] || die "cannot read $SRC" 66
 [ "$DRY" -eq 1 ] || [ -n "$HEAD" ] || die "--expect-head <sha> is required (the PR head your edit is based on)" 64
 
-GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-github-read.py"
+GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/drover-github-read.py"
 # REST, not `gh pr view`/`gh pr edit`: this script runs ~3 times per lane per
 # card, and the REST core bucket is separate from the GraphQL one the board
 # lives on. GH_REPO fills {owner}/{repo}; unset, gh uses the current checkout.

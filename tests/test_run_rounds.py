@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Whole runner rounds (scripts/super-board-run.sh) with fakes on PATH for gh, claude
+"""Whole runner rounds (scripts/drover-run.sh) with fakes on PATH for gh, claude
 and pgrep (NFR-7). The board is a JSON file the fake gh serves; nothing reaches GitHub,
 and no real worker or dispatcher on this machine is ever matched or signalled."""
 import json
@@ -22,7 +22,7 @@ NAMES = ['super-board', 'super-build', 'super-qa', 'super-review', 'super-collec
 FAKE_GH = r'''
 import glob, json, os, re, sys
 args = sys.argv[1:]
-manifest = ''.join(open(p).read() for p in glob.glob('docs/super-board/runs/*-fixture.md'))
+manifest = ''.join(open(p).read() for p in glob.glob('docs/drover/runs/*-fixture.md'))
 phase = 'round' if 'initial Ready count' in manifest else 'startup'
 with open(os.environ['CALL_LOG'], 'a') as f:
     f.write(json.dumps({'phase': phase, 'args': args}) + '\n')
@@ -140,13 +140,13 @@ class RunnerRounds(unittest.TestCase):
             project=dict(owner='o', number=1), base_branch='main', worker_backend='claude-p',
             max_workers=3, bot_identity='bot', verify_commands=['true'], human_approves_merge=True,
             tick_seconds=0, no_progress_cycles=cycles)))
-        result = subprocess.run(['bash', str(KIT / 'scripts/super-board-run.sh'), 'fixture'], cwd=self.root,
+        result = subprocess.run(['bash', str(KIT / 'scripts/drover-run.sh'), 'fixture'], cwd=self.root,
                                 env=self.env, text=True, capture_output=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
 
     def stop(self):
-        result = subprocess.run(['bash', str(KIT / 'scripts/super-board-stop.sh'), 'fixture'], cwd=self.root,
+        result = subprocess.run(['bash', str(KIT / 'scripts/drover-stop.sh'), 'fixture'], cwd=self.root,
                                 env=self.env, text=True, capture_output=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
@@ -189,7 +189,7 @@ class RunnerRounds(unittest.TestCase):
         [pid] = self.worker_pids(expect=1)
         self.assertTrue(alive(pid), 'the fake worker should still be running')
         self.assertIn('PID=%d\n' % pid, self.lock(7) or '', 'live worker lost its lock')
-        manifest = next((self.root / 'docs/super-board/runs').glob('*-fixture.md')).read_text()
+        manifest = next((self.root / 'docs/drover/runs').glob('*-fixture.md')).read_text()
         self.assertNotIn('reaped stale lock', manifest)
         self.assertEqual(manifest.count('dispatch lane=build issue=#7'), 1, manifest)
         self.assertNotIn(['issue', 'edit', '7', '--remove-assignee', 'bot'], self.calls())

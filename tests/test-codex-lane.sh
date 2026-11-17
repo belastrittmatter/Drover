@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Stubbed Codex only: model precedence and ladders, review consent, bounded permissions,
 # structured failures and wave routing/concurrency/halt/stop. No network.
-# Every case runs twice: through the super-board-codex-lane.sh shim and through
-# super-board-lane.sh --backend codex, with the same stubbed codex.
+# Every case runs twice: through the drover-codex-lane.sh shim and through
+# drover-lane.sh --backend codex, with the same stubbed codex.
 set -euo pipefail
 KIT=$(cd "$(dirname "$0")/.." && pwd)
 if [ -z "${SB_LANE_ENTRY:-}" ]; then
@@ -10,16 +10,16 @@ if [ -z "${SB_LANE_ENTRY:-}" ]; then
   # The backend seam: a missing, unknown or not-yet-built backend exits 64 and names the valid ones.
   T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
   for args in "" "--backend gemini" "--backend claude" "--backend=gemini" "--backend"; do
-    RC=0; bash "$KIT/scripts/super-board-lane.sh" $args --config x --card '{}' --lane build >/dev/null 2>"$T/err" || RC=$?
+    RC=0; bash "$KIT/scripts/drover-lane.sh" $args --config x --card '{}' --lane build >/dev/null 2>"$T/err" || RC=$?
     [ "$RC" -eq 64 ] && grep -q 'valid backends: codex' "$T/err" || { echo "FAIL: '$args' must exit 64 naming the valid backends (rc=$RC)" >&2; cat "$T/err" >&2; exit 1; }
   done
-  grep -q '^exec .*super-board-lane.sh" --backend codex "\$@"$' "$KIT/scripts/super-board-codex-lane.sh" || { echo 'FAIL: codex-lane must be a one-line shim' >&2; exit 1; }
+  grep -q '^exec .*drover-lane.sh" --backend codex "\$@"$' "$KIT/scripts/drover-codex-lane.sh" || { echo 'FAIL: codex-lane must be a one-line shim' >&2; exit 1; }
   echo 'PASS: test-codex-lane.sh (shim + --backend codex; backend refusal)'
   exit 0
 fi
 case "$SB_LANE_ENTRY" in
-  shim) LAUNCHER=("$KIT/scripts/super-board-codex-lane.sh") ;;
-  *) LAUNCHER=("$KIT/scripts/super-board-lane.sh" --backend codex) ;;
+  shim) LAUNCHER=("$KIT/scripts/drover-codex-lane.sh") ;;
+  *) LAUNCHER=("$KIT/scripts/drover-lane.sh" --backend codex) ;;
 esac
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/bin" "$T/repo"
@@ -44,7 +44,7 @@ cd "$T/repo"
 echo '{"verify_commands":["git diff --check"]}' > "$T/config.json"
 CARD='{"number":1,"status":"Ready","title":"example"}'
 lane() { bash "${LAUNCHER[@]}" --config "$T/config.json" --card "$CARD" --lane "$@" 2>"$T/stderr"; }
-wave() { bash "$KIT/scripts/super-board-codex-wave.sh" --config "$T/config.json" --cards "$CARDS" "$@" 2>"$T/stderr"; }
+wave() { bash "$KIT/scripts/drover-codex-wave.sh" --config "$T/config.json" --cards "$CARDS" "$@" 2>"$T/stderr"; }
 fail() { echo "FAIL: $*" >&2; cat "$T/stderr" >&2; exit 1; }
 last_model() { tail -1 "$SB_CODEX_TEST_LOG" | jq -r '.args | if index("-m") then .[index("-m")+1] else "default" end'; }
 
@@ -147,10 +147,10 @@ call = json.loads(pathlib.Path(sys.argv[1]).read_text().splitlines()[-1])
 args = call['args']
 configs = [args[i+1] for i, arg in enumerate(args) if arg == '-c']
 assert 'approval_policy="never"' in configs
-assert 'default_permissions="super-board-lane"' in configs
+assert 'default_permissions="drover-lane"' in configs
 assert not any('.extends=' in entry for entry in configs)
-assert 'permissions.super-board-lane.network.enabled=true' in configs
-grants = next(entry.split('=', 1)[1] for entry in configs if entry.startswith('permissions.super-board-lane.filesystem='))
+assert 'permissions.drover-lane.network.enabled=true' in configs
+grants = next(entry.split('=', 1)[1] for entry in configs if entry.startswith('permissions.drover-lane.filesystem='))
 filesystem = json.loads(grants.replace('=', ':'))
 for path in sys.argv[2:]:
     assert filesystem[str(pathlib.Path(path).resolve())] == 'write'

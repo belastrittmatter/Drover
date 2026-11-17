@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests super-board-deps.sh — the `## Blocked by` parser. No gh calls: the issue
+# Tests drover-deps.sh — the `## Blocked by` parser. No gh calls: the issue
 # payload is injected with --from.
 #
 # Every scenario here is a shape that was observed on a real board, not an
@@ -8,7 +8,7 @@
 # they needed.
 set -euo pipefail
 cd "$(dirname "$0")"
-DEPS="../scripts/super-board-deps.sh"
+DEPS="../scripts/drover-deps.sh"
 FIX=fixtures/deps-issues.json
 
 fail() { echo "FAIL: $1" >&2; exit 1; }

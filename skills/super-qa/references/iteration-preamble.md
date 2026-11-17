@@ -220,7 +220,7 @@ commit:
 
   `🧪 [test] super-qa: retrofit forensics assertions onto existing specs`
 
-When a `[b]` is filed, the bug body produced for `super-qa-file-bug.sh`
+When a `[b]` is filed, the bug body produced for `drover-qa-file-bug.sh`
 MUST carry these artifacts in its folded Evidence table (writing-standard.md § 3):
 console and page errors → `Error + stack` and `Logs` (with the
 `docs/super-qa/report/<slug>/tc-N/<locale>/*.log` paths), the HAR →
@@ -317,7 +317,7 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
    ```
 
    PR body = the marker blocks of writing-standard.md § 2
-   (`.claude/bin/super-board-pr-body.sh --skeleton`): status card with
+   (`.claude/bin/drover-pr-body.sh --skeleton`): status card with
    `Closes #${ISSUE_N}`, Problem (the failing assertion / signal type, lettered
    steps, screenshot), Solution (plain bullets), Acceptance criteria with proof
    lines, Iteration history, Risk (🟢/🟡/🔴 + Door + Blast radius — subjective
@@ -538,7 +538,7 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
    **Process the verdict:**
    - If "no UX issues" → log one line in `iteration-N.md` Section 6:
      `<slug>: UX clean`. Continue.
-   - For each finding → file a GH issue via `super-qa-file-bug.sh` with
+   - For each finding → file a GH issue via `drover-qa-file-bug.sh` with
      kind `ux`, category `visual`, priority per the agent's call, and suggested owner `ui-refine-loop` (a UI ticket — a human can run `/ui-refine-loop`; the board never triggers it). Body includes
      the finding's location + why + suggested fix. The cell still counts
      as `[x]` (functional green); UX bugs are a separate stream from
@@ -624,7 +624,7 @@ detection (do NOT batch at end of iter):
 
 2. **File the issue + auto-promote to Ready:**
    ```bash
-   ISSUE_N=$(scripts/super-qa-file-bug.sh \
+   ISSUE_N=$(scripts/drover-qa-file-bug.sh \
      --title "<one-line title>" \
      --body-file /tmp/super-qa-iter-${N}-bug-${slug}.md \
      --kind bug \
@@ -699,7 +699,7 @@ re-label later via `gh issue edit`.
 
 ```yaml super-qa-bug
 id: B-N.M
-gh_issue: 42                  # number printed by super-qa-file-bug.sh
+gh_issue: 42                  # number printed by drover-qa-file-bug.sh
 priority: high|medium|low
 type: bug|feature|ux|tests|docs|tech-debt
 category: functional|visual|network|console|i18n|a11y|data|testability|docs

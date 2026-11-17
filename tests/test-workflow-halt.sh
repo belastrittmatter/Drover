@@ -2,7 +2,7 @@
 # Offline workflow boundary: a read halt ends queued lane chains and the wave.
 set -euo pipefail
 cd "$(dirname "$0")"
-node - ../workflows/super-board-wave.js <<'JS'
+node - ../workflows/drover-wave.js <<'JS'
 const fs = require('fs')
 const source = fs.readFileSync(process.argv[2], 'utf8').replace(/^export const meta/m, 'const meta')
 const AsyncFunction = (async () => {}).constructor

@@ -20,7 +20,7 @@ exit 1
 SH
 cat > "$TMP/bin/ps" <<'SH'
 #!/usr/bin/env bash
-echo "python3 - /kit/scripts/super-board-codex-wave.sh"
+echo "python3 - /kit/scripts/drover-codex-wave.sh"
 SH
 chmod +x "$TMP/bin/"*
 python3 - "$TMP" <<'PY' &
@@ -40,7 +40,7 @@ for attempt in {1..100}; do
   [ -f "$TMP/.claude/super-board/codex-wave.pid" ] && break
   sleep .02
 done
-(cd "$TMP" && PATH="$TMP/bin:$PATH" bash "$ROOT/scripts/super-board-stop.sh" test > stop.log)
+(cd "$TMP" && PATH="$TMP/bin:$PATH" bash "$ROOT/scripts/drover-stop.sh" test > stop.log)
 wait "$wave_pid"
 wave_pid=""
 [ "$(head -1 "$STOP_TRACE")" = wave-stopped ] || { echo 'FAIL: claims released before wave stopped'; exit 1; }
@@ -57,7 +57,7 @@ printf 'PID=999999999\nLANE=qa\n' > "$TMP/.claude/super-board/inflight/13"
 printf '#!/usr/bin/env bash\necho unrelated-process\n' > "$TMP/bin/ps"
 : > "$STOP_TRACE"
 rc=0
-(cd "$TMP" && PATH="$TMP/bin:$PATH" bash "$ROOT/scripts/super-board-stop.sh" test > stop.log) || rc=$?
+(cd "$TMP" && PATH="$TMP/bin:$PATH" bash "$ROOT/scripts/drover-stop.sh" test > stop.log) || rc=$?
 [ "$rc" -eq 1 ] || { echo 'FAIL: reused PID not refused'; exit 1; }
 [ ! -s "$STOP_TRACE" ] || { echo 'FAIL: reused PID released claims'; exit 1; }
 [ -f "$TMP/.claude/super-board/inflight/13" ] || { echo 'FAIL: reused PID removed worker lock'; exit 1; }

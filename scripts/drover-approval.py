@@ -16,7 +16,7 @@ import re
 import subprocess
 import sys
 
-_reader_spec = importlib.util.spec_from_file_location("github_read", Path(__file__).with_name("super-board-github-read.py"))
+_reader_spec = importlib.util.spec_from_file_location("github_read", Path(__file__).with_name("drover-github-read.py"))
 github_read = importlib.util.module_from_spec(_reader_spec)
 _reader_spec.loader.exec_module(github_read)
 

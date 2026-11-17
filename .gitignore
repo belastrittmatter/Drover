@@ -24,15 +24,15 @@ __pycache__/
 .worktrees/
 
 # QA evidence (heavy artifacts; keep summaries)
-docs/super-board/runs/**/*.png
-docs/super-board/runs/**/*.jpg
-docs/super-board/runs/**/*.jpeg
-docs/super-board/runs/**/*.webp
-docs/super-board/runs/**/*.html
-docs/super-board/runs/**/*.log
-docs/super-board/runs/**/*.patch
-docs/super-board/runs/**/*.diff
-docs/super-board/runs/**/*.zip
-docs/super-board/runs/**/*.trace
-docs/super-board/runs/**/*.trace.zip
+docs/drover/runs/**/*.png
+docs/drover/runs/**/*.jpg
+docs/drover/runs/**/*.jpeg
+docs/drover/runs/**/*.webp
+docs/drover/runs/**/*.html
+docs/drover/runs/**/*.log
+docs/drover/runs/**/*.patch
+docs/drover/runs/**/*.diff
+docs/drover/runs/**/*.zip
+docs/drover/runs/**/*.trace
+docs/drover/runs/**/*.trace.zip
 

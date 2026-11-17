@@ -58,7 +58,7 @@ the saved halt and receipt, check the remote result, and resolve that specific
 pending fingerprint only after its outcome is known:
 
 ```bash
-python3 .claude/bin/super-board-collect-state.py --repo owner/repo \
+python3 .claude/bin/drover-collect-state.py --repo owner/repo \
   --action reconcile --fingerprint 'the-exact-pending-fingerprint'
 ```
 

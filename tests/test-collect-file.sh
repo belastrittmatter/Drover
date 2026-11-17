@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests skills/super-collect/scripts/super-collect-file.sh. Deterministic, no
+# Tests skills/super-collect/scripts/drover-collect-file.sh. Deterministic, no
 # network: `gh` is a stub on PATH, and the real super-qa / super-review filers
 # run underneath it. Covers dry-run default, per-source fingerprint shapes,
 # repo-wide dedupe, recurrence, holding-column resolution (never Ready), routing,
@@ -10,7 +10,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SCRIPT="$REPO_ROOT/skills/super-collect/scripts/super-collect-file.sh"
+SCRIPT="$REPO_ROOT/skills/super-collect/scripts/drover-collect-file.sh"
 WORK="$(mktemp -d)"
 export SB_GITHUB_RETRY_DELAY=0 SB_GITHUB_HALT_FILE="$WORK/halt.json"
 trap 'rm -rf "$WORK"' EXIT
@@ -168,7 +168,7 @@ lacks "no duplicate card" "$(cat "$GH_LOG")" "issue create"
 OUT=$(STUB_HITS='[{"number":88,"state":"CLOSED","body":"prs|merge-gate|lockfile-drift"}]' run "${FIX[@]}")
 has "closed-only hit is a recurrence" "$OUT" "recurrence|#88"
 
-echo "── filing a bug through super-qa-file-bug.sh"
+echo "── filing a bug through drover-qa-file-bug.sh"
 OUT=$(run "${BUG[@]}" --yes)
 is  "returns the new issue" "412" "$OUT"
 has "routes via the QA filer (source:qa label)" "$(cat "$GH_LOG")" "source:qa"

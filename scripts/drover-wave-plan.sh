@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-board-wave-plan.sh — compute the next workflow-backend wave from board state.
+# drover-wave-plan.sh — compute the next workflow-backend wave from board state.
 # Read-only: no gh writes, no locks. The orchestrator owns every mutation; this
 # script only says what the next wave should contain and what should be swept.
 #
@@ -37,7 +37,7 @@
 # section cannot be parsed confidently is never treated as free. It is reported
 # in `flag` so the orchestrator can comment on it, and it is left where it is.
 # Guessing "runnable" is how a card gets built against a base branch that does
-# not have what it needs. See super-board-deps.sh for what "unreadable" means and
+# not have what it needs. See drover-deps.sh for what "unreadable" means and
 # the three shapes that produce it.
 #
 # STRANDED BUILDING CARDS. No lane selects from Building: a Builder moves its card
@@ -57,12 +57,12 @@
 # reading it as "full" would start building on a board meant only for testing.
 #
 # Usage:
-#   super-board-wave-plan.sh --config <config.json> [--items <project-items.json>]
+#   drover-wave-plan.sh --config <config.json> [--items <project-items.json>]
 #                            [--deps <deps.json>]
-# Without --items, fetches live board state via super-board-card.sh items — the
+# Without --items, fetches live board state via drover-card.sh items — the
 # item-list shape for ~1 GraphQL point per 100 cards, where `gh project item-list`
 # spends 101 per 100 (fieldValues x four nested connections).
-# Without --deps, derives the graph via super-board-deps.sh. Pass --deps in tests
+# Without --deps, derives the graph via drover-deps.sh. Pass --deps in tests
 # to keep the script offline.
 #
 # Stdout:
@@ -89,9 +89,9 @@ done
 # which is a FIFO and cannot be read twice.
 CONFIG_JSON=$(cat "$CONFIG")
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-printf '%s\n' "$CONFIG_JSON" | python3 "$HERE/super-board-verification-ready.py" --config -
+printf '%s\n' "$CONFIG_JSON" | python3 "$HERE/drover-verification-ready.py" --config -
 export SB_REPO_PATH=$(echo "$CONFIG_JSON" | jq -r '.repo.path // "."')
-python3 "$HERE/super-board-github-read.py" --check
+python3 "$HERE/drover-github-read.py" --check
 VARIANT=$(echo "$CONFIG_JSON" | jq -r '.variant // ""')
 # 0 or absent = unlimited. A wave is sized by the dependency graph, not a knob.
 MAX_WORKERS=$(echo "$CONFIG_JSON" | jq -r '.max_workers // 0')
@@ -101,7 +101,7 @@ NUMBER=$(echo "$CONFIG_JSON" | jq -r '.project.number')
 if [ -n "$ITEMS_FILE" ]; then
   ITEMS=$(cat "$ITEMS_FILE")
 else
-  ITEMS=$("$HERE/super-board-card.sh" --owner "$OWNER" --number "$NUMBER" items)
+  ITEMS=$("$HERE/drover-card.sh" --owner "$OWNER" --number "$NUMBER" items)
 fi
 
 # `variant` was removed in v3.0.0 (labels route cards now). Absent or "full" is
@@ -124,7 +124,7 @@ else
   HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
   # A graph we cannot fetch is not a graph of zero blockers. Fail rather than
   # plan a wave that treats every card as free.
-  DEPS=$("$HERE/super-board-deps.sh" --repo "$REPO" --limit 300) || {
+  DEPS=$("$HERE/drover-deps.sh" --repo "$REPO" --limit 300) || {
     rc=$?; echo "could not derive the dependency graph for ${REPO}" >&2; exit "$rc"; }
 fi
 

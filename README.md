@@ -27,8 +27,8 @@
 Before you start:
 
 - [ ] Claude Code, and `gh` with board access: `gh auth refresh -s project,read:project,repo`
-- [ ] Dynamic workflows on in `/config` ([backends](docs/super-board/README.md#backends))
-- [ ] `verify_commands` set in your config, so the merge gate can prove the build ([setup notes](docs/super-board/README.md#setup-notes))
+- [ ] Dynamic workflows on in `/config` ([backends](docs/drover/README.md#backends))
+- [ ] `verify_commands` set in your config, so the merge gate can prove the build ([setup notes](docs/drover/README.md#setup-notes))
 
 In your project folder:
 
@@ -86,7 +86,7 @@ Add cards to `Ready`. The board drains on its own.
 
 ## How it works
 
-**Which path?** Clear idea, foggy idea or bugs: [the routing rule](docs/super-board/routing.md) says what to run, and when 1–5 tickets go to `/implement-spec` instead of the board.
+**Which path?** Clear idea, foggy idea or bugs: [the routing rule](docs/drover/routing.md) says what to run, and when 1–5 tickets go to `/implement-spec` instead of the board.
 
 <p align="center"><a href="https://youtu.be/aggJvNZxfKA"><img src="https://i.ytimg.com/vi/aggJvNZxfKA/maxresdefault.jpg" alt="Watch I Built a Self-Improving Software Factory by Eric Tech on YouTube" width="100%"></a></p>
 <p align="center"><a href="https://youtu.be/aggJvNZxfKA"><strong>▶ Watch on YouTube: I Built a Self-Improving Software Factory</strong></a></p>
@@ -141,12 +141,12 @@ Run automatically once installed. Python stdlib, JSON in, JSON out.
 | | |
 | --- | --- |
 | [guard-worktree-path](hooks/guard-worktree-path.py) | Blocks `git worktree add` outside `.claude/worktrees/` |
-| [guard-secrets](hooks/guard-secrets.py) | Blocks reading or piping dotenv files, SSH keys and credential files; key names via `super-board-env-check.sh` |
+| [guard-secrets](hooks/guard-secrets.py) | Blocks reading or piping dotenv files, SSH keys and credential files; key names via `drover-env-check.sh` |
 | [guard-key-literals](hooks/guard-key-literals.py) | Blocks a live-looking API key written into a file; flags one already there |
 | [guard-delete-outside](hooks/guard-delete-outside.py) | Blocks `rm`, `find -delete` and `git clean` aimed outside the project, `~` or `/` |
 | [guard-protected-push](hooks/guard-protected-push.py) | Opt-in (`onboard` asks, or `install.sh --protect-main`): blocks direct and force pushes to main/master/base |
 | [cleanup-wt](hooks/cleanup-wt.py) | Removes merged worktrees and branches after each merge and at session start, with a recovery file |
-| [merge gate](scripts/super-board-merge-gate.sh) | Merges only after the current base plus your non-empty project `verify_commands` pass (missing checks halt setup), pinned to the reviewed commit; applies `merge_policy` and runs allowed DB migrations |
+| [merge gate](scripts/drover-merge-gate.sh) | Merges only after the current base plus your non-empty project `verify_commands` pass (missing checks halt setup), pinned to the reviewed commit; applies `merge_policy` and runs allowed DB migrations |
 
 ## Models
 
@@ -203,7 +203,7 @@ MIT © Eric Tech ([LICENSE](LICENSE)). Built on [obra/superpowers](https://githu
 Setup and dispatch resolve real, nonempty `SKILL.md` files for the actual
 Claude or Codex host. Missing required skills halt before claims or workers;
 lockfiles and arbitrary plugin caches do not count. The shared registry in
-`scripts/super-board-skills-ready.py` owns lane dependencies, overrides and the
+`scripts/drover-skills-ready.py` owns lane dependencies, overrides and the
 two declared ponytail fallbacks. The QA lane requires the bundled
 `pr-security-review`; Cloudflare's `security-audit` is an optional QA entry,
 so a missing copy never halts a run. Setup's full helper union may be red while a

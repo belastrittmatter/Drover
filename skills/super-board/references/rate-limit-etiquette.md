@@ -18,13 +18,13 @@ wave spent ~2,850 of 5,000 points (~950 a card) and the board stalled an hour:
 | `gh project view` | 2 |
 | `gh issue view` · `gh pr view` · `gh pr list` · review-thread query | 1 |
 | `gh issue comment` · `gh pr comment` · `gh issue edit` · `gh pr ready` | ~2 (lookup + mutation) |
-| `super-board-card.sh move` | 1 (3 the first time an issue is seen) |
-| `super-board-card.sh status` · `items` | 1 · ~1 per 100 cards |
+| `drover-card.sh move` | 1 (3 the first time an issue is seen) |
+| `drover-card.sh status` · `items` | 1 · ~1 per 100 cards |
 | `gh api repos/...` (REST) | 0 — the separate 5,000/hr core bucket |
 
 The rules that follow from it:
 
-- **Cards go through `.claude/bin/super-board-card.sh`** — `move <issue> <Status>`,
+- **Cards go through `.claude/bin/drover-card.sh`** — `move <issue> <Status>`,
   `status <issue>`, `items`. It caches the project, Status field and option ids
   and each issue's item id, shared across worktrees. `gh project item-list`,
   `field-list` and `view` belong to onboarding.
@@ -50,7 +50,7 @@ The rules that follow from it:
 ## 1. Source the guard at worker start
 
 ```bash
-source scripts/super-board-gh-guard.sh
+source scripts/drover-gh-guard.sh
 sb_gh_budget_init 150      # per-worker soft cap on gh calls
 sb_gh_guard_check 200      # sleep if GraphQL remaining < 200
 sb_gh_guard_summary        # log starting quota for the run manifest
@@ -70,7 +70,7 @@ It's a no-op if quota is healthy. It sleeps to reset only if remaining is below 
 
 The Worker self-check item "Card column move re-read and verified" previously required `gh project item-list --limit 500` on every worker exit — ~200 points per worker per lane transition, for very little signal. **Rule:**
 
-- Trust the exit code of `super-board-card.sh move` (it already re-reads stale ids and retries once).
+- Trust the exit code of `drover-card.sh move` (it already re-reads stale ids and retries once).
 - If it returned non-zero, re-try once with `sb_gh_guard_check 200` first.
 - If still non-zero, write the halt comment and exit. Do not re-query the whole board.
 
@@ -100,4 +100,4 @@ Use `sb_gh_guard_summary` to grab the snapshot. This gives the run manifest visi
 
 ---
 
-Pointer: dispatcher-side guard lives in `super-board-run.sh::gh_rate_guard`. The two together are defense in depth — dispatcher pauses before the next tick, worker pauses before its next burst.
+Pointer: dispatcher-side guard lives in `drover-run.sh::gh_rate_guard`. The two together are defense in depth — dispatcher pauses before the next tick, worker pauses before its next burst.

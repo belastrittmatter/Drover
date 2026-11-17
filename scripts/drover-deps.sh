@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-board-deps.sh — work out, for every open issue, whether it can start now.
+# drover-deps.sh — work out, for every open issue, whether it can start now.
 #
 # Two sources, in precedence order:
 #   1. the last `blocked-by:` line in the issue's Block comments (what a lane
@@ -38,7 +38,7 @@
 # that does not have what it needs yet — one wave saved, one rewrite spent.
 #
 # Usage:
-#   super-board-deps.sh --repo <owner/name> [--issues 12,34] [--from <payload.json>]
+#   drover-deps.sh --repo <owner/name> [--issues 12,34] [--from <payload.json>]
 #
 # Stdout, one object keyed by issue number:
 #   { "40": { "number": 40, "title": "…", "state": "OPEN",
@@ -48,7 +48,7 @@
 #
 # `needsYou` — the newest Block comment carries the 🙋 reason tag, or the issue
 # has the `needs-you` label: a human-only command is waiting (block-template.md).
-# `needsYouDone` — verified by super-board-approval.py: a trusted human replied
+# `needsYouDone` — verified by drover-approval.py: a trusted human replied
 # done after a pinned request for the current PR head. Labels are never authority.
 # Saved --from payloads stay offline and cannot assert verified human approval.
 # A 🙋 card stays humanGated either way — only the resume path moves it.
@@ -81,7 +81,7 @@ else
   # lives in a COMMENT and the REST list cannot return comments. One query gets
   # bodies and comments together; `gh issue view` per issue would be one REST
   # call each, and a 35-card board burns that budget for no reason.
-  PAGES=$(python3 "$HERE/super-board-github-read.py" --kind issues -- api graphql --paginate --slurp -f query='
+  PAGES=$(python3 "$HERE/drover-github-read.py" --kind issues -- api graphql --paginate --slurp -f query='
     query($owner:String!,$repo:String!,$endCursor:String){
       repository(owner:$owner,name:$repo){
         issues(states:OPEN,first:100,after:$endCursor){
@@ -192,4 +192,4 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
           needsYouDone: false }
     ]
   | ( if $filter == null then . else map(select(.number as $n | $filter | index($n))) end )
-  | INDEX(.number | tostring)' | python3 "$(dirname "${BASH_SOURCE[0]}")/super-board-approval.py" --deps --repo "$APPROVAL_REPO"
+  | INDEX(.number | tostring)' | python3 "$(dirname "${BASH_SOURCE[0]}")/drover-approval.py" --deps --repo "$APPROVAL_REPO"

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Tests super-board-throttle.sh — the GitHub-limit step-down written back into
+# Tests drover-throttle.sh — the GitHub-limit step-down written back into
 # max_workers after a wave. No network: `gh` is a stub that answers the REST
 # rate_limit and the GraphQL rateLimit reads from env vars.
 set -euo pipefail
 KIT=$(cd "$(dirname "$0")/.." && pwd)
-S="$KIT/scripts/super-board-throttle.sh"
+S="$KIT/scripts/drover-throttle.sh"
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 fail() { echo "FAIL: $1" >&2; exit 1; }
 mkdir -p "$T/bin"

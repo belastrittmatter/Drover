@@ -2,7 +2,7 @@
 """cleanup-wt -- remove worktrees and branches whose work is already on a base branch.
 
 A hook, not a user skill: installed at .claude/hooks/cleanup-wt.py, run by
-super-board-merge-gate.sh after each merge (--post-merge) and by the default SessionStart
+drover-merge-gate.sh after each merge (--post-merge) and by the default SessionStart
 hook (--auto). A manual dry run (no flags) still works for a one-off look.
 
 Usage (from the repo root or any of its worktrees):

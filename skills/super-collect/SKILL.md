@@ -9,7 +9,7 @@ One job: find problems and turn them into tickets. The flow:
 
 1. Collect candidates from the sources.
 2. One fresh verifier checks each candidate.
-3. Write ONE findings doc that groups what survived: `docs/super-board/findings/collect-<YYYY-MM-DD>.md`.
+3. Write ONE findings doc that groups what survived: `docs/drover/findings/collect-<YYYY-MM-DD>.md`.
 4. `/to-spec` turns the findings doc into a spec.
 5. `/to-tickets` turns the spec into tickets.
 6. Build fork: **1–5 tickets → `/implement-spec`** (one session, no QA lane). **6+ tickets →
@@ -19,7 +19,7 @@ No `/to-spec` or `/to-tickets` in this project → file each finding straight in
 (today's path, "Filing" below) and print why. super-collect never edits app code and never
 moves a card to `Ready`. Per project only: it reads the active project's super-board config and
 files onto that project's board. The whole rule in plain words:
-[routing](../../docs/super-board/routing.md).
+[routing](../../docs/drover/routing.md).
 
 ## Invocation
 
@@ -47,8 +47,8 @@ No job, cadence or scheduler is created by this skill.
    requested source → stop and point at `/super-board onboard` (its collect step sets sources up).
 2. Secrets come only from `.env` (nearest walking up): `SENTRY_AUTH_TOKEN`,
    `POSTHOG_PERSONAL_API_KEY`. Never print, echo or paste them.
-3. Source `.claude/bin/super-board-gh-guard.sh`; `sb_gh_guard_check 200` before each gh burst.
-4. Snapshot the board through `.claude/bin/super-board-github-read.py --kind items -- project item-list <number> --owner <owner> --format json --limit 500`. A count mismatch or read failure halts; never treat a partial board as complete.
+3. Source `.claude/bin/drover-gh-guard.sh`; `sb_gh_guard_check 200` before each gh burst.
+4. Snapshot the board through `.claude/bin/drover-github-read.py --kind items -- project item-list <number> --owner <owner> --format json --limit 500`. A count mismatch or read failure halts; never treat a partial board as complete.
    It is the dedupe set for verification and the "not on the board" set for `github`.
 
 Scripts live in `.claude/skills/super-collect/scripts/` (`S=` below). Every fetcher takes
@@ -172,7 +172,7 @@ missing) or `--direct` → skip to **Filing** below and print the `reason` line 
    findings with the same cause share one group.
 2. `python3 $S/collect_handoff.py doc --findings <verified.json> --since <w>` prints the doc
    (dry run). On confirm, add `--yes`: it writes
-   `docs/super-board/findings/collect-<YYYY-MM-DD>.md` (never overwrites; `-2`, `-3`, …) and
+   `docs/drover/findings/collect-<YYYY-MM-DD>.md` (never overwrites; `-2`, `-3`, …) and
    prints the path. Only `file` and `needs-triage` findings go in; drops and duplicates are
    listed under "Not in this doc". A `duplicate` still gets its "Seen again" comment through
    the filer (`--yes`, same fingerprint), and a `github` candidate is still adopted with
@@ -184,7 +184,7 @@ missing) or `--direct` → skip to **Filing** below and print the `reason` line 
    - **1–5 tickets → `/implement-spec <spec>`**: one session, its own review, no QA lane.
      super-collect does not build: it prints the command; on confirm it starts it.
    - **6+ tickets → super-board**: add each ticket to Backlog with
-     `$S/super-collect-file.sh --config <cfg> --adopt <n> --type bug|feature|refactor --yes`,
+     `$S/drover-collect-file.sh --config <cfg> --adopt <n> --type bug|feature|refactor --yes`,
      then `/super-board lint`. Build → QA (with the security check) → Review → merge gate.
    - Tickets in a local tracker (files, not GitHub issues) cannot go on the board: report
      their paths and stop.
@@ -197,14 +197,14 @@ The direct path (no planning chain, `--direct`, adopting a `github` issue, a dup
 "Seen again" comment) and the 6+ adoption go through one script, which routes to the pack's filers:
 
 ```bash
-$S/super-collect-file.sh --config <cfg> --type bug|feature|refactor|fix \
+$S/drover-collect-file.sh --config <cfg> --type bug|feature|refactor|fix \
   --source sentry|posthog|github|prs|architecture|custom --title "<one line>" --body-file <md> \
   --fingerprint "<key>" [--priority p] [--area a] [--label needs-triage] [--label ux] [--yes]
-$S/super-collect-file.sh --config <cfg> --adopt <n> --type <t> [--yes]
+$S/drover-collect-file.sh --config <cfg> --adopt <n> --type <t> [--yes]
 ```
 
-- `bug`, `feature`, `fix` → `super-qa-file-bug.sh` (`fix` files as `tech-debt`); `refactor` →
-  `super-review-file-refactor.sh`. `--title` is the bare problem: the filers add the
+- `bug`, `feature`, `fix` → `drover-qa-file-bug.sh` (`fix` files as `tech-debt`); `refactor` →
+  `drover-review-file-refactor.sh`. `--title` is the bare problem: the filers add the
   `<emoji> [<kind>] <scope>:` prefix, so never pass one (`🐛 [bug] …` would appear twice). Every body uses the ticket format in
   `.claude/skills/super-board/references/writing-standard.md` § 3: Problem · Context (lettered
   steps under Where) · Fix · Acceptance Criteria (checklist) · Risk; bugs add the folded 12-row
@@ -229,13 +229,13 @@ with `--yes`.
 ```
 ## super-collect: <planned n | filed n | dry-run n> · since 2026-09-18 (14d)
 Coverage   sentry: read 42 | posthog: read 9 (silent: rageclick) | github: read 7 | prs: 23 PRs, 6 reports | architecture: 4 | linear: read 12
-Findings   docs/super-board/findings/collect-2026-10-02.md  (7 findings, 3 groups)
+Findings   docs/drover/findings/collect-2026-10-02.md  (7 findings, 3 groups)
 Spec       #430  ← /to-spec
 Tickets    #431–#438 (8)  ← /to-tickets
 Build      6+ tickets → super-board: #431–#438 adopted into Backlog
 Duplicate  #301 ← Sentry 4502 (comment added)
 Dropped    Sentry 4490 drop-fixed — resolved in web@1.4.0, not seen since (PR #377)
-Report     docs/super-board/runs/collect-funnel-2026-10-02.md
+Report     docs/drover/runs/collect-funnel-2026-10-02.md
 Next       /super-board lint  — nothing here is in Ready
 ```
 

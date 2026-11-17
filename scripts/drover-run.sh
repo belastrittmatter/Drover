@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# super-board-run.sh — headless autonomous runner.
-# Spawned as `nohup scripts/super-board-run.sh <config-slug> &`.
+# drover-run.sh — headless autonomous runner.
+# Spawned as `nohup scripts/drover-run.sh <config-slug> &`.
 # Pure shell while-loop. Dispatches `claude -p` workers per lane.
 # Holds NO Claude session state — re-reads GitHub on every tick.
 #
@@ -31,7 +31,7 @@
 # (no subshell, no `exec` of a native PE), so `$!` names the worker itself rather than a bash stub.
 
 set -euo pipefail
-SB_GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-github-read.py"
+SB_GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/drover-github-read.py"
 gh_checkpoint() { python3 "$SB_GITHUB_READ" --check || exit $?; }
 gh_write_once() {
   gh_checkpoint
@@ -97,15 +97,15 @@ if [ "$WORKER_BACKEND" != "claude-p" ]; then
   exit 78
 fi
 
-python3 "$(dirname "$SB_GITHUB_READ")/super-board-verification-ready.py" --config "$CONFIG_PATH"
+python3 "$(dirname "$SB_GITHUB_READ")/drover-verification-ready.py" --config "$CONFIG_PATH"
 
 RUN_DATE=$(date +%Y-%m-%d)
-RUN_MANIFEST="docs/super-board/runs/${RUN_DATE}-${CONFIG_SLUG}.md"
+RUN_MANIFEST="docs/drover/runs/${RUN_DATE}-${CONFIG_SLUG}.md"
 # Per-worker logs (issue #13). Workers used to be spawned with >/dev/null, so the run
 # log could never show what a worker was doing during a 13-minute silence.
-WORKER_LOG_DIR="docs/super-board/runs/${RUN_DATE}-${CONFIG_SLUG}-workers"
+WORKER_LOG_DIR="docs/drover/runs/${RUN_DATE}-${CONFIG_SLUG}-workers"
 INFLIGHT_DIR=".claude/super-board/inflight"
-mkdir -p "docs/super-board/runs" "$WORKER_LOG_DIR" .claude/worktrees "$INFLIGHT_DIR"
+mkdir -p "docs/drover/runs" "$WORKER_LOG_DIR" .claude/worktrees "$INFLIGHT_DIR"
 fi  # end non-lib-only setup
 
 # Defaults so the helpers below are safe to source under `set -u` in lib-only mode.
@@ -120,10 +120,10 @@ log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*" | tee -a "$RUN_MANIFEST"; }
 PROJECT_ITEMS_JSON=""
 fetch_project_items() {
   # One board read per tick; all column lookups read from this cache.
-  # super-board-card.sh items: ~1 GraphQL point per 100 cards, where
+  # drover-card.sh items: ~1 GraphQL point per 100 cards, where
   # `gh project item-list` spends 101 per 100.
   local fresh
-  fresh=$("$(dirname "$SB_GITHUB_READ")/super-board-card.sh" --owner "$PROJECT_OWNER" --number "$PROJECT_NUMBER" items) || return $?
+  fresh=$("$(dirname "$SB_GITHUB_READ")/drover-card.sh" --owner "$PROJECT_OWNER" --number "$PROJECT_NUMBER" items) || return $?
   PROJECT_ITEMS_JSON="$fresh"
 }
 
@@ -274,8 +274,8 @@ gh_rate_guard() {
   # Sleep until rate limit resets if GraphQL remaining < 200.
   local payload remaining reset now wait
   payload=$(python3 "$SB_GITHUB_READ" --kind quota -- api rate_limit) || return $?
-  # REST misreports the GraphQL bucket; super-board-gh-guard.sh → sb_gh_quota_merge.
-  payload=$(. "$(dirname "$SB_GITHUB_READ")/super-board-gh-guard.sh" && sb_gh_quota_merge "$payload")
+  # REST misreports the GraphQL bucket; drover-gh-guard.sh → sb_gh_quota_merge.
+  payload=$(. "$(dirname "$SB_GITHUB_READ")/drover-gh-guard.sh" && sb_gh_quota_merge "$payload")
   remaining=$(echo "$payload" | jq -r '.resources.graphql.remaining // 5000')
   if [ "$remaining" -lt 200 ]; then
     reset=$(echo "$payload" | jq -r '.resources.graphql.reset // 0')
@@ -325,7 +325,7 @@ dispatch_lane() {
   card=$(echo "$PROJECT_ITEMS_JSON" | jq -c --argjson n "$issue" --arg lane "$lane" '
     [.items[] | select(.content.number == $n) | {number:$n, status:(.status // "Ready"), labels:(.labels // .content.labels // []), lane:$lane}]')
   [ "$(printf '%s' "$card" | jq length)" -eq 1 ] || { log "skills-readiness: selected issue #${issue} missing from board cache"; exit 64; }
-  skills_report=$(printf '%s' "$card" | python3 "$(dirname "$SB_GITHUB_READ")/super-board-skills-ready.py"     --root "$PWD" --host claude --cards - --hydrate) || skills_rc=$?
+  skills_report=$(printf '%s' "$card" | python3 "$(dirname "$SB_GITHUB_READ")/drover-skills-ready.py"     --root "$PWD" --host claude --cards - --hydrate) || skills_rc=$?
   if [ "$skills_rc" -ne 0 ]; then
     log "skills-readiness: halt before claim lane=${lane} issue=#${issue}; ${skills_report}"
     exit "$skills_rc"
@@ -339,7 +339,7 @@ dispatch_lane() {
     review) prompt="Run super-review on issue #${issue} for super-board run. Read .claude/skills/super-board/references/run.md → Reviewer lifecycle. Config: ${CONFIG_PATH}." ;;
     *) log "unknown lane: $lane"; return 1 ;;
   esac
-  prompt="First operation: run .claude/bin/super-board-skills-ready.py --root '$PWD' --host claude --cards - --lane '$lane' --hydrate with $card as stdin. Halt on exit 10 before worktree creation or lifecycle writes; preserve claims and approval evidence. Load resolved paths and only declared fallbacks; recheck conditionals with --require before activation. $prompt"
+  prompt="First operation: run .claude/bin/drover-skills-ready.py --root '$PWD' --host claude --cards - --lane '$lane' --hydrate with $card as stdin. Halt on exit 10 before worktree creation or lifecycle writes; preserve claims and approval evidence. Load resolved paths and only declared fallbacks; recheck conditionals with --require before activation. $prompt"
   # Worker output goes to a per-worker log, not /dev/null (issue #13). Redirect at the
   # `claude` invocation itself — no wrapping subshell, no `exec` — so the wire to the
   # file survives and `$!` names the worker process rather than a bash stub.
@@ -572,7 +572,7 @@ REAP_COUNT=0
 LANDED_COUNT=0
 DISPATCH_LOG=""
 
-# Sourced by the gate tests (`SB_LIB_ONLY=1 . scripts/super-board-run.sh`) to exercise
+# Sourced by the gate tests (`SB_LIB_ONLY=1 . scripts/drover-run.sh`) to exercise
 # the helpers above without starting a run. Executing the script normally is unaffected.
 if [ "${SB_LIB_ONLY:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
@@ -644,7 +644,7 @@ QA_PID=""; QA_ISSUE=""
 REVIEW_PID=""; REVIEW_ISSUE=""
 
 while true; do
-  python3 "$(dirname "$SB_GITHUB_READ")/super-board-verification-ready.py" --config "$CONFIG_PATH"
+  python3 "$(dirname "$SB_GITHUB_READ")/drover-verification-ready.py" --config "$CONFIG_PATH"
   gh_checkpoint
   # Workflow-backend mutual exclusion, re-checked every tick: the startup
   # check alone leaves a TOCTOU window where a workflow run starting at the

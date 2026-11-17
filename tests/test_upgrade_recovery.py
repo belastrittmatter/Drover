@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-SOURCE = Path(__file__).resolve().parents[1] / 'scripts/super-board-setup.py'
+SOURCE = Path(__file__).resolve().parents[1] / 'scripts/drover-setup.py'
 spec = importlib.util.spec_from_file_location('board_setup', SOURCE)
 setup = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(setup)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-board-host.sh — which agent host is this shell inside: `claude`, `codex` or `opencode`.
+# drover-host.sh — which agent host is this shell inside: `claude`, `codex` or `opencode`.
 #
 # WHY. `/super-board run` launched from a Codex CLI session has no Claude Workflow tool, so the
 # workflow backend cannot start. The orchestrator checks its own tool list first; this is the
@@ -22,7 +22,7 @@
 # ORDER. SUPER_BOARD_HOST, Codex ids, OPENCODE, CLAUDECODE, then the config's top-level
 # `host` key (--config <file>), else exit 65. A live env sign beats the saved config.
 #
-# Usage: super-board-host.sh [--config <config.json>]
+# Usage: drover-host.sh [--config <config.json>]
 #        prints `claude`, `codex` or `opencode`, exit 0
 #        exit 65   no sign: nothing on stdout, how to choose on stderr
 #        exit 64   SUPER_BOARD_HOST or config `host` is not one of the three
@@ -34,13 +34,13 @@ config=
 case "${1:-}" in
   --config) config=${2:-} ;;
   '') ;;
-  *) echo "usage: super-board-host.sh [--config <config.json>]" >&2; exit 64 ;;
+  *) echo "usage: drover-host.sh [--config <config.json>]" >&2; exit 64 ;;
 esac
 
 case "${SUPER_BOARD_HOST:-}" in
   claude|codex|opencode) echo "$SUPER_BOARD_HOST"; exit 0 ;;
   '') ;;
-  *) echo "super-board-host.sh: SUPER_BOARD_HOST must be claude, codex or opencode" >&2; exit 64 ;;
+  *) echo "drover-host.sh: SUPER_BOARD_HOST must be claude, codex or opencode" >&2; exit 64 ;;
 esac
 
 if [ -n "${CODEX_THREAD_ID:-}" ] || [ -n "${CODEX_SESSION_ID:-}" ]; then
@@ -52,9 +52,9 @@ elif [ -n "${CLAUDECODE:-}" ]; then
 elif saved=$( [ -f "$config" ] && jq -r '.host // empty' "$config" 2>/dev/null ) && [ -n "$saved" ]; then
   case "$saved" in
     claude|codex|opencode) echo "$saved" ;;
-    *) echo "super-board-host.sh: config host must be claude, codex or opencode, got '$saved'" >&2; exit 64 ;;
+    *) echo "drover-host.sh: config host must be claude, codex or opencode, got '$saved'" >&2; exit 64 ;;
   esac
 else
-  echo "super-board-host.sh: unknown agent host. Pick one: SUPER_BOARD_HOST=claude|codex|opencode, or set \"host\" in the board config" >&2
+  echo "drover-host.sh: unknown agent host. Pick one: SUPER_BOARD_HOST=claude|codex|opencode, or set \"host\" in the board config" >&2
   exit 65
 fi

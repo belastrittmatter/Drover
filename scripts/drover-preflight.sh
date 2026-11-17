@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-board-preflight.sh — before a card goes Ready → Building, is it worth building?
+# drover-preflight.sh — before a card goes Ready → Building, is it worth building?
 #
 # Four questions, asked of every candidate card before any Builder starts:
 #
@@ -31,7 +31,7 @@
 # view` per issue. The worker gh guard runs first when it is installed alongside.
 #
 # Usage:
-#   super-board-preflight.sh --repo <owner/name> --issues <N[,M…]>
+#   drover-preflight.sh --repo <owner/name> --issues <N[,M…]>
 #                            [--inflight <cards.json>]   # [{number,title,status}] board cards
 #                            [--files a/b.ts,c/d.ts]     # paths the card will touch (else: parsed from body)
 #                            [--threshold 0.6]           # title Jaccard for a duplicate
@@ -63,21 +63,21 @@ done
 echo "$ISSUES" | grep -Eq '^[0-9]+(,[0-9]+)*$' || { echo "--issues must be numbers: $ISSUES" >&2; exit 64; }
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-if [ -f "$HERE/super-board-gh-guard.sh" ]; then
+if [ -f "$HERE/drover-gh-guard.sh" ]; then
   # shellcheck source=/dev/null
-  . "$HERE/super-board-gh-guard.sh"
+  . "$HERE/drover-gh-guard.sh"
   sb_gh_guard_check 200 || exit $?
 fi
 
-MERGED=$(python3 "$HERE/super-board-github-read.py" --kind prs-merged -- pr list --repo "$REPO" --state merged --limit 100 --json number,title,body,url ) || exit $?
-OPEN=$(python3 "$HERE/super-board-github-read.py" --kind prs-open -- pr list --repo "$REPO" --state open --limit 100 --json number,title,body,url,headRefName,files ) || exit $?
-CLOSED=$(python3 "$HERE/super-board-github-read.py" --kind issues-closed -- issue list --repo "$REPO" --state closed --limit 100 --json number,title,body,stateReason ) || exit $?
+MERGED=$(python3 "$HERE/drover-github-read.py" --kind prs-merged -- pr list --repo "$REPO" --state merged --limit 100 --json number,title,body,url ) || exit $?
+OPEN=$(python3 "$HERE/drover-github-read.py" --kind prs-open -- pr list --repo "$REPO" --state open --limit 100 --json number,title,body,url,headRefName,files ) || exit $?
+CLOSED=$(python3 "$HERE/drover-github-read.py" --kind issues-closed -- issue list --repo "$REPO" --state closed --limit 100 --json number,title,body,stateReason ) || exit $?
 CARDS="[]"
 [ -n "$INFLIGHT" ] && CARDS=$(cat "$INFLIGHT")
 
 TARGETS="[]"
 for n in ${ISSUES//,/ }; do
-  one=$(python3 "$HERE/super-board-github-read.py" --kind issue -- issue view "$n" --repo "$REPO" --json number,title,body ) || exit $?
+  one=$(python3 "$HERE/drover-github-read.py" --kind issue -- issue view "$n" --repo "$REPO" --json number,title,body ) || exit $?
   TARGETS=$(jq -c --argjson one "$one" '. + [$one]' <<<"$TARGETS")
 done
 

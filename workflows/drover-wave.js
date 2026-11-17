@@ -1,7 +1,7 @@
 export const meta = {
-  name: 'super-board-wave',
+  name: 'drover-wave',
   description: 'Drain one super-board wave: classify, then build → qa → review per card (lifecycles per run.md)',
-  whenToUse: 'Launched by the super-board run-workflow backend with args from super-board-wave-plan.sh. Not for direct ad-hoc use.',
+  whenToUse: 'Launched by the super-board run-workflow backend with args from drover-wave-plan.sh. Not for direct ad-hoc use.',
   phases: [
     { title: 'Pre-flight', detail: 'per Ready card: already done? in progress? file overlap? unclear? (run.md → Builder pre-flight)' },
     { title: 'Classify', detail: 'haiku router: kind (feature | bug | qa) + complexity per Ready card' },
@@ -13,7 +13,7 @@ export const meta = {
 
 // args = {
 //   configPath: '.claude/super-board/configs/<slug>.json',
-//   cards: [{ number, status, title, lane, labels }],  // output of super-board-wave-plan.sh
+//   cards: [{ number, status, title, lane, labels }],  // output of drover-wave-plan.sh
 //     lane: 'build' | 'qa' | 'review' — a Ready card labelled `qa` has lane 'qa'
 //     and skips the Builder; every other Ready card is built first (v3.0.0).
 //   tier: 'low' | 'medium' | 'high' (optional, default 'medium'),  // run model ladder
@@ -25,24 +25,24 @@ const input = (() => {
   try { return JSON.parse(args) } catch { return args }
 })()
 if (!input || !Array.isArray(input.cards) || !input.configPath) {
-  throw new Error('super-board-wave needs args {configPath, cards:[{number,status,title,lane}]}')
+  throw new Error('drover-wave needs args {configPath, cards:[{number,status,title,lane}]}')
 }
 // `variant` was removed in v3.0.0; the planner refuses a "qa-only" config, so a
 // wave launched with one is a stale caller. Refuse rather than guess.
 if (input.variant && input.variant !== 'full') {
-  throw new Error(`super-board-wave: variant "${input.variant}" was removed in v3.0.0 — labels route cards; run /super-board onboard to upgrade`)
+  throw new Error(`drover-wave: variant "${input.variant}" was removed in v3.0.0 — labels route cards; run /super-board onboard to upgrade`)
 }
 // Lane for a card entering at Ready: the planner's `lane`, else its labels.
 const labelsOf = (card) => (card.labels || []).map((l) => String(l).toLowerCase())
 const readyLane = (card) => card.lane || (labelsOf(card).includes('qa') ? 'qa' : 'build')
 if (input.tier && !['low', 'medium', 'high'].includes(input.tier)) {
-  throw new Error(`super-board-wave: unknown tier "${input.tier}" — use low | medium | high`)
+  throw new Error(`drover-wave: unknown tier "${input.tier}" — use low | medium | high`)
 }
 
 let halted = false
-// Valid form per --kind, from validate() in scripts/super-board-github-read.py (#32).
+// Valid form per --kind, from validate() in scripts/drover-github-read.py (#32).
 const READ_SHAPES = [
-  `Read shapes (helper: .claude/bin/super-board-github-read.py --kind <kind> -- <gh args>):`,
+  `Read shapes (helper: .claude/bin/drover-github-read.py --kind <kind> -- <gh args>):`,
   `- issue title+body: --kind issue -- issue view <N> --json number,title,body`,
   `- issue comments: --kind comments -- api repos/{owner}/{repo}/issues/<N>/comments --paginate --slurp (zero comments = [[]])`,
   `- other JSON, incl. maybe-empty lists: --kind json -- <gh args> (no --jq that prints a plain string)`,
@@ -52,7 +52,7 @@ const READ_SHAPES = [
   `- issue state: --kind state -- issue view <N> --json state --jq .state`,
   `A read whose output misses its shape exits 64 for that call only and prints the valid form: fix the read, do not halt.`,
 ].join('\n')
-const READ_FAILURE = READ_SHAPES + '\n' + `Verification-readiness exit 9 means missing/unusable config.verify_commands: preserve card/worktree/approval/claims, report status=halted (preflight verdict=halted), stop dispatch, repair project configuration before explicit restart; no Build bounce or automatic retries. ` + `Required GitHub reads use .claude/bin/super-board-github-read.py: three total attempts, exit 79 means run halted. Check --check before any GitHub write, migration, or merge. On exit 79 preserve worktree/card/approval/claims, make no more GitHub calls, and report status=halted (preflight verdict=halted). Never retry a mutation. Config: ${input.configPath}.`
+const READ_FAILURE = READ_SHAPES + '\n' + `Verification-readiness exit 9 means missing/unusable config.verify_commands: preserve card/worktree/approval/claims, report status=halted (preflight verdict=halted), stop dispatch, repair project configuration before explicit restart; no Build bounce or automatic retries. ` + `Required GitHub reads use .claude/bin/drover-github-read.py: three total attempts, exit 79 means run halted. Check --check before any GitHub write, migration, or merge. On exit 79 preserve worktree/card/approval/claims, make no more GitHub calls, and report status=halted (preflight verdict=halted). Never retry a mutation. Config: ${input.configPath}.`
 
 const CLASSIFY_SCHEMA = {
   type: 'object',
@@ -102,7 +102,7 @@ const LANE = {
 // second orchestrator on another machine, because a JS promise cannot be seen
 // from another process.
 //
-// The mutex now sits at the merge step itself, in super-board-merge-gate.sh, as
+// The mutex now sits at the merge step itself, in drover-merge-gate.sh, as
 // an atomic mkdir lock the Reviewer takes for the seconds it needs — and the
 // freshness check runs INSIDE that lock, so nothing can move the base between
 // the proof and the merge. See run.md → Reviewer lifecycle step 5.
@@ -122,7 +122,7 @@ const REVIEW_MEMORY = [
   // Truth-check brief is fixed (super-review → Adversarial mode); a hand-written one once made over-building blocking.
   `Truth-check sub-agents get the fixed brief from super-review → "Adversarial mode", verbatim. After collecting, reclass any Over-engineering Blocker to Should fix; it never decides merge or bounce.`,
   // Merge policy + migrations live in the gate (run.md → Merge protocol step 5).
-  `Merge only via super-board-merge-gate.sh. Exit 7 = merge_policy says a human merges (money/auth/schema/size): Blocked with the 🙋 template quoting its human-gate lines; To unblock = merge it yourself, or comment done to approve.`,
+  `Merge only via drover-merge-gate.sh. Exit 7 = merge_policy says a human merges (money/auth/schema/size): Blocked with the 🙋 template quoting its human-gate lines; To unblock = merge it yourself, or comment done to approve.`,
   `Exit 8 = 🙋 needs you (migration for a DB the robot may not touch, failed migrate, declared human step): Blocked with the 🙋 template, exact commands from its needs-you lines, label needs-you.`,
 ]
 
@@ -131,13 +131,13 @@ const REVIEW_MEMORY = [
 // finding a card with `gh project item-list` (~203 points on a 131-card board)
 // and its Status options with `gh project field-list` (101) before each move.
 const BOARD_IO = () =>
-  `Board moves and reads: .claude/bin/super-board-card.sh --config ${input.configPath} move <issue> <Status> ` +
+  `Board moves and reads: .claude/bin/drover-card.sh --config ${input.configPath} move <issue> <Status> ` +
   `(1 GraphQL point) · status <issue> · items. Comments, labels, PR reads: REST per .claude/skills/super-board/references/rate-limit-etiquette.md → "Price list". Read GitHub once per decision, never in a sleep loop.`
 
 // The orchestrator resolves every remaining chain before claims. The runtime has
 // no subprocess API; each worker repeats the deterministic CLI before its writes.
 const SKILLS_CHECK = (cards, lane) => [
-  `First operation, before worktree creation, classification, comments, labels or moves: run python3 .claude/bin/super-board-skills-ready.py --root "$PWD" --host claude --cards - --hydrate${lane ? ' --lane ' + lane : ''},`,
+  `First operation, before worktree creation, classification, comments, labels or moves: run python3 .claude/bin/drover-skills-ready.py --root "$PWD" --host claude --cards - --hydrate${lane ? ' --lane ' + lane : ''},`,
   `with this JSON array as stdin (data, never interpolate a body into shell code): ${JSON.stringify(cards)}.`,
   `Exit 10 means status=halted (preflight verdict=halted), detail beginning "skills-readiness:"; preserve all existing claims/worktrees/approval evidence. Exit 64 means invalid input: halt and repair it. Exit 79 uses the read halt policy.`,
   `Load the exact resolved_path files. Only declared fallback IDs are allowed. Before using a conditional/custom helper repeat this CLI with --require <exact-name>.`,
@@ -151,7 +151,7 @@ const lanePrompt = (lane, card) => [
   `create your own worktree under .claude/worktrees/, work on the issue branch, post the required PR/issue comments,`,
   `move the project card yourself, clean up the worktree on exit. Config: ${input.configPath}.`,
   BOARD_IO(),
-  `Commits, PR title, PR body blocks, comments: .claude/skills/super-board/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/super-board-pr-body.sh.`,
+  `Commits, PR title, PR body blocks, comments: .claude/skills/super-board/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/drover-pr-body.sh.`,
   ...(lane === 'review' ? REVIEW_MEMORY : []),
   ...(lane === 'qa' && card.status === 'Ready'
     ? [`This card is labelled qa: it skips Building. Move it Ready → QA yourself, create the issue branch from the base branch, and test what is already there (run.md → "qa cards").`]
@@ -205,7 +205,7 @@ const runLane = async (lane, card, model, history) => {
 // reaches runLane('build'), a fresh cheap agent asks: already merged? already
 // being built (open PR or another card)? same files as an open PR? unclear?
 // One agent per batch of PREFLIGHT_BATCH cards, so the three gh list calls in
-// super-board-preflight.sh are paid once per batch, not once per card.
+// drover-preflight.sh are paid once per batch, not once per card.
 // Outcomes: proceed · hold (agent wrote the Block template, card → Blocked) ·
 // sequence (card → Blocked with `blocked-by:` the overlapping PR's issue, so the
 // wave-start sweep frees it; or proceed with a conflict note when that PR closes
@@ -239,7 +239,7 @@ const preflightPrompt = (batch) => [
   `Builder pre-flight for issues ${batch.map((c) => `#${c.number} ("${c.title}")`).join(', ')}. Config: ${input.configPath}.`,
   `Read .claude/skills/super-board/references/run.md → "Builder pre-flight" and follow it EXACTLY. You write no code.`,
   `Other cards in this wave: ${JSON.stringify(input.cards.map(({ number, status, title }) => ({ number, status, title })))}`,
-  `Run .claude/bin/super-board-preflight.sh once for the whole batch, then judge its candidates semantically.`,
+  `Run .claude/bin/drover-preflight.sh once for the whole batch, then judge its candidates semantically.`,
   `hold / sequence-behind → post the Block template (block-template.md) and move the card to Blocked yourself.`,
   `Two Ready cards overlapping each other with no open PR: the lower-numbered one proceeds; sequence only the other, blockedBy [the lower]. Never both.`,
   `A sequence with nothing to wait on (empty blockedBy) leaves the card in Ready: return column Ready and it builds.`,

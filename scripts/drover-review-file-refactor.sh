@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-review-file-refactor.sh — file a deepening opportunity spotted during review.
+# drover-review-file-refactor.sh — file a deepening opportunity spotted during review.
 #
 # Super Review's gate is merge-or-bounce. A shallow module in an otherwise-correct
 # diff is a future ticket, not a reason to hold a green PR — so this script files
@@ -13,7 +13,7 @@
 # unrefined ticket.
 #
 # Usage:
-#   super-review-file-refactor.sh --config <config.json> \
+#   drover-review-file-refactor.sh --config <config.json> \
 #     --title "<one-line shape problem>" \
 #     --body-file <path.md> \
 #     --fingerprint "<module>|<shape-problem>" \
@@ -74,7 +74,7 @@ else
   REPO_FLAG=()
 fi
 
-GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-github-read.py"
+GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/drover-github-read.py"
 python3 "$GITHUB_READ" --check || exit $?
 
 # --- dedupe -----------------------------------------------------------------

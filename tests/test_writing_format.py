@@ -92,7 +92,7 @@ def test_standard_examples_are_valid_subjects():
 
 
 def test_dispatcher_greps_the_standard_loop_subjects():
-    src = (ROOT / "skills" / "super-build" / "scripts" / "super-build-dispatch.sh").read_text(encoding="utf-8")
+    src = (ROOT / "skills" / "super-build" / "scripts" / "drover-build-dispatch.sh").read_text(encoding="utf-8")
     pats = re.findall(r'grep -E "\^\[0-9a-f\]\+ (.*?)" \| head', src)
     assert len(pats) == 2, f"expected the close and wip greps, found {pats}"
     close_pat, wip_pat = (p.replace("$N", "42").replace("\\\\", "\\") for p in pats)
@@ -110,7 +110,7 @@ def test_dispatcher_greps_the_standard_loop_subjects():
 
 def test_no_old_commit_shapes_in_templates():
     old = re.compile(r"chore\(loop\)|wip\(loop\)|fix\(super-qa\)|feat\(super-qa\)|refine\(\$?\{?[a-z<]")
-    allowed = {"super-build-dispatch.sh"}  # documents and still accepts the legacy shapes
+    allowed = {"drover-build-dispatch.sh"}  # documents and still accepts the legacy shapes
     for p in list((ROOT / "skills").rglob("*.md")) + list((ROOT / "skills").rglob("*.sh")) + list((ROOT / "workflows").glob("*.js")):
         if p.name in allowed or "visual" in p.parts:
             continue
@@ -134,9 +134,9 @@ def test_ticket_template_has_required_sections_in_order():
 
 
 def test_bug_filer_matches_the_standard():
-    src = (ROOT / "scripts" / "super-qa-file-bug.sh").read_text(encoding="utf-8")
+    src = (ROOT / "scripts" / "drover-qa-file-bug.sh").read_text(encoding="utf-8")
     for s in ["Problem", "Context", "Evidence", "Fix", "Acceptance Criteria", "Risk"]:
-        assert f'"{s}"' in src, f"super-qa-file-bug.sh does not require {s}"
+        assert f'"{s}"' in src, f"drover-qa-file-bug.sh does not require {s}"
     rows = re.search(r'EVIDENCE_ROWS="([^"]+)"', src)[1].split("|")
     assert rows == [r.lower() for r in EVIDENCE_ROWS], f"filer evidence rows drifted: {rows}"
     table = re.findall(r"^\| ([A-Za-z][^|]+?) \| ", STANDARD.split("**Bug Evidence**", 1)[1], flags=re.M)
@@ -148,7 +148,7 @@ def test_ticket_title_shape():
     title = re.compile(r"^(🐛 \[bug\]|✨ \[feat\]|💄 \[ui\]|🧪 \[test\]|📝 \[docs\]|♻️ \[refactor\]|🔒 \[security\]) [a-z0-9][a-z0-9._/-]*: \S")
     assert title.match("🐛 [bug] receipts: spinner never stops over 10 MB")
     assert not title.match("🐛 Bug /imports — CSV upload silently drops rows")
-    src = (ROOT / "scripts" / "super-qa-file-bug.sh").read_text(encoding="utf-8")
+    src = (ROOT / "scripts" / "drover-qa-file-bug.sh").read_text(encoding="utf-8")
     assert 'FULL_TITLE="${BADGE} ${SCOPE}: ${TITLE}"' in src
 
 
@@ -196,7 +196,7 @@ def test_block_template_uses_the_header():
     assert heads, "block-template.md has no header line"
     for h in heads:
         assert re.match(r"^\[(<role>|builder|qa|reviewer|collect|orchestrator)\] \[blocker\] \S", h), h
-    assert "Reason tag:" in text, "super-board-deps.sh parses 'Reason tag:'"
+    assert "Reason tag:" in text, "drover-deps.sh parses 'Reason tag:'"
 
 
 def test_needs_you_comment_is_checklist_first():
@@ -217,7 +217,7 @@ def test_needs_you_comment_is_checklist_first():
 # ── PR body ──────────────────────────────────────────────────────────────────
 
 def test_pr_body_markers():
-    out = subprocess.run(["bash", str(ROOT / "scripts" / "super-board-pr-body.sh"), "--skeleton"],
+    out = subprocess.run(["bash", str(ROOT / "scripts" / "drover-pr-body.sh"), "--skeleton"],
                          capture_output=True, text=True, check=True).stdout
     for b in PR_BLOCKS:
         assert f"<!-- sb:{b} -->" in out and f"<!-- /sb:{b} -->" in out, f"skeleton lacks {b}"

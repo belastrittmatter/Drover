@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests docs/hosts.md — every host value super-board-host.sh accepts in its SUPER_BOARD_HOST
+# Tests docs/hosts.md — every host value drover-host.sh accepts in its SUPER_BOARD_HOST
 # case has a table row, and README's Install section links the page.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -9,8 +9,8 @@ DOC=docs/hosts.md
 
 # The accepted values: the first case arm after `case "${SUPER_BOARD_HOST:-}" in`.
 values=$(awk '/case "\$\{SUPER_BOARD_HOST:-\}" in/{getline; sub(/^[ \t]*/, ""); sub(/\).*/, ""); print; exit}' \
-  scripts/super-board-host.sh | tr '|' ' ')
-[ -n "$values" ] || fail "no SUPER_BOARD_HOST values found in super-board-host.sh"
+  scripts/drover-host.sh | tr '|' ' ')
+[ -n "$values" ] || fail "no SUPER_BOARD_HOST values found in drover-host.sh"
 n=0
 for v in $values; do
   grep -q "^| \`$v\` |" "$DOC" || fail "host \`$v\` has no row in $DOC"

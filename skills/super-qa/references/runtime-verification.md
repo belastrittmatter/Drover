@@ -111,7 +111,7 @@ an inconclusive report. Custom adapters must not daemonize into detached session
 
 ```bash
 python3 .claude/skills/super-qa/scripts/runtime_compare.py \
-  --config docs/runtime/search.json --output docs/super-board/runs/issue-N-qa-v1/runtime
+  --config docs/runtime/search.json --output docs/drover/runs/issue-N-qa-v1/runtime
 ```
 
 The output directory must be new; old evidence is never overwritten. Attach

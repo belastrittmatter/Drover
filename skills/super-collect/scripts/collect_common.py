@@ -5,7 +5,7 @@
 - secret(name): an env var, else the nearest `.env` / `.env.local` walking up
   from cwd. Only the named key is read; values are never printed.
 - since(arg, default_days): `--since 30d` / `--since 2026-09-01` -> aware UTC datetime.
-- fingerprint(source, *parts): the stable dedupe key super-collect-file.sh stamps.
+- fingerprint(source, *parts): the stable dedupe key drover-collect-file.sh stamps.
 """
 from __future__ import annotations
 

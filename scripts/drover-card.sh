@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-board-card.sh — read and move project cards for a few GraphQL points.
+# drover-card.sh — read and move project cards for a few GraphQL points.
 #
 # Why this exists: on 2026-10-04 a 3-card wave spent ~2,850 of the 5,000/hr
 # GraphQL points (~950 a card) and the board stalled an hour after every wave.
@@ -17,7 +17,7 @@
 # and lists the whole board for ~1 point per 100 cards.
 #
 # Usage:
-#   super-board-card.sh [--config <cfg.json>] [--owner O --number N] [--repo owner/name] <verb>
+#   drover-card.sh [--config <cfg.json>] [--owner O --number N] [--repo owner/name] <verb>
 #     move <issue> <Status>   set the card's Status column (Ready, QA, Review, Blocked, Done, …)
 #     status <issue>          print the card's current Status name (1 point, never cached)
 #     item-id <issue>         print the card's project item id (cached)
@@ -34,7 +34,7 @@
 # once — a stale id costs one extra point, never a wrong move.
 #
 # Exit: 0 ok · 64 usage · 66 config · 69 GitHub read/mutation failed ·
-#       79 reads halted (super-board-github-read.py) · 3 issue not on this board /
+#       79 reads halted (drover-github-read.py) · 3 issue not on this board /
 #       Status option missing.
 set -euo pipefail
 # Fixed read commands: a malformed payload is GitHub's, so it halts (#32).
@@ -54,7 +54,7 @@ while [ $# -gt 0 ]; do
     *) break ;;
   esac
 done
-VERB="${1:-}"; [ -n "$VERB" ] || { echo "usage: super-board-card.sh <move|status|item-id|ids|items> …" >&2; exit 64; }
+VERB="${1:-}"; [ -n "$VERB" ] || { echo "usage: drover-card.sh <move|status|item-id|ids|items> …" >&2; exit 64; }
 shift
 
 if [ -n "$CONFIG" ]; then
@@ -71,8 +71,8 @@ REPO=$(echo "$REPO" | sed -E 's#^(https?://github\.com/|git@github\.com:)##; s#\
 # Reads go through the kit's bounded retry helper when it is installed, so a
 # board read shares the run's halt file; plain gh otherwise.
 gh_read() {
-  if [ -f "$HERE/super-board-github-read.py" ]; then
-    python3 "$HERE/super-board-github-read.py" --kind json -- "$@"
+  if [ -f "$HERE/drover-github-read.py" ]; then
+    python3 "$HERE/drover-github-read.py" --kind json -- "$@"
   else
     gh "$@"
   fi
@@ -84,7 +84,7 @@ cache_dir() {
   if [ -n "${SB_CARD_CACHE_DIR:-}" ]; then echo "$SB_CARD_CACHE_DIR"; return; fi
   local common
   common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
-  # Same rule as halt_path() in super-board-github-read.py: a submodule's common
+  # Same rule as halt_path() in drover-github-read.py: a submodule's common
   # dir is .git/modules/<path>, shared-parent territory, so its state stays inside.
   if [ -z "$common" ]; then echo "$PWD/.claude/super-board/cache"
   elif [ "$(basename "$common")" = .git ]; then echo "$(dirname "$common")/.claude/super-board/cache"

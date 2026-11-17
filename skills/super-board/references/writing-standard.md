@@ -84,8 +84,8 @@ Closes #790
 **Title** = commit subject format: `🐛 [fix] receipts: show a size error over 10 MB`.
 
 **Body** = marker blocks, in this order. A lane rewrites only its own blocks, with
-`.claude/bin/super-board-pr-body.sh` (it refuses when the PR head moved since you read it).
-`super-board-pr-body.sh --skeleton` prints an empty body with every marker.
+`.claude/bin/drover-pr-body.sh` (it refuses when the PR head moved since you read it).
+`drover-pr-body.sh --skeleton` prints an empty body with every marker.
 
 | Block | Marker | Written by | When | Required |
 |---|---|---|---|---|
@@ -135,7 +135,7 @@ alert, one `> needs-you: <command>` line each; the merge gate reads it there or 
 - **Who:** any signed-in user (free plan)
 - **What happened:** the spinner never stops
 
-![receipts · desktop](https://github.com/acme/app/raw/5a2363b/docs/super-board/runs/issue-790-qa-v1/desktop.png)
+![receipts · desktop](https://github.com/acme/app/raw/5a2363b/docs/drover/runs/issue-790-qa-v1/desktop.png)
 ```
 
 **Solution** — plain bullets, one change each. Docs consulted go last, as `Docs:` bullets.
@@ -165,7 +165,7 @@ goes in Before | After.
 
 **Iteration history** — folded in `<details>`, so the reader sees Problem to Risk first.
 Local time from config `timezone` (onboard sets it to the machine's zone). Get the stamp with
-`super-board-pr-body.sh --time --config <cfg>`. `--append-file` keeps a new row inside the
+`drover-pr-body.sh --time --config <cfg>`. `--append-file` keeps a new row inside the
 fold, above the blank line and `</details>`; an older unfolded history still appends at its end.
 
 ```
@@ -253,7 +253,7 @@ A 12 MB PDF spins forever. The 413 is never handled.
   - c. Drag `12mb.pdf` onto the drop zone
 - **Who:** any signed-in user
 
-![receipts · desktop](https://github.com/acme/app/raw/5a2363b/docs/super-board/runs/issue-790-qa-v1/desktop.png)
+![receipts · desktop](https://github.com/acme/app/raw/5a2363b/docs/drover/runs/issue-790-qa-v1/desktop.png)
 
 ## Fix
 Map 413 to the size message; check size before upload.
@@ -301,7 +301,7 @@ An unavailable prior witness stays unverified. See
 </details>
 ```
 
-The filers (`super-qa-file-bug.sh`, `super-collect-file.sh`, `super-review-file-refactor.sh`)
+The filers (`drover-qa-file-bug.sh`, `drover-collect-file.sh`, `drover-review-file-refactor.sh`)
 refuse a body that misses a required section.
 
 ## 4 · Comment

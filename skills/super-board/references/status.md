@@ -7,7 +7,7 @@
 
 ## ⚡ Fast path — prefer this
 
-If `.claude/bin/super-board-status.py` exists:
+If `.claude/bin/drover-status.py` exists:
 
 1. **Run it.**
 2. **Print its stdout verbatim, inside a single fenced code block.**
@@ -17,8 +17,8 @@ Skip everything below in this file — the script implements the locked
 template defined here.
 
 ```bash
-python .claude/bin/super-board-status.py                # sole-config or active marker
-python .claude/bin/super-board-status.py <config-slug>  # multi-project repo
+python .claude/bin/drover-status.py                # sole-config or active marker
+python .claude/bin/drover-status.py <config-slug>  # multi-project repo
 ```
 
 ### Do NOT, under any circumstances:
@@ -62,7 +62,7 @@ Exit codes the orchestrator should respect:
 
 The script enforces the same read-only contract as the rest of this file
 (no `gh ... edit/create/delete`, no GraphQL mutations). If you want to verify
-that for a given invocation: `grep -E 'gh ?\.api\.(issue|pr|project) (edit|create|delete)|mutation {|gh.*(edit|create|delete)' .claude/bin/super-board-status.py` — should return nothing.
+that for a given invocation: `grep -E 'gh ?\.api\.(issue|pr|project) (edit|create|delete)|mutation {|gh.*(edit|create|delete)' .claude/bin/drover-status.py` — should return nothing.
 
 The rest of this document is the format spec the script implements. Read it
 only when (a) the script is missing and you need to hand-render, or (b) you're
@@ -259,7 +259,7 @@ other` if the comment can't be parsed.
 ### §G — Recent-events section format
 
 Tail the last 5 state-transition lines from the most recent run manifest
-(`docs/super-board/runs/<YYYY-MM-DD>-<slug>.md`). Reformat each as:
+(`docs/drover/runs/<YYYY-MM-DD>-<slug>.md`). Reformat each as:
 
 ```
    T-<Nm>    <glyph> <verb>      #<NNN> → <Target>  <detail>
@@ -351,7 +351,7 @@ belong in the manifest, not the snapshot.
 
 ## Implementation hints (authored — NOT in spec)
 
-These notes describe the data flow that `super-board-status.py` implements.
+These notes describe the data flow that `drover-status.py` implements.
 They also apply if you need to hand-render via the model-render fallback when
 the script is missing.
 
@@ -366,7 +366,7 @@ the script is missing.
   configured identity (e.g. `claim.assignee_login`).
 - **Project items (column counts + in-flight workers, both from ONE call):**
   the script issues a single targeted `gh api graphql` query (`ITEMS_QUERY`
-  near the top of `super-board-status.py`) that fetches each item's `number`,
+  near the top of `drover-status.py`) that fetches each item's `number`,
   `title`, `labels{nodes{name}}`, and the `Status` single-select field —
   ≈3 KB total. Group locally by Status for column counts; filter the same
   `labels` array for `loop:in-{builder,tester,reviewer}` to identify
@@ -379,7 +379,7 @@ the script is missing.
   match the leading emoji against §I. Cache results during the snapshot — do
   not re-read mid-render.
 - **Recent events:** tail the most recent run manifest at
-  `docs/super-board/runs/<YYYY-MM-DD>-<slug>.md`. Filter to state-transition
+  `docs/drover/runs/<YYYY-MM-DD>-<slug>.md`. Filter to state-transition
   lines (§G); skip `tick —` lines. Take the last 5 after filtering.
 - **Health:**
   - `Last tick` — most recent `tick —` line in today's manifest.
@@ -407,7 +407,7 @@ Same rules as §4 config discovery:
 
 ## Read-only contract — enforced on both rendering paths
 
-When `super-board-status.py` runs, this contract is enforced by inspection:
+When `drover-status.py` runs, this contract is enforced by inspection:
 the script issues no `gh` mutations (see the `grep` verification command in
 the Fast-path block above). When the model-render fallback executes instead,
 the model MUST confirm before printing the snapshot that no `gh` invocation

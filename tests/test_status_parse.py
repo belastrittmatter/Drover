@@ -1,10 +1,10 @@
-"""Tests for super-board-status.py's manifest parser.
+"""Tests for drover-status.py's manifest parser.
 
 Pure stdlib. No pytest dependency, no `gh` auth, no network — runs anywhere
 Python 3.10+ runs (matches the CI matrix in `.github/workflows/cross-platform.yml`).
 
 Why these tests exist: the renderer's regexes are the contract between this
-script and `scripts/super-board-run.sh`. When the dispatcher's log format
+script and `scripts/drover-run.sh`. When the dispatcher's log format
 diverges from the parser's expectations, the Workers / Recent / Health
 sections silently empty out — which is exactly what happened before these
 tests existed (cf. the `attempt=` / `reaped worktree` calibration bugs).
@@ -24,7 +24,7 @@ from pathlib import Path
 
 # The script has a hyphen in its filename, so import via spec_from_file_location.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_SCRIPT = _REPO_ROOT / "scripts" / "super-board-status.py"
+_SCRIPT = _REPO_ROOT / "scripts" / "drover-status.py"
 _spec = importlib.util.spec_from_file_location("super_board_status", _SCRIPT)
 assert _spec is not None and _spec.loader is not None
 sbs = importlib.util.module_from_spec(_spec)

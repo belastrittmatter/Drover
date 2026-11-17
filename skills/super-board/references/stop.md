@@ -1,6 +1,6 @@
 # super-board stop — full contract
 
-**Where it runs:** interactive orchestrator. Spawns the headless `scripts/super-board-stop.sh` synchronously, reports the summary, exits. No background processes.
+**Where it runs:** interactive orchestrator. Spawns the headless `scripts/drover-stop.sh` synchronously, reports the summary, exits. No background processes.
 
 ## What stop does — the one-line version
 
@@ -31,7 +31,7 @@ Nothing else. Stop is intentionally tolerant — its job is to bring the system 
 ## What stop reads
 
 - `.claude/super-board/inflight/<issue-N>` — one file per in-flight worker. New (v1.3.0+) format: `PID=…\nLANE=…\nSTARTED=…`. Legacy single-line PID format is also supported.
-- `pgrep -f 'super-board-run\.sh'` — dispatcher PID(s).
+- `pgrep -f 'drover-run\.sh'` — dispatcher PID(s).
 - `pgrep -f 'claude -p .*super-board'` — orphan worker scan (workers without a lock file, e.g. from a crashed dispatcher).
 
 ## Per-worker wrap-up (run for each in-flight lock)
@@ -52,7 +52,7 @@ Nothing else. Stop is intentionally tolerant — its job is to bring the system 
 ## After the per-worker loop
 
 6. **Sweep orphan workers** — `pgrep -f 'claude -p .*super-board'` catches any `claude -p` worker that wasn't in `inflight/` (defensive against crashed dispatchers).
-7. **Kill the dispatcher loop** — `pgrep -f 'super-board-run\.sh'`, SIGTERM → 1s → SIGKILL.
+7. **Kill the dispatcher loop** — `pgrep -f 'drover-run\.sh'`, SIGTERM → 1s → SIGKILL.
 8. **Clear in-flight locks** — `rm -f .claude/super-board/inflight/*`. The PIDs they reference are dead now.
 9. **Print summary** — workers stopped, dispatchers stopped, resume command.
 
@@ -94,7 +94,7 @@ Resume cost: **one lane cycle per previously-in-flight card** (Builder ~5min, Te
 Per the cardinal orchestrator/worker rule:
 
 1. Verify `.claude/super-board/active` exists OR a slug was provided.
-2. Run `scripts/super-board-stop.sh <slug>` synchronously (it's fast — seconds, not minutes).
+2. Run `scripts/drover-stop.sh <slug>` synchronously (it's fast — seconds, not minutes).
 3. Pass through the script's summary to the user.
 4. **Do not** retry kills, do not chase down zombies the script missed, do not "while you're at it" clean up worktrees or branches. If the script reported failures, surface them and wait for explicit user direction.
 
@@ -105,7 +105,7 @@ Per the cardinal orchestrator/worker rule:
 | `gh issue comment` fails | gh auth expired or network blip | Comments are best-effort. The kill + lock cleanup still happens. Manually note the stop in the issue later if needed. |
 | Assignee release fails (gh 403) | rate limit or auth | The next `super-board run` startup runs `reap_finished_locks` which sweeps stale assignees idempotently. No manual action needed. |
 | Worker PID survives SIGKILL | extremely rare (kernel-level stuck process) | `ps aux \| grep claude -p` to confirm, then escalate via OS tools. |
-| Stop reports "nothing to stop" but `ps` shows live workers | dispatcher and workers were started by a different repo / different inflight dir | Run stop in the right repo OR `pkill -f 'super-board-run\.sh'` manually + `pkill -f 'claude -p .*super-board'`. |
+| Stop reports "nothing to stop" but `ps` shows live workers | dispatcher and workers were started by a different repo / different inflight dir | Run stop in the right repo OR `pkill -f 'drover-run\.sh'` manually + `pkill -f 'claude -p .*super-board'`. |
 
 ## Lock file format (v1.3.0+)
 

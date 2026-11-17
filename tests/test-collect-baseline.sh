@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Baseline regression suite for super-collect-file.sh, driven by the ticket fixtures in
+# Baseline regression suite for drover-collect-file.sh, driven by the ticket fixtures in
 # tests/fixtures/collect/tickets/. Pins today's behaviour of: fingerprint dedupe (open hit →
 # "Seen again" comment, closed-only → recurrence ticket), ticket-format rejection, the
 # no-holding-column refusal (exit 65), and the PostHog tracking-gap ticket shape.
@@ -14,7 +14,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SCRIPT="$REPO_ROOT/skills/super-collect/scripts/super-collect-file.sh"
+SCRIPT="$REPO_ROOT/skills/super-collect/scripts/drover-collect-file.sh"
 TICKETS="$REPO_ROOT/tests/fixtures/collect/tickets"
 WORK="$(mktemp -d)"
 export SB_GITHUB_RETRY_DELAY=0 SB_GITHUB_HALT_FILE="$WORK/halt.json"
@@ -179,10 +179,10 @@ is  "Sentry 441 is not a duplicate of Sentry 4411" \
 
 echo "── SKILL.md setup step 3: source the gh guard, then sb_gh_guard_check"
 if command -v zsh >/dev/null; then
-  RC=0; (cd "$WORK" && zsh -c "source '$REPO_ROOT/scripts/super-board-gh-guard.sh'; sb_gh_halt_check" >/dev/null 2>&1) || RC=$?
+  RC=0; (cd "$WORK" && zsh -c "source '$REPO_ROOT/scripts/drover-gh-guard.sh'; sb_gh_halt_check" >/dev/null 2>&1) || RC=$?
   is "gh guard works when sourced from zsh" 0 "$RC"
 fi
-RC=0; (cd "$WORK" && bash -c "source '$REPO_ROOT/scripts/super-board-gh-guard.sh'; sb_gh_halt_check" >/dev/null 2>&1) || RC=$?
+RC=0; (cd "$WORK" && bash -c "source '$REPO_ROOT/scripts/drover-gh-guard.sh'; sb_gh_halt_check" >/dev/null 2>&1) || RC=$?
 is "gh guard works when sourced from bash" 0 "$RC"
 
 echo
