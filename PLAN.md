@@ -48,8 +48,7 @@ FR-BRD-3 (stage 6).
 ## Stage 1: audit (done)
 
 Result in `docs/audit.md`. Remove list signed off 2026-11-17 (section 14),
-except `docs/blocked-column-audit.html` and `.claude/settings.json`, which
-stay. Spec follow-ups: FR-BRD-5/7/8 ports (stage 6), FR-RUN-5 is new for
+except `docs/blocked-column-audit.html`, which stays. Spec follow-ups: FR-BRD-5/7/8 ports (stage 6), FR-RUN-5 is new for
 the runner, FR-HRN-4 coverage test, `calibration` key dropped.
 
 
@@ -80,8 +79,6 @@ Exit: every file has a verdict; you sign off on the remove list.
 
 - Delete what `docs/audit.md` section 14 lists, plus its tests; move
   `diagrams/skill-map.json` to `tests/fixtures/` and repoint its 3 tests.
-- `.claude/settings.json` stays: remove its two hook entries (readme-sync,
-  gate-skill-evals), whose scripts are deleted.
 - Drop the `calibration` key from `config-schema.json` and its readers.
 - Do not delete the `workflow` / Codex backends yet (stage 6 ports them first).
 - Grep each deleted path; fix every caller in scripts, skills, `install.sh`,

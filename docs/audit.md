@@ -391,6 +391,7 @@ Deleted in stage 2. All paths exist at the fork point.
 | `.github/workflows/pages.yml` | 1 | 69 | |
 | `.github/workflows/release.yml` | 1 | 35 | |
 | `.github/scripts/publish-release.sh` | 1 | 22 | |
+| `.claude/settings.json` | 1 | 27 | |
 | `tests/test-agents-md.sh` | 1 | 82 | |
 | `tests/test-get.sh` | 1 | 122 | |
 | `tests/test-readme-sync.sh` | 1 | 96 | |
@@ -410,11 +411,8 @@ Not on this list, deleted in stage 6 (`remove@6` and `port-then-remove`):
 
 Rejected: `scripts/super-board-approval.py` (keep, section 3).
 
-Signed off 2026-11-17, except `docs/blocked-column-audit.html` and
-`.claude/settings.json`: the owner keeps both, so the total is 147 entries
-(145 regular files), 44,791 lines. `.claude/settings.json` runs
-`readme-sync.py` and `gate-skill-evals.py`, both removed: stage 2 removes
-those two hook entries, or the Stop hook fails on the missing file.
+Signed off 2026-11-17, except `docs/blocked-column-audit.html`, which the
+owner keeps: the total is 148 entries (146 regular files), 44,818 lines.
 
 ## 15. Findings that contradict or are missing from the spec
 
