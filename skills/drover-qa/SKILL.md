@@ -37,7 +37,7 @@ The bootstrap is **non-interactive**. If the curl returns an existing-user error
 
 ## QA loop state board — GitHub Project as the state store
 
-State for the QA↔Build loop lives in a GitHub Project named **`Super Ultimate QA`** (auto-discovered by title at the user/org level). It has six Status columns:
+State for the QA↔Build loop lives in a GitHub Project named **`drover QA`** (auto-discovered by title at the user/org level). It has six Status columns:
 
 | Column   | Meaning                                              |
 |----------|------------------------------------------------------|
@@ -55,7 +55,7 @@ This board is the durable, machine-readable state for the loop. `docs/drover-qa/
 Resolution order (used by `scripts/drover-qa-file-bug.sh` and the orchestrator):
 
 1. If `DROVER_QA_PROJECT_TITLE` is set, query `gh project list --owner $DROVER_QA_PROJECT_OWNER --format json` and pick the project whose title matches (case-insensitive).
-2. Otherwise default to title `Super Ultimate QA`.
+2. Otherwise default to title `drover QA`.
 3. Owner defaults to `$(gh repo view --json owner -q .owner.login)` or `DROVER_QA_PROJECT_OWNER` if set.
 
 If no matching project exists, the loop halts with a one-line error and instructs the operator to create one. Do not silently fall back to the repo's primary project — column semantics differ.
@@ -65,7 +65,7 @@ If no matching project exists, the loop halts with a one-line error and instruct
 When the worker finds a red spec, it calls `scripts/drover-qa-file-bug.sh`. The script:
 
 - Creates the issue with `source:qa` label and full evidence body.
-- Adds the issue to the resolved **Super Ultimate QA** project.
+- Adds the issue to the resolved **drover QA** project.
 - Sets the Status field to `Bug` (override with `DROVER_QA_TARGET_OPTION_NAME`).
 
 A `Flaky` retry-only finding goes to `Flaky`; out-of-scope routes go to `Skip`. The same issue may also live on a repo-level project for normal triage — Status on the QA project is the loop state; status elsewhere is independent.
@@ -180,7 +180,7 @@ Examples:
 - QA category when relevant: `qa:functional`, `qa:visual`, `qa:network`, `qa:console`, `qa:i18n`, `qa:a11y`, `qa:data`, `qa:testability`.
 - Suggested skill owner when helpful: `skill:drover-build`, `skill:drover-qa`, `skill:ui-refine-loop`, or `skill:drover-review`. `skill:ui-refine-loop` marks a UI ticket for a human to run `/ui-refine-loop` on; the board never triggers it.
 
-The script adds the issue to the resolved `Super Ultimate QA` project and moves it into the `Bug` column (override with `DROVER_QA_TARGET_OPTION_NAME`) so a human (or `/drover-build` with `BUILD_LOOP_SOURCE_COLUMN=Bug`) can pick it up immediately. The repo's standalone feature project is not touched by this flow.
+The script adds the issue to the resolved `drover QA` project and moves it into the `Bug` column (override with `DROVER_QA_TARGET_OPTION_NAME`) so a human (or `/drover-build` with `BUILD_LOOP_SOURCE_COLUMN=Bug`) can pick it up immediately. The repo's standalone feature project is not touched by this flow.
 
 The `iteration-N.md` Section 3 is the per-iter audit (with `gh_issue: <N>` back-references); the GH issue is the durable tracker. The fix-commit message includes `(closes #<N>)` so the issue auto-closes on merge.
 
@@ -557,7 +557,7 @@ The worker (per `references/iteration-preamble.md`) must load and follow:
 
 ## Coexistence with `/drover-build`
 
-`drover-qa-file-bug.sh` files bugs into the **Super Ultimate QA** project's `Bug` column. This is a separate board from `/drover-build`'s standalone feature queue (`BUILD_LOOP_PROJECT`), so the two skills can run concurrently without column races:
+`drover-qa-file-bug.sh` files bugs into the **drover QA** project's `Bug` column. This is a separate board from `/drover-build`'s standalone feature queue (`BUILD_LOOP_PROJECT`), so the two skills can run concurrently without column races:
 
 - **Standalone `/drover-build`** keeps reading `Ready` from its configured feature project. Untouched by `/drover-qa`.
 - **`Bug` cards reach a builder** when someone moves them to `Ready`, or when `/drover-build` runs with `BUILD_LOOP_SOURCE_COLUMN=Bug` against this board. Builds go to `QA` as PRs; nothing moves to `Done` without the Reviewer's merge gate.

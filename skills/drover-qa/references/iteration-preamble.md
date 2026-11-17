@@ -585,7 +585,7 @@ items that match these rules — and **only** these:
 ### Filing bugs to GitHub (mandatory for every `[b]` cell + every regression red)
 
 Bugs are tracked in **GitHub Issues, in the `Bug` column of the resolved
-**Super Ultimate QA** project** (override the column with
+**drover QA** project** (override the column with
 `DROVER_QA_TARGET_OPTION_NAME`),
 not in markdown files. The `iteration-N.md` bug section is the per-iter audit
 trail; the GH issue is the persistent tracker that you, the human, and any
@@ -640,7 +640,7 @@ detection (do NOT batch at end of iter):
    The issue title will be board-readable, for example `🐛 [bug] imports: CSV upload fails after submit`, and the labels will include `bug`, `source:qa`, `priority:<high|medium|low>`, optional `area:<area>`, optional `qa:<category>`, and optional `skill:<owner>`. The script validates required body sections and dedupes by fingerprint: if the same open `source:qa` issue already exists, it comments with the new evidence and returns the existing issue number instead of creating a duplicate card.
 
    The script prints the new issue number on stdout and drops the issue card
-   in the `Bug` column of the resolved **Super Ultimate QA** project (see
+   in the `Bug` column of the resolved **drover QA** project (see
    `../SKILL.md` → "Project resolution"). Capture `$ISSUE_N` and reference it
    everywhere downstream:
    - In `queue.md` line: `[b] /foo → BUG-N.M → #${ISSUE_N} (iter:N)`

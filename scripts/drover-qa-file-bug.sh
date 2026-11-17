@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # drover-qa-file-bug.sh — file one Drover QA finding as a GitHub issue on the
-# Super Ultimate QA project board.
+# drover QA project board.
 #
 # The QA loop runs unattended, so this is the carved exception to "ask before
 # `gh issue create`" — every issue it files carries the `source:qa` label so a
@@ -28,7 +28,7 @@
 #
 # Project resolution (per drover-qa/SKILL.md → "Project resolution"):
 #   owner  $DROVER_QA_PROJECT_OWNER, else the current repo's owner
-#   title  $DROVER_QA_PROJECT_TITLE, else "Super Ultimate QA"
+#   title  $DROVER_QA_PROJECT_TITLE, else "drover QA"
 # Never falls back to the repo's primary project — column semantics differ.
 #
 # Column: "Bug", override with $DROVER_QA_TARGET_OPTION_NAME.
@@ -152,7 +152,7 @@ OWNER="${DROVER_QA_PROJECT_OWNER:-}"
 if [ -z "$OWNER" ]; then
   OWNER=$(python3 "$GITHUB_READ" --kind scalar -- repo view --json owner -q .owner.login) || exit $?
 fi
-PROJECT_TITLE="${DROVER_QA_PROJECT_TITLE:-Super Ultimate QA}"
+PROJECT_TITLE="${DROVER_QA_PROJECT_TITLE:-drover QA}"
 TARGET_COLUMN="${DROVER_QA_TARGET_OPTION_NAME:-Bug}"
 
 PROJECT_LIST=$(python3 "$GITHUB_READ" --kind projects -- project list --owner "$OWNER" --format json) || exit $?

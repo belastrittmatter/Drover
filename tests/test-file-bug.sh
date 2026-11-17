@@ -106,7 +106,7 @@ case "$1 ${2:-}" in
   "label create")  exit 0 ;;
   "project list")
     P=""
-    for t in ${PROJECTS:-Super_Ultimate_QA}; do
+    for t in ${PROJECTS:-drover_QA}; do
       P="${P}{\"number\":9,\"title\":\"$(echo "$t" | tr '_' ' ')\"},"
     done
     echo "{\"projects\":[${P%,}]}" ;;
