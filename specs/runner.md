@@ -16,8 +16,12 @@ Part of the [drover spec](README.md).
 | FR-RUN-11 | `run` after a stop continues existing branches and PRs | `references/run.md` builder step 2 | none (add in stage 0) |
 | FR-RUN-12 | After `rebuild_cap` (default 2) bounces a card goes to Blocked `[blocked:rebuild-cap]` | `references/run.md` reviewer step 7 | none |
 
-FR-RUN-5 lives in the `workflow` backend today; stage 6 moves
-them into the runner. Behaviour stays the same.
+FR-RUN-5's batch before any claim exists only in the `workflow` backend
+(`workflows/super-board-wave.js:206-284`). Upstream's `claude-p` runner
+has the builder run pre-flight itself, one card at a time, after the claim
+(`references/run.md` "Builder pre-flight"). Stage 6 moves the batch into
+the runner; for the runner this is new behaviour, with `workflow` as the
+reference.
 
 ## New or changed
 

@@ -58,7 +58,8 @@ default (`project`, `base_branch`, `verify_commands`, `model_tier`,
 `merge_policy`, `migrations`, `rebuild_cap`, `usage_pause_pct`,
 `max_dispatches`, `no_progress_cycles`, `block_rate_alert_pct`, `target`,
 `collect`, `refine`, `notifications`, `columns`, `human_approves_merge`,
-`timezone`, `description`, `version`, `calibration` until the audit decides).
+`timezone`, `description`, `version`). `calibration` is removed (stage 1
+audit: it only fed an outside skill drover does not ship).
 
 | Key | Change |
 |---|---|
@@ -85,7 +86,9 @@ default (`project`, `base_branch`, `verify_commands`, `model_tier`,
   worker needs (commands, tools, paths), and drover shall pass them at
   start. A worker shall never wait on an approval prompt; any command a
   role's rules tell it to run shall be covered. (Stage 0: upstream's first
-  worker command needed approval, so every headless worker quit.)
+  worker command needed approval, so every headless worker quit. Upstream's
+  `test_run_allowlist.py` never read the runner's worker prompt; drover's
+  coverage test shall read the worker prompt and every role rules file.)
 - **FR-HRN-3** v1 shall ship `claude` only. Codex, OpenCode and
   Antigravity are deferred; each needs its headless command, skill folders,
   hook install and permission enforcement confirmed first (upstream notes

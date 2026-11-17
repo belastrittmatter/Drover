@@ -66,7 +66,7 @@ It is super-board cut down and made harness-independent:
 | Topic | Decision | Rejected alternative |
 |---|---|---|
 | Worker backend | Headless worker command per harness (`claude -p` first); hc is an opt-in add-on with fallback | Upstream `workflow` backend (in-session, not watchable); hc-only |
-| Upstream backends | Drop `workflow` and Codex scripts after porting pre-flight, classifier and usage pause into the runner | Keep three backends |
+| Upstream backends | Drop `workflow` and Codex scripts after porting pre-flight, classifier, usage pause, the Blocked sweep (FR-BRD-5), the open-blocker filter (FR-BRD-7) and approval resume (FR-BRD-8) into the runner | Keep three backends |
 | State | GitHub Project board; no state abstraction until a second store exists | Labels only; local SQLite |
 | Concurrency | `max_workers` per role, default 1 | Fixed 1 per role |
 | Structure | `drover` CLI on PATH; skills installed per harness; project holds `.drover/config.json` only | Copy scripts into each project |
@@ -80,7 +80,7 @@ It is super-board cut down and made harness-independent:
 | QA crawl mode | Own branch and PR per iteration, through the gate | Direct commits to the active branch |
 | Test locking | Deferred; revisit when FR-REV-12 shows builders editing QA tests | Hook + gate exit 10 |
 | Hidden checks | Deferred; needs storage that keeps FR-BRD-1 | Local hidden tests per card |
-| Cross-PR knowledge | Deferred; audit upstream's calibration feature first | `.drover/knowledge.md` of recurring findings |
+| Cross-PR knowledge | Deferred; upstream's calibration has nothing to reuse (stage 1 audit), so it starts fresh | `.drover/knowledge.md` of recurring findings |
 | Stack presets | Deferred | ios / web-ts / python / rust presets at onboard |
 | Harnesses | Claude only in v1 (config.md FR-HRN-3) | Codex, OpenCode, Antigravity in v1 |
 | Skills | Keep all upstream skills; remove one only for an observed reason | Remove by audit verdict up front |
@@ -157,7 +157,8 @@ New or changed:
 - **NFR-7 Testability.** Every external command (`gh`, remote `git`, harness
   CLIs, `hc`, `herdr-app`) shall be replaceable by a fake on `PATH`.
 - **NFR-8 Footprint.** v1 shall have fewer files and fewer lines than the
-  fork point (356 files).
+  fork point (356 regular files, 88,434 lines; `git ls-tree` shows 358
+  entries, 2 of them symlinks).
 
 ## 6. Boundaries for agents working on drover
 
@@ -210,7 +211,7 @@ New or changed:
 | 4 conventions | conventions.md FR-CNV, board.md FR-BRD-6 |
 | 5 CLI + harness | config.md (incl. FR-HRN-4) |
 | 0 baseline | also metrics.md FR-MET-1 |
-| 6 runner | runner.md FR-RUN-2, 7, 8, 13, FR-WRK-1/2/6/8/10; board.md FR-BRD-3; metrics.md FR-MET |
+| 6 runner | runner.md FR-RUN-2, 5, 7, 8, 13, FR-WRK-1/2/6/8/10; board.md FR-BRD-3, 5, 7, 8; metrics.md FR-MET |
 | 7 reviewer | roles.md FR-REV-1, 3, 6, 8-12, FR-BLD-7, FR-CTX; gate.md FR-MRG-4 |
 | 8 evidence | conventions.md FR-EVD |
 | 9 hc add-on | runner.md FR-WRK-3/4/5/7, board.md FR-STS-2 |
