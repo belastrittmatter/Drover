@@ -35,7 +35,7 @@ In Codex the skill is not a slash command: it is `$drover <verb>`, found in `.ag
 | `drover run ...` with config `worker_backend: "claude-p"` (legacy, explicit opt-in) | `references/run.md` |
 | `drover stop ...` / "stop the run" / "pause the loop" / "kill drover" | `references/stop.md` |
 | "resume" / "pick up where I left off" / "restart after stop" | `references/stop.md` (resume = run; no separate verb) |
-| Anything about Blocked exits, 🙋 needs you, or dropping a card | `references/block-template.md` |
+| Anything about Blocked exits, reason tags, `[needs-you]`, or dropping a card | `references/block-template.md` |
 | Config structure questions | `references/config-schema.json` |
 | Worker gh-call discipline / rate-limit recovery | `references/rate-limit-etiquette.md` (+ `scripts/drover-gh-guard.sh`) |
 

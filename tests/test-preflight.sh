@@ -74,7 +74,7 @@ get 22 '.blockedBy == [50] and .conflictWith == [41]' || fail "#22 must sit behi
 #     back for a rebuild, not a duplicate of itself.
 get 23 '.verdict == "proceed" and .tag == "clean"' || fail "#23 is clean (own PR ignored): $(echo "$OUT" | jq -c '.["23"]')"
 
-# 5 — no acceptance criteria → hold as unclear (❓), never built on a guess.
+# 5 — no acceptance criteria → hold as unclear ([blocked:unclear]), never built on a guess.
 get 24 '.verdict == "hold" and .tag == "unclear"' || fail "#24 has no ACs: $(echo "$OUT" | jq -c '.["24"]')"
 
 # 6 — a merged PR with the same fingerprint is "already done" even with a

@@ -9,12 +9,12 @@ Tears down an in-flight `drover run` cleanly: posts a "stopped here" comment on 
 ## Intro shown when stop runs
 
 ```
-🛑 drover stop
+drover stop
 ─────────────────────────────────────────────────────────
 Purpose: terminate the in-flight run and wrap up context
          so the next `drover run` resumes cleanly.
 
-Progress: ✅ onboard  →  ✅ run  →  🛑 stop (you are here)
+Progress: [done] onboard  →  [done] run  →  stop (you are here)
 ─────────────────────────────────────────────────────────
 ```
 
@@ -40,10 +40,10 @@ Nothing else. Stop is intentionally tolerant — its job is to bring the system 
    - `git branch -a --list "*issue-<N>-*"` → latest commit on the issue branch.
    - `gh pr list --search "head:issue-<N>-*"` → PR number, if any.
 2. **Post the stop comment** on the issue AND (if it exists) the PR, in the comment format of
-   writing-standard.md § 4 — header `[orchestrator] [report] 🛑 stopped · <lane> lane`, then:
+   writing-standard.md § 4 — header `[orchestrator] [report] stopped · <lane> lane`, then:
    - Did: worker PID and timestamp.
-   - ✅ Done: last commit on the branch (a recovery point; inspect the preserved worktree for later edits).
-   - ❌ Not done: interrupted work may be uncommitted.
+   - Done: last commit on the branch (a recovery point; inspect the preserved worktree for later edits).
+   - Not done: interrupted work may be uncommitted.
    - Next: `drover run <slug>`.
 3. **Release the assignee mutex** on the issue (`gh issue edit --remove-assignee <bot>`).
 4. **Remove descriptive labels** (`loop:in-build`, `loop:in-qa`, `loop:in-review`) — best-effort.

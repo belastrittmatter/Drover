@@ -161,6 +161,16 @@ def test_no_old_commit_shapes_in_templates():
             assert not old.search(line), f"old commit shape at {p.relative_to(ROOT)}:{n}: {line.strip()}"
 
 
+def test_owner_word():
+    """FR-CNV-7: the person who must act is `owner`, never a name."""
+    assert "| Next | `builder` · `qa` · `reviewer` · `owner` · `none` |" in STANDARD
+    name = re.compile(r"\bEric\b(?! Tech)")
+    for p in list((ROOT / "skills").rglob("*.md")) + list((ROOT / "workflows").glob("*.js")) + list((ROOT / "scripts").glob("*")):
+        if p.is_file():
+            for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+                assert not name.search(line), f"names a person at {p.relative_to(ROOT)}:{n}: {line.strip()}"
+
+
 # ── ticket ───────────────────────────────────────────────────────────────────
 
 def headings(text: str) -> list[str]:

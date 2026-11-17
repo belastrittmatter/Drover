@@ -305,12 +305,12 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
 4. **Commit + push + open PR:**
    ```bash
    git add -p   # stage only fix-relevant hunks
-   git commit -m "🐛 [fix] <area>: <one-line bug summary>" -m "- <what changed>
+   git commit -m "<fix subject in commit_style, e.g. fix(<area>): <one-line bug summary>>" -m "- <what changed>
    - <spec that proves it>
    Refs #${ISSUE_N}"
    git push -u origin HEAD
    gh pr create \
-     --title "🐛 [fix] <area>: <one-line bug summary>" \
+     --title "<the same subject>" \
      --label drover-qa \
      --label "$([[ "$SIGNAL" = "objective" ]] && echo auto-merge-candidate || echo needs-human-review)" \
      --body-file /tmp/drover-qa-pr-body-${N}-${slug}.md
@@ -320,8 +320,8 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
    (`.claude/bin/drover-pr-body.sh --skeleton`): status card with
    `Closes #${ISSUE_N}`, Problem (the failing assertion / signal type, lettered
    steps, screenshot), Solution (plain bullets), Acceptance criteria with proof
-   lines, Iteration history, Risk (🟢/🟡/🔴 + Door + Blast radius — subjective
-   signals are never 🟢).
+   lines, Iteration history, Risk (**Low**/**Medium**/**High** + Door + Blast radius — subjective
+   signals are never Low).
    Forensics excerpts go in the proof lines, not as file lists.
    After opening the PR and after each later push, follow
    `.claude/skills/drover/references/pr-author-notes.md`: one file-level review
@@ -412,7 +412,7 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
 
    **If `docs/SPEC.md` has no section matching this route:**
    - Log `MISSING-SPEC: <route>` to `iteration-N.md` Section 1.
-   - File a low-priority docs issue with title `📝 QA docs <route> — Missing SPEC section` and labels `docs`, `source:qa`, `priority:low`, `qa:docs`, and `area:<area>`.
+   - File a low-priority docs issue with `--kind docs`, bare title `SPEC section missing for <route>` and labels `docs`, `source:qa`, `priority:low`, `qa:docs`, and `area:<area>`.
    - Write a render-only smoke spec for now (TC-1 only). Continue.
 
    **If iter 1 (read-only smoke):** TC-1 only — read requirements but do
@@ -470,7 +470,7 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
      it as a low-risk change.
    - If you can't add the testid (e.g., it's in a 3rd-party component),
      file a low-priority tests issue with labels `tests`, `source:qa`, `priority:low`, and `qa:testability`:
-     title `🧪 QA tests <route> — Add data-testid to <element-description>`.
+     `--kind tests`, bare title `add data-testid to <element-description> on <route>`.
      Use `getByRole` for now and reference the issue in a `// TODO` next
      to the brittle selector.
 
@@ -616,7 +616,7 @@ detection (do NOT batch at end of iter):
    - `## Fix` — first-suspect `file:line` and the intended change in 1–3 lines.
    - `## Acceptance Criteria` — `- [ ]` checklist: user-visible fix + regression
      coverage + Drover QA rerun.
-   - `## Risk` — 🟢/🟡/🔴 + one line.
+   - `## Risk` — **Low** / **Medium** / **High** + one line.
    The owner goes in `--suggested-skill` (`drover-build` for implementation,
    `ui-refine-loop` for a UI ticket a human runs, `drover-qa` for harness/test-only,
    `drover-review` for release-readiness), the dedupe key in `--fingerprint`
@@ -637,7 +637,7 @@ detection (do NOT batch at end of iter):
      --fingerprint "<slug>|<tc>|<failure-signature>" \
      --suggested-skill drover-build)
    ```
-   The issue title will be board-readable, for example `🐛 [bug] imports: CSV upload fails after submit`, and the labels will include `bug`, `source:qa`, `priority:<high|medium|low>`, optional `area:<area>`, optional `qa:<category>`, and optional `skill:<owner>`. The script validates required body sections and dedupes by fingerprint: if the same open `source:qa` issue already exists, it comments with the new evidence and returns the existing issue number instead of creating a duplicate card.
+   The issue title will be board-readable, for example `[bug] imports: CSV upload fails after submit`, and the labels will include `bug`, `source:qa`, `priority:<high|medium|low>`, optional `area:<area>`, optional `qa:<category>`, and optional `skill:<owner>`. The script validates required body sections and dedupes by fingerprint: if the same open `source:qa` issue already exists, it comments with the new evidence and returns the existing issue number instead of creating a duplicate card.
 
    The script prints the new issue number on stdout and drops the issue card
    in the `Bug` column of the resolved **drover QA** project (see
@@ -645,7 +645,7 @@ detection (do NOT batch at end of iter):
    everywhere downstream:
    - In `queue.md` line: `[b] /foo → BUG-N.M → #${ISSUE_N} (iter:N)`
    - In `iteration-N.md` Section 3 YAML: `gh_issue: ${ISSUE_N}`
-   - In any fix commit: `🐛 [fix] <area>: …` with `Closes #${ISSUE_N}` in the body
+   - In any fix commit: a subject in `commit_style` (e.g. `fix(<area>): …`) with `Closes #${ISSUE_N}` in the body
 
 3. **If the script exits non-zero:**
    - Exit 64/66/70: bad arguments — log a `loop-internal` failure to

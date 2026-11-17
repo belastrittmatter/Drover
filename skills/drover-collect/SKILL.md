@@ -69,7 +69,7 @@ Scripts live in `.claude/skills/drover-collect/scripts/` (`S=` below). Every fet
 
 ### custom sources
 
-Added in onboard's "➕ Add another source" (`drover onboard` → 📥 Bug sources): the user types a
+Added in onboard's "Add another source" (`drover onboard` → Bug sources): the user types a
 link, an app name, an API URL, an MCP server or a command; `collect_custom.py classify` decides
 which, `ping` proves it can be read (read-only) and `add` saves `{name, kind, target, auth_env?,
 map?}` to this project's config and its `name` to `collect.sources`. Here they run like any other
@@ -205,7 +205,7 @@ $S/drover-collect-file.sh --config <cfg> --adopt <n> --type <t> [--yes]
 
 - `bug`, `feature`, `fix` → `drover-qa-file-bug.sh` (`fix` files as `tech-debt`); `refactor` →
   `drover-review-file-refactor.sh`. `--title` is the bare problem: the filers add the
-  `<emoji> [<kind>] <scope>:` prefix, so never pass one (`🐛 [bug] …` would appear twice). Every body uses the ticket format in
+  `[<kind>] <scope>:` prefix, so never pass one (`[bug] …` would appear twice). Every body uses the ticket format in
   `.claude/skills/drover/references/writing-standard.md` § 3: Problem · Context (lettered
   steps under Where) · Fix · Acceptance Criteria (checklist) · Risk; bugs add the folded 12-row
   Evidence table (a missing row says `n/a — why`), fixes add an Evidence section. Evidence is

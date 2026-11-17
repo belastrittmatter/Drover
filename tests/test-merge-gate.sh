@@ -188,9 +188,9 @@ teardown
 # 9b — the squash message: --subject and --body-file reach `gh pr merge` (writing standard).
 head_setup
 printf -- '- 413 shows the size message\nCloses #1\n' > "$TMP/msg.md"
-RC=0; STUB_OID="$SHA" gate --expect-head "$SHA" --subject "🐛 [fix] receipts: show a size error" --body-file "$TMP/msg.md" >/dev/null 2>&1 || RC=$?
+RC=0; STUB_OID="$SHA" gate --expect-head "$SHA" --subject "fix(receipts): show a size error" --body-file "$TMP/msg.md" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 0 ] || fail "a merge with a subject should exit 0, got $RC"
-grep -q -- "--subject 🐛 \[fix\] receipts: show a size error" "$GH_LOG" || fail "merge must pass --subject, got: $(cat "$GH_LOG")"
+grep -q -- "--subject fix(receipts): show a size error" "$GH_LOG" || fail "merge must pass --subject, got: $(cat "$GH_LOG")"
 grep -q -- "--body-file $TMP/msg.md" "$GH_LOG" || fail "merge must pass --body-file, got: $(cat "$GH_LOG")"
 RC=0; STUB_OID="$SHA" gate --expect-head "$SHA" --body-file /nope.md >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 66 ] || fail "an unreadable --body-file should exit 66, got $RC"
@@ -453,7 +453,7 @@ RC=0; STUB_OID="$SHA" STUB_META="$(meta "" supabase/migrations/001_add.sql)" gat
 [ -f "$TMP/ran-test" ] && [ -f "$TMP/ran-staging" ] || fail "both allowed migrate commands should have run"
 teardown
 
-# 19 — the target env is NOT allowed (live): 🙋 exit 8 with the exact command,
+# 19 — the target env is NOT allowed (live): [needs-you] exit 8 with the exact command,
 #      no merge. The allowed env still ran, so the human has one step left.
 head_setup
 cfgset ".migrations = {allowed_envs: [\"staging\"], target_env: \"live\",
@@ -494,7 +494,7 @@ teardown
 head_setup
 RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts '<!-- sb:status -->
 > [!WARNING]
-> 🛑 Blocked · needs you · Closes #7 · head `3f9c2a1`
+> Blocked · needs owner · Closes #7 · head `3f9c2a1`
 > needs-you: `npm run backfill -- --env live`
 <!-- /sb:status -->
 

@@ -35,7 +35,7 @@ export PATH="$WORK:$PATH" GH_LOG="$WORK/gh.log" BODY="$WORK/body.md" HEAD_OID="3
 cat > "$BODY" <<'MD'
 <!-- sb:status -->
 > [!NOTE]
-> ⏳ In QA · ✅ 0/2 AC · Closes #7 · head `3f9c2a1`
+> In QA · 0/2 AC · Closes #7 · head `3f9c2a1`
 <!-- /sb:status -->
 
 <!-- sb:problem -->
@@ -47,19 +47,19 @@ cat > "$BODY" <<'MD'
 ## Iteration history
 | Lane | Done | Time | Details |
 |---|---|---|---|
-| 🔨 builder | ✅ | Oct 2, 10:02 EDT | draft |
+| builder | pass | Oct 2, 10:02 EDT | draft |
 <!-- /sb:history -->
 MD
 
-printf '> [!TIP]\n> ✅ Merged · `9c41e07`\n' > "$WORK/status.md"
-printf '## Risk\n🟢 **Low** · one constant.\n' > "$WORK/risk.md"
-printf '| 🔍 qa | ✅ v1 | Oct 2, 11:55 EDT | runs/issue-7-qa-v1/ |\n' > "$WORK/row.md"
+printf '> [!TIP]\n> Merged · `9c41e07`\n' > "$WORK/status.md"
+printf '## Risk\n**Low** · one constant.\n' > "$WORK/risk.md"
+printf '| qa | pass v1 | Oct 2, 11:55 EDT | runs/issue-7-qa-v1/ |\n' > "$WORK/row.md"
 
 run() { : > "$GH_LOG"; "$SCRIPT" "$@" 2>"$WORK/err"; }
 
 echo "── replace one block, keep the rest"
 is  "replace reports updated" "updated" "$(run --pr 7 --block status --expect-head 3f9c2a1 --body-file "$WORK/status.md")"
-has "new status written"      "$(cat "$BODY")" "✅ Merged"
+has "new status written"      "$(cat "$BODY")" "> Merged · "
 hasnt "old status gone"       "$(cat "$BODY")" "In QA"
 has "problem block untouched" "$(cat "$BODY")" '- **Where:** `/x`'
 
@@ -89,7 +89,7 @@ cp "$BODY" "$WORK/unfolded.md"
 cat > "$BODY" <<'FOLD'
 <!-- sb:status -->
 > [!NOTE]
-> ⏳ In QA · Closes #7 · head `3f9c2a1`
+> In QA · Closes #7 · head `3f9c2a1`
 <!-- /sb:status -->
 
 <!-- sb:history -->
@@ -97,7 +97,7 @@ cat > "$BODY" <<'FOLD'
 
 | Lane | Done | Time | Details |
 |---|---|---|---|
-| 🔨 builder | ✅ | Oct 2, 10:02 EDT | draft |
+| builder | pass | Oct 2, 10:02 EDT | draft |
 
 </details>
 <!-- /sb:history -->
