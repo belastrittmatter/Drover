@@ -45,7 +45,13 @@ run. Locks were reaped only after workers exited; FR-WRK-1 stays as a
 preventive rule. Follow-ups: FR-HRN-4 (stage 5), FR-RUN-13, FR-WRK-10,
 FR-BRD-3 (stage 6).
 
-## Stage 1: audit (1-1.5 days)
+## Stage 1: audit (done)
+
+Result in `docs/audit.md`. Remove list signed off 2026-11-17 (section 14),
+except `docs/blocked-column-audit.html` and `.claude/settings.json`, which
+stay. Spec follow-ups: FR-BRD-5/7/8 ports (stage 6), FR-RUN-5 is new for
+the runner, FR-HRN-4 coverage test, `calibration` key dropped.
+
 
 Deliverable: `docs/audit.md`, one row per skill, script, hook, workflow and
 test suite: what it does, who calls it, verdict (keep / improve / remove),
@@ -72,7 +78,11 @@ Exit: every file has a verdict; you sign off on the remove list.
 
 ## Stage 2: cut (0.5-1 day)
 
-- Delete what the audit marked remove, plus its tests.
+- Delete what `docs/audit.md` section 14 lists, plus its tests; move
+  `diagrams/skill-map.json` to `tests/fixtures/` and repoint its 3 tests.
+- `.claude/settings.json` stays: remove its two hook entries (readme-sync,
+  gate-skill-evals), whose scripts are deleted.
+- Drop the `calibration` key from `config-schema.json` and its readers.
 - Do not delete the `workflow` / Codex backends yet (stage 6 ports them first).
 - Grep each deleted path; fix every caller in scripts, skills, `install.sh`,
   `CLAUDE.md`, plugin manifests.
@@ -106,6 +116,9 @@ hits only LICENSE; tests green.
   regex in `tests/test_writing_format.py` with per-style checks.
 - Blocked reasons: the plain tags in specs/board.md FR-BRD-6 in `block-template.md` and `status.md`; update the grouping
   parser in the status script.
+- Builder success detection in `skills/super-build/scripts/super-build-dispatch.sh`
+  and `skills/super-build/SKILL.md` matches the `[chore] loop: close #N`
+  subject; change it with the commit style (audit section 15.8).
 - Strip emoji from every drover-written comment, log line and PR body;
   drop the footer boilerplate in the PR body script. Manifest lines keep
   their format (specs/metrics.md FR-MET-2).
@@ -132,7 +145,8 @@ new tags; tests green.
   readiness check from `super-board-skills-ready.py`, minus `REGISTRY`).
   Onboard writes upstream's current routing as the starting config.
 - Headless permissions in `harnesses/claude.json`, passed at worker start;
-  test that every command in the role rules is covered (FR-HRN-4).
+  test that every command in the worker prompt and the role rules is
+  covered (FR-HRN-4; start from audit section 11).
 
 - `config-schema.json` per specs/config.md "Keys"; validation at every
   command start (FR-CFG-2).
@@ -153,6 +167,9 @@ Exit: a fresh repo onboards with only `.drover/config.json` added; tests green.
     before any builder claims;
   - classifier: fast model picks feature/bug and complexity (model tier),
     and adds missing risk labels with a one-line reason (FR-RUN-7);
+  - Blocked sweep, open-blocker filter, approval resume (FR-BRD-5, 7, 8)
+    from `super-board-wave-plan.sh` and `super-board-deps.sh`; rewrite
+    `test-wave-plan.sh` against the runner;
   - usage pause: per harness (`usage_probe` in the harness entry; Claude's
     status-line `rate_limits` today), checked before each dispatch.
 - Failed-dispatch halt (FR-RUN-13), one-tick grace before stopping a
