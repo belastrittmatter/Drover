@@ -37,6 +37,15 @@ def test_each_shape():
         assert cs.style_of(s) == "other", s
 
 
+def test_case_insensitive_prefixes():
+    for s in ("Fix: x", "Feat(scope): x", "FIX(api)!: drop v1"):
+        assert cs.style_of(s) == "conventional", s
+    for s in ("[FIX] x", "[Feat] chat: stream"):
+        assert cs.style_of(s) == "bracket-tag", s
+    assert cs.style_of("Fixed: the thing") == "conventional", "a colon right after the word is a type prefix"
+    assert cs.style_of("Fixed the thing") == "other", "the -ed heuristic is unchanged"
+
+
 def test_majority_wins():
     assert cs.classify(CONV * 3) == "conventional"
     assert cs.classify(BRACKET * 2 + CONV[:1]) == "bracket-tag"

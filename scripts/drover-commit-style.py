@@ -24,8 +24,8 @@ import subprocess
 import sys
 
 STYLES = ("conventional", "bracket-tag", "plain", "other")
-CONVENTIONAL = re.compile(r"^[a-z]+(\([^)]+\))?!?: \S")
-BRACKET = re.compile(r"^(\S+ )?\[[a-z][a-z0-9-]*\] \S")
+CONVENTIONAL = re.compile(r"^[a-z]+(\([^)]+\))?!?: \S", re.I)
+BRACKET = re.compile(r"^(\S+ )?\[[a-z][a-z0-9-]*\] \S", re.I)
 PLAIN = re.compile(r"^[A-Z][a-z]+ \S")
 MERGE = re.compile(r"^(Merge (pull request|branch|remote-tracking)|Revert \")")
 SAMPLE, MIN_SUBJECTS = 50, 10
