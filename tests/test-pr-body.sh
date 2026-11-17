@@ -45,7 +45,7 @@ cat > "$BODY" <<'MD'
 
 <!-- sb:history -->
 ## Iteration history
-| Lane | Done | Time | Details |
+| Lane | Result | Time | Details |
 |---|---|---|---|
 | builder | pass | Oct 2, 10:02 EDT | draft |
 <!-- /sb:history -->
@@ -95,7 +95,7 @@ cat > "$BODY" <<'FOLD'
 <!-- sb:history -->
 <details><summary>Iteration history</summary>
 
-| Lane | Done | Time | Details |
+| Lane | Result | Time | Details |
 |---|---|---|---|
 | builder | pass | Oct 2, 10:02 EDT | draft |
 

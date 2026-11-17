@@ -56,6 +56,17 @@ Closes #<N>
 NEVER add `Co-Authored-By`, "Generated with" or any other attribution or footer line to a
 commit or PR.
 
+**Branch-only commits keep a fixed conventional subject.** A few tool commits land only on a
+card or refine branch and never reach the base branch, because the merge gate squashes the
+branch and the squash subject is the PR title (which follows `commit_style`). They do not
+detect the style:
+
+| Commit | Subject | Written by |
+|---|---|---|
+| ui-refine-loop round | `ui(<slug>): round <n> — <what changed>` | `workflows/ui-refine-loop.js` |
+| ui-refine-loop screenshots | `ui(<slug>): before/after screenshots` | `skills/ui-refine-loop/scripts/pr-shots.sh` |
+| worktree snapshot before cleanup | `wip(cleanup-wt): snapshot <iso time>` | `hooks/cleanup-wt.py` |
+
 Subject regexes (checked by `tests/test_writing_format.py`):
 
 | `commit_style` | Regex |
@@ -180,7 +191,7 @@ fold, above the blank line and `</details>`; an older unfolded history still app
 ```
 <details><summary>Iteration history</summary>
 
-| Lane | Done | Time | Details |
+| Lane | Result | Time | Details |
 |---|---|---|---|
 | builder | pass | Oct 2, 10:02 EDT | draft · `3f9c2a1` |
 | qa | fail v1 | Oct 2, 10:40 EDT | mobile hidden · `runs/issue-790-qa-v1/` |

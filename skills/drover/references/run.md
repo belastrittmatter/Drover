@@ -148,7 +148,7 @@ read it — re-read, then redo the edit. Builder opens the PR with every block f
 | `problem` (lettered steps under Where, screenshot embedded) | writes from the ticket's Context | — | — |
 | `solution` (plain bullets, `Docs:` bullets last) | writes, updates on rebuild | — | — |
 | `ac` (checklist + one proof line each) | writes all unchecked | ticks with proof, or leaves unchecked with the reason | unticks one it disproved |
-| `history` (Lane · Done · Time · Details) | appends a row | appends a row | appends a row |
+| `history` (Lane · Result · Time · Details) | appends a row | appends a row | appends a row |
 | `visual` (Before \| After, UI only) | — | writes | — |
 | `risk` (**Low**/**Medium**/**High** + one line, Door, Blast radius) | writes | — | adjusts |
 | `redcheck` (only when merged with a failing check) | — | — | writes |
@@ -187,7 +187,7 @@ read it — re-read, then redo the edit. Builder opens the PR with every block f
 <!-- sb:history -->
 <details><summary>Iteration history</summary>
 
-| Lane | Done | Time | Details |
+| Lane | Result | Time | Details |
 |---|---|---|---|
 | builder | pass | <drover-pr-body.sh --time> | draft · `<sha>` |
 

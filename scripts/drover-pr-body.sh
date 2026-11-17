@@ -50,7 +50,7 @@ if [ "$MODE" = "skeleton" ]; then
   for b in $BLOCKS; do
     [ "$b" = redcheck ] && continue   # only when a check was red
     if [ "$b" = history ]; then       # folded; --append-file keeps rows inside
-      printf '<!-- sb:history -->\n<details><summary>Iteration history</summary>\n\n| Lane | Done | Time | Details |\n|---|---|---|---|\n\n</details>\n<!-- /sb:history -->\n\n'
+      printf '<!-- sb:history -->\n<details><summary>Iteration history</summary>\n\n| Lane | Result | Time | Details |\n|---|---|---|---|\n\n</details>\n<!-- /sb:history -->\n\n'
       continue
     fi
     printf '<!-- sb:%s -->\n<!-- /sb:%s -->\n\n' "$b" "$b"
