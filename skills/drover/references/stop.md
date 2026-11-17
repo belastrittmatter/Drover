@@ -59,7 +59,7 @@ Nothing else. Stop is intentionally tolerant — its job is to bring the system 
 ## What stop does NOT do (deliberate)
 
 - **Does not wait for workers to finish.** `claude -p` workers have no SIGTERM handler that flushes a partial commit. Worktree files remain, but unsaved in-memory work may be lost. Inspect uncommitted edits before resuming; restart recovery keeps dirty worktrees for inspection.
-- **Does not touch worktrees** under `.drover/worktrees/` or the legacy `.worktrees/` location. A legacy board worktree halts the next run until inspected/moved to the canonical folder; cleanup never force-removes it.
+- **Does not touch worktrees** under `.drover/worktrees/` or the legacy `.worktrees/` and `.claude/worktrees/issue-*` locations. A legacy board worktree halts the next run until inspected/moved to the canonical folder; cleanup never force-removes it.
 - **Does not touch branches or PRs.** Both persist. State lives on the GitHub Project board — cards stay in whichever column they were in when stopped.
 - **Does not modify the config.** A stopped run is not a deactivated config; `.claude/drover/active` is preserved.
 - **Does not bypass the GitHub assignee mutex.** It releases the mutex, then kills. If the GitHub API is unreachable, release is best-effort and the orphan-scan + reap-on-next-start covers the gap.

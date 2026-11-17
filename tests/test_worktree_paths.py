@@ -90,6 +90,16 @@ class WorktreePaths(unittest.TestCase):
         self.assertIn("legacy worktree", result.stdout)
         self.assertEqual((old / "unfinished.txt").read_text(), "keep this work")
 
+    def test_runner_halts_for_pre_rename_card_worktree_without_removing_it(self):
+        old = self.root / ".claude/worktrees/issue-7-build"
+        self.run_cmd("git", "worktree", "add", "-b", "issue-7", str(old), "main")
+        (old / "unfinished.txt").write_text("keep this work")
+        result = self.runner_helper("check_legacy_worktrees")
+        self.assertEqual(result.returncode, 73, result.stdout + result.stderr)
+        self.assertIn("legacy worktree .claude/worktrees/issue-7-build", result.stdout)
+        self.assertIn(".drover/worktrees/", result.stdout)
+        self.assertEqual((old / "unfinished.txt").read_text(), "keep this work")
+
     def test_reclaim_uses_canonical_path_and_keeps_dirty_work(self):
         clean = self.root / ".drover/worktrees/issue-7-build"
         dirty = self.root / ".drover/worktrees/issue-8-build"

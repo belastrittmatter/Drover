@@ -92,7 +92,7 @@ Run the same preconditions as `run.md` §Preconditions, minus PID checks:
    Preserve work; repair setup and restart explicitly, never bounce to Build.
 2. Production-merge guard: refuse `base_branch: main` + `human_approves_merge:
    false` when deploy markers exist (same rule as drover-run.sh).
-3. Worktree check: if legacy `.worktrees/issue-*` exists, halt for inspection/move
+3. Worktree check: if legacy `.worktrees/issue-*` or `.claude/worktrees/issue-*` exists, halt for inspection/move
    as described in run.md. Scan only board worktrees under `.drover/worktrees/`;
    when their named branch is gone use `git worktree remove` without force. Preserve
    detached, dirty, locked, unregistered, and unrelated folders.
