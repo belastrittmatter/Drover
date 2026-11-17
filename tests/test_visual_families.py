@@ -17,7 +17,7 @@ if not binary:
     print("SKIP: test_visual_families.py (no Chrome)")
     sys.exit(0)
 
-model = json.loads((pack / "diagrams/skill-map.json").read_text())
+model = json.loads((pack / "tests/fixtures/skill-map.json").read_text())
 model["kind"] = "map"
 assert not visual.validate_map(model), visual.validate_map(model)
 for field, value, message in (

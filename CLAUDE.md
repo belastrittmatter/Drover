@@ -3,9 +3,8 @@
 This repo ships nine skills under `skills/`: five you type (`super-board`, `super-collect`,
 `ui-refine-loop`, `visual`, `git-sync`) and four the board runs (the lane workers `super-build`, `super-qa`,
 `super-review`, plus `pr-security-review`, which super-qa runs on every PR). Cloudflare's
-`security-audit` is not shipped: get.sh and onboard fetch it with `npx skills`, and no lane runs it. Architecture findings come from `/super-collect architecture`.
-Worktree cleanup (`hooks/cleanup-wt.py`) is a hook, not a skill. README skill tables are generated
-by `scripts/super-board-readme-sync.py` from SKILL.md frontmatter and `skills/families.json`.
+`security-audit` is not shipped: onboard fetches it with `npx skills`, and no lane runs it. Architecture findings come from `/super-collect architecture`.
+Worktree cleanup (`hooks/cleanup-wt.py`) is a hook, not a skill.
 
 ## The cardinal rule
 
@@ -55,11 +54,10 @@ left alone; where no symlink can be made the file is copied. Settings and run st
 ├── skills/<all nine>/...
 ├── hooks/guard-*.py, cleanup-wt.py   (wired into settings.json; --no-hooks skips)
 ├── workflows/super-board-wave.js, ui-refine-loop.js
-└── bin/super-board-*.sh (incl. pr-body), super-board-*.py (status, merge-policy, agents-md, settings, setup), super-qa-file-bug.sh, super-review-file-refactor.sh
+└── bin/super-board-*.sh (incl. pr-body), super-board-*.py (status, merge-policy, settings, setup), super-qa-file-bug.sh, super-review-file-refactor.sh
 ```
 
-It also refreshes the managed `<!-- super-board:begin … -->` block in the target's AGENTS.md when
-one exists (nothing outside the markers), records an older install in
+It also records an older install in
 `.claude/super-board/upgrade.json`, prints grouped emoji output, and asks nothing:
 `super-board onboard` asks the questions. Onboard's 🔍 Checks (`scripts/super-board-setup.py`)
 fixes must-haves and finishes upgrades with no question.
@@ -92,10 +90,5 @@ every project it is installed in.
 
 ## Release checks
 
-Run `bash tests/run-safety.sh` for the offline suite. A pushed `v*` tag runs the same checks
-on Linux/macOS plus status-reader smoke checks, then publishes only if they pass. Follow
-[RELEASING.md](RELEASING.md); it also lists the settings needed to limit manual bypass.
-
-## Map pages (diagrams/)
-
-Every map page must be listed in the nav and in Explore, from the registry `diagrams/_shared/maps.json`. To add one: create `diagrams/<map>/map.json` (or `map.py`), add its entry (title, blurb, path, thumb, logo) to the registry, add a 960x600 thumb, run `python3 diagrams/_shared/sync_explore.py` then `python3 diagrams/_shared/build_skillmap.py <map>`. The build and `sync_explore.py --check` fail if a map page has no registry entry or the Explore cards are stale.
+Run `bash tests/run-safety.sh` for the offline suite. CI (`.github/workflows/cross-platform.yml`)
+runs the same checks on Linux/macOS on pushes to main/dev and on pull requests.

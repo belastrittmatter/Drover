@@ -3,7 +3,7 @@
 Claude Code hook scripts. Python 3 standard library only (no jq, no node). Each reads the
 hook JSON on stdin, prints a decision only when it blocks, and exits 0 on its own errors
 so a broken guard never stops unrelated work. All of the below are on by default except the
-protected-push guard (opt-in) and the dev-only skill-eval gate.
+protected-push guard (opt-in).
 
 - `guard-worktree-path.py` — PreToolUse `Bash`: denies `git worktree add|move` whose target resolves outside `<repo>/.claude/worktrees/` (honours `cd X &&`, `git -C X`).
 - `guard-secrets.py` — PreToolUse `Bash|Read|Grep`: denies reading or piping dotenv files, SSH keys, `.npmrc`, `credentials(.json)`, service-account JSON and `.pem`; `.env.example` stays readable. One plain call to `super-board-env-check.sh KEY…` is allowed: it prints present / empty / missing per key and never a value (no pipe, chain or redirect may ride along).
@@ -101,33 +101,7 @@ entry is `settings-protect-main.json`:
   "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-protected-push.py" } ] }
 ```
 
-## For repos that author skills: `dev/gate-skill-evals.py`
-
-A Stop hook for this pack and for EricOS, **never installed into a target project** (`install.sh`
-copies `hooks/*.py` only). When a skill changed this session — uncommitted, untracked, or committed
-but not pushed — and no `claude plugin eval` result is newer than the change, it blocks the stop and
-names the command to run. A changed `SKILL.md` always counts; a changed reference, script or the
-plugin's `workflows/<skill>*.js` counts only when the skill has an eval case. Cases are found per
-skill (`<skill>/evals/`) or per plugin (`evals/<case>/case.yaml` whose `tags` or `name` has the
-skill); results are the newest file under the matching `evals/results/`. A changed `SKILL.md` with
-no case only warns. A running `plugin eval`, `stop_hook_active`, `SKILL_EVAL_GATE=off` and globs in
-`.claude/eval-gate-ignore` all stand it down.
-
-Why Stop and not pre-commit: the point is to make the agent run the eval while it still has the
-context to read the result. A pre-commit gate fires later, in whoever commits (a human, `git-sync`,
-another agent), and cannot run a paid eval itself, so it gets bypassed with `--no-verify`. The Stop
-hook still covers commits made during the session, via the unpushed-commits check.
-
-Wired in this pack's `.claude/settings.json`. For EricOS, add to its `.claude/settings.json`:
-
-```
-"Stop": [ { "hooks": [ { "type": "command", "timeout": 30,
-  "command": "python3 \"$CLAUDE_PROJECT_DIR\"/_skills/vendor/super-board/hooks/dev/gate-skill-evals.py" } ] } ]
-```
-
-Adapted from `gate-skill-evals.sh` in Eric Tech's ai-builder-starter-kit.
-
-Tests: `tests/test-guard-hooks.sh` (all guards and the eval gate), `tests/test-cleanup-wt.sh`.
+Tests: `tests/test-guard-hooks.sh` (all guards), `tests/test-cleanup-wt.sh`.
 
 ## Credit
 

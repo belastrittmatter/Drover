@@ -1,9 +1,6 @@
 """Offline Sentry / PostHog for super-collect: a urlopen stand-in that answers from this folder.
 
-Used two ways, so the regression tests and the behavioural evals read the same payloads:
-  - tests/test_collect_baseline.py patches `urllib.request.urlopen` with `Urlopen(dir, now)`.
-  - evals/_stubs/py/sitecustomize.py installs it in every python3 the eval agent runs, when
-    SC_FIXTURES names a copy of this folder.
+tests/test_collect_baseline.py patches `urllib.request.urlopen` with `Urlopen(dir, now)`.
 
 Timestamps in the JSON are written `{{ago:<n><m|h|d>}}` and rendered relative to `now`, so a
 "seen 2 hours ago" error stays 2 hours old whenever the fixture is read. Any URL with no

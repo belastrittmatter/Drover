@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Offline release checks. Keep test-* / test_* suites offline; paid evals live in evals/.
+# Offline checks. Keep test-* / test_* suites offline.
 # Run every suite even after a failure, then fail the whole gate if any suite failed.
 set -uo pipefail
 cd "$(dirname "$0")/.."

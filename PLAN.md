@@ -75,7 +75,15 @@ Spec: specs/extras.md, specs/README.md NFR-8.
 
 Exit: every file has a verdict; you sign off on the remove list.
 
-## Stage 2: cut (0.5-1 day)
+## Stage 2: cut (done)
+
+Removed the 148 entries in `docs/audit.md` section 14: 372 -> 224 tracked
+files, 91,722 -> 46,645 lines, 65 -> 59 suites. Follow-on edits: onboard
+lost its AGENTS.md step (8 -> 7 steps), `test-install.sh` scenario 11 now
+checks install leaves AGENTS.md and CLAUDE.md untouched, `cross-platform.yml`
+lost `workflow_call`. `tests/fixtures/skill-map.json` still names removed
+files; it is test input.
+
 
 - Delete what `docs/audit.md` section 14 lists, plus its tests; move
   `diagrams/skill-map.json` to `tests/fixtures/` and repoint its 3 tests.

@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="docs/assets/logo.svg" width="88" height="88" alt="super-board kanban logo">
-
 <h1>super-board</h1>
 
 <p><strong>Add tasks, walk away, get merged PRs with proof.</strong></p>
@@ -24,9 +22,6 @@
 
 </div>
 
-<p align="center"><a href="https://erictechpro.github.io/super-board/skill-map/"><img src="docs/assets/skill-map.png" alt="The super-board skill map: open the interactive version" width="100%"></a></p>
-<p align="center"><sub>The skill map. Click it for the live version: zoom, pan, open any node.</sub></p>
-
 ## Install
 
 Before you start:
@@ -38,7 +33,7 @@ Before you start:
 In your project folder:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh | bash
+./install.sh /path/to/your-project   # from a checkout of this repo
 ```
 
 Or as a Claude Code plugin:
@@ -65,17 +60,12 @@ Claude Code's built-in `/security-review` is left as it is.
 
 Running from Codex or OpenCode? See [supported hosts](docs/hosts.md) for tested versions, sign-in and gaps.
 
-Optional post-run learning can delegate an already installed `calibrate` skill after
-verified selected work completes. It applies only to explicitly permitted existing
-canonical skill files; the package bundles no private skill. See
-[post-run calibration](skills/super-board/references/calibration.md).
-
 ## Quick start
 
 ### 1. Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh | bash
+./install.sh /path/to/your-project   # from a checkout of this repo
 ```
 
 ### 2. Onboard
@@ -84,7 +74,7 @@ curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh
 /super-board onboard
 ```
 
-Checks · GitHub · Board · Branch · AGENTS.md · Policies · Bug sources · Review. <kbd>Enter</kbd> takes the recommended answer.
+Checks · GitHub · Board · Branch · Policies · Bug sources · Review. <kbd>Enter</kbd> takes the recommended answer.
 
 ### 3. Run
 
@@ -126,12 +116,12 @@ Add cards to `Ready`. The board drains on its own.
 | [`/pr-security-review`](skills/pr-security-review/README.md) | Security pass on every PR diff; super-qa runs it, findings fail QA. |
 <!-- skills:end -->
 
-Each name links to that skill's README. Adding a skill? Write its `SKILL.md` and `README.md`, add a line to `skills/families.json`, and this table updates itself.
+Each name links to that skill's README. Adding a skill? Write its `SKILL.md` and `README.md`, and add a line to `skills/families.json` and to this table.
 
 ## Commands
 
 ```
-/super-board onboard          # 8-step setup, resumes
+/super-board onboard          # 7-step setup, resumes
 /super-board lint             # vague ACs?
 /super-board status           # read-only snapshot
 /super-board run <slug>       # drain the board
@@ -155,7 +145,6 @@ Run automatically once installed. Python stdlib, JSON in, JSON out.
 | [guard-key-literals](hooks/guard-key-literals.py) | Blocks a live-looking API key written into a file; flags one already there |
 | [guard-delete-outside](hooks/guard-delete-outside.py) | Blocks `rm`, `find -delete` and `git clean` aimed outside the project, `~` or `/` |
 | [guard-protected-push](hooks/guard-protected-push.py) | Opt-in (`onboard` asks, or `install.sh --protect-main`): blocks direct and force pushes to main/master/base |
-| [README sync](scripts/super-board-readme-sync.py) | Regenerates the skill table; pre-commit and PostToolUse hooks keep it fresh |
 | [cleanup-wt](hooks/cleanup-wt.py) | Removes merged worktrees and branches after each merge and at session start, with a recovery file |
 | [merge gate](scripts/super-board-merge-gate.sh) | Merges only after the current base plus your non-empty project `verify_commands` pass (missing checks halt setup), pinned to the reviewed commit; applies `merge_policy` and runs allowed DB migrations |
 
@@ -189,8 +178,6 @@ Commits, tickets, PR bodies and comments all follow [one writing standard](https
 2. Run `/super-board onboard`; step 1 upgrades for you and keeps a backup.
 3. Try `board-migrate --dry-run` on a copy of your board first.
 
-[Full notes](RELEASE-NOTES.md#upgrading-from-2x)
-
 </details>
 
 ## Credits
@@ -207,8 +194,6 @@ MIT © Eric Tech ([LICENSE](LICENSE)). Built on [obra/superpowers](https://githu
 <a href="https://erictechpro.github.io/super-board/impeccable/">Impeccable map</a> ·
 <a href="https://erictechpro.github.io/super-board/pstack/">pstack map</a> ·
 <a href="https://erictechpro.github.io/super-board/security-audit/">Security audit map</a> ·
-<a href="RELEASE-NOTES.md">Release notes</a> ·
-<a href="RELEASING.md">Release checks</a> ·
 <a href="https://youtu.be/nX_bGyIOFM4">YouTube walkthrough</a>
 </p>
 <p align="center"><sub>Made by Eric Tech</sub></p>

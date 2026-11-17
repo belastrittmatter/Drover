@@ -19,7 +19,7 @@ Confirm the active config matches the intended repo/board, then test a dry run.
 > repo and board before writes. Verify candidates and deduplicate before filing.
 > File verified new findings or recurrences into Backlog or its holding-column
 > alias, never Ready; preserve cards already on the board. Do not build, merge,
-> migrate, deploy or run calibration as part of intake. Keep unchanged results
+> migrate or deploy as part of intake. Keep unchanged results
 > quiet. Notify only for verified new findings, meaningful new evidence or
 > recurrences, failures, or required user action. Report unavailable/partial
 > sources honestly. If reads or a write outcome are halted, preserve the reason

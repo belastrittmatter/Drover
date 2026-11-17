@@ -1,7 +1,7 @@
 # Writing standard
 
-One format for everything super-board writes: commits, PR bodies, tickets, comments, the
-AGENTS.md block. It applies in the super-board repo and in every project super-board is
+One format for everything super-board writes: commits, PR bodies, tickets, comments.
+It applies in the super-board repo and in every project super-board is
 installed into. A host repo with its own commit style (EricOS root) keeps it outside the pack.
 
 Every template in this pack points here. Change the format here first, then the templates.
@@ -389,11 +389,6 @@ Next: builder
 
 Reviewer status words: `merge-ready` · `bounced` · `blocked` · `human-gated` · `unverified` ·
 `merged`. Classes: Gap · Bug · Verification miss · Scope drift · Over-engineering.
-
-## 5 · AGENTS.md section
-
-Tables plus CAPS rules (NEVER / DON'T / ALWAYS). No prose paragraphs. The managed block is
-`agents-md-block.md`, ≤ 40 lines.
 
 ## Plain-words rules (when `humanizer` is not installed)
 

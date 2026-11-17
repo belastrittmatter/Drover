@@ -38,12 +38,3 @@ and leave its proof/AC unverified. An invented sample cannot replace historical 
 Collect proposes this AC; it does not implement or execute the product regression. The fresh
 verifier checks the source and current applicability, then normal dedupe and user curation
 file only into Backlog. Canned fixtures demonstrate intake behavior, not a live incident.
-
-## Calibration authority
-
-Apply the same correction preference to a completed run's bounded lessons. Product changes
-in ownership, types, schemas, guards or tests remain proposals for ordinary verified,
-curated Backlog intake. Calibration may edit only its explicit existing canonical SKILL.md
-allowlist using current-run evidence. Follow the host's
-[calibration scope](../../super-board/references/calibration.md#delegate-the-installed-skill)
-and diff inspection; a stronger product mechanism does not expand edit authority.
