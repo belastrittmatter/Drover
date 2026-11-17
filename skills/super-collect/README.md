@@ -49,6 +49,3 @@ Tests: `python3 tests/test_collect_handoff.py` · `bash tests/test-collect-file.
 `tests/run-safety.sh`). The baseline suites replay the canned Sentry, PostHog and PR payloads in
 `tests/fixtures/collect/`: fingerprint dedupe, ticket-format checks, the dry run, unreachable
 sources.
-
-Evals: the four `collect-*` cases in [`evals/`](../../evals/README.md) run the skill on a model
-(paid, not in CI): Sentry verdicts, duplicate, PostHog gap, PR pattern.

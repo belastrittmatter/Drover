@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests hooks/guard-*.py and hooks/dev/gate-skill-evals.py with stubbed Claude Code hook JSON on stdin.
+# Tests hooks/guard-*.py with stubbed Claude Code hook JSON on stdin.
 # A deny prints a PreToolUse permissionDecision; an allow prints nothing.
 # Fake keys are assembled at runtime so this file never holds a key-shaped literal.
 set -euo pipefail
@@ -138,53 +138,5 @@ dd allow 'rm -rf /tmp/sb-test-123'                 "inside /tmp"
 dd allow 'T=$(mktemp -d); rm -rf "$T/x"'           "unknowable value is allowed"
 dd allow 'echo "rm -rf /"'                         "quoted text is not a command"
 dd allow 'ls -la ~ && git status'                  "no deletion"
-
-# ---- dev/gate-skill-evals (Stop; pack + EricOS only) -------------------------
-G=$(mktemp -d); G=$(cd "$G" && pwd -P)
-git -C "$G" init -q -b main; git -C "$G" config user.email t@t; git -C "$G" config user.name t
-mkdir -p "$G/skills/a/references" "$G/skills/b/references" "$G/workflows" "$G/evals/case1" "$G/evals/results"
-printf -- '---\nname: a\n---\n' > "$G/skills/a/SKILL.md"; echo r > "$G/skills/a/references/r.md"
-printf -- '---\nname: b\n---\n' > "$G/skills/b/SKILL.md"; echo r > "$G/skills/b/references/r.md"
-echo 'x' > "$G/workflows/a-wave.js"; printf 'name: case1\ntags: [a]\n' > "$G/evals/case1/case.yaml"
-echo 'evals/results/' > "$G/.gitignore"
-git -C "$G" add -A; git -C "$G" commit -qm init
-git init -q --bare "$G.origin"; git -C "$G" remote add origin "$G.origin"; git -C "$G" push -q -u origin main
-gate() {  # $1 expected exit, $2 label, $3 optional stdin JSON; sets GOUT/GERR
-  local rc=0
-  GOUT=$(printf '%s' "${3:-{\}}" | CLAUDE_PROJECT_DIR="$G" python3 "$H/dev/gate-skill-evals.py" 2>"$G.err") || rc=$?
-  GERR=$(cat "$G.err")
-  [ "$rc" -eq "$1" ] || fail "gate: $2: expected exit $1, got $rc (out='$GOUT' err='$GERR')"
-  PASS=$((PASS + 1))
-}
-old() { touch -t 202001010000 "$@"; }
-gate 0 "clean tree"; [ -z "$GOUT$GERR" ] || fail "gate: clean tree should be silent"
-echo more >> "$G/skills/a/SKILL.md"
-gate 2 "covered SKILL.md changed, no result"; case "$GERR" in *skills/a*case1*) ;; *) fail "gate: should name skills/a and case1, got '$GERR'" ;; esac
-old "$G/skills/a/SKILL.md"; touch "$G/evals/results/run.json"
-gate 0 "result newer than the change"
-echo more >> "$G/skills/a/references/r.md"; touch -t 203001010000 "$G/skills/a/references/r.md"
-gate 2 "covered skill's reference changed after the run"
-gate 0 "stop_hook_active never loops" '{"stop_hook_active":true}'; case "$GOUT" in *systemMessage*) ;; *) fail "gate: stop_hook_active should still warn" ;; esac
-SKILL_EVAL_GATE=off gate 0 "SKILL_EVAL_GATE=off"
-git -C "$G" checkout -q -- skills/a; rm -f "$G/evals/results/run.json"
-echo more >> "$G/skills/b/references/r.md"
-gate 0 "uncovered skill, reference only"; [ -z "$GOUT$GERR" ] || fail "gate: uncovered reference edit should be silent"
-echo more >> "$G/skills/b/SKILL.md"
-gate 0 "uncovered SKILL.md warns only"; case "$GOUT" in *systemMessage*skills/b*) ;; *) fail "gate: should warn about skills/b, got '$GOUT'" ;; esac
-mkdir -p "$G/.claude"; echo 'skills/b' > "$G/.claude/eval-gate-ignore"
-gate 0 "ignored skill"; [ -z "$GOUT$GERR" ] || fail "gate: ignored skill should be silent"
-git -C "$G" checkout -q -- skills/b; rm -rf "$G/.claude"
-echo y >> "$G/workflows/a-wave.js"
-gate 2 "a plugin workflow belongs to its skill"
-git -C "$G" checkout -q -- workflows
-echo 'x' > "$G/evals/case1/prompt.md"
-gate 0 "authoring an eval case is not a skill change"; rm -f "$G/evals/case1/prompt.md"
-echo more >> "$G/skills/a/SKILL.md"; git -C "$G" commit -qam "edit a"
-gate 2 "committed but unpushed change still counts"
-git -C "$G" push -q
-gate 0 "pushed change no longer counts"
-git -C "$G" checkout -q -b feat; echo more >> "$G/skills/a/SKILL.md"; git -C "$G" commit -qam "on feat"
-gate 2 "local branch with no upstream: commits since main count"
-rm -rf "$G" "$G.origin" "$G.err"
 
 echo "PASS: test-guard-hooks.sh ($PASS cases)"

@@ -190,7 +190,6 @@ for h in guard-worktree-path.py guard-secrets.py guard-key-literals.py guard-del
   [ -f "$T/.claude/hooks/$h" ] || fail "hook $h was not installed"
 done
 [ ! -e "$T/.claude/skills/cleanup-wt" ] || fail "cleanup-wt is a hook now, not a skill"
-[ ! -e "$T/.claude/hooks/dev" ] && [ ! -e "$T/.claude/hooks/gate-skill-evals.py" ] || fail "hooks/dev/ (skill-eval gate) must never be installed into a target"
 S="$T/.claude/settings.json"
 jq -e '.permissions.allow == ["Bash(ls:*)"]' "$S" >/dev/null || fail "existing permissions were lost"
 jq -e '[.hooks.PreToolUse[].hooks[].command] | index("echo mine") != null' "$S" >/dev/null || fail "existing PreToolUse hook was lost"
@@ -248,21 +247,18 @@ OUT=$("$INSTALL" --protect-main "$T" 2>&1)
 echo "$OUT" | grep -q "already present" || fail "a second --protect-main install should change nothing"
 rm -rf "$T"
 
-# 11 — AGENTS.md: a re-install refreshes only the managed block; a project without
-#      a block is left alone; a rules-bearing CLAUDE.md gets the onboard hint; the
-#      last line names onboard as the one next step.
+# 11 — AGENTS.md and CLAUDE.md are the project's own: install leaves both byte for
+#      byte, managed markers included; the last line names onboard as the one next step.
 T=$(mktemp -d)
 printf '# AGENTS.md\n\n- keep me\n<!-- super-board:begin v0.0.1 -->\nold\n<!-- super-board:end -->\n- and me\n' > "$T/AGENTS.md"
 printf '# Rules\n- pnpm\n' > "$T/CLAUDE.md"
+cp "$T/AGENTS.md" "$T/AGENTS.before"; cp "$T/CLAUDE.md" "$T/CLAUDE.before"
 OUT=$("$INSTALL" --no-hooks "$T" 2>&1)
-grep -q '^- keep me$' "$T/AGENTS.md" && grep -q '^- and me$' "$T/AGENTS.md" || fail "install changed AGENTS.md outside the markers"
-grep -q '^old$' "$T/AGENTS.md" && fail "install should refresh the managed block"
-grep -q "super-board:begin v$(cat ../VERSION)" "$T/AGENTS.md" || fail "block should carry the pack version"
-echo "$OUT" | grep -q "CLAUDE.md holds its own rules" || fail "a non-pointer CLAUDE.md should get the onboard hint"
+cmp -s "$T/AGENTS.md" "$T/AGENTS.before" || fail "install changed AGENTS.md"
+cmp -s "$T/CLAUDE.md" "$T/CLAUDE.before" || fail "install changed CLAUDE.md"
 [ "$(echo "$OUT" | tail -1)" = "👉 next: open Claude Code here and run /super-board onboard" ] || fail "last line should name onboard, got: $(echo "$OUT" | tail -1)"
-echo "$OUT" | grep -q "📜 AGENTS.md: super-board block refreshed" || fail "the block refresh should be one grouped line, got: $OUT"
 rm -rf "$T"
-# SUPER_BOARD_QUIET_NEXT=1 (set by get.sh, which prints its own header and next step)
+# SUPER_BOARD_QUIET_NEXT=1 (for a wrapper that prints its own header and next step)
 # prints only the 🔧 installing group: one line per group of files, no per-file list.
 T=$(mktemp -d)
 OUT=$(SUPER_BOARD_QUIET_NEXT=1 "$INSTALL" "$T" 2>&1)
@@ -290,7 +286,7 @@ rm -rf "$T"
 T=$(mktemp -d); printf '# AGENTS.md\n- mine\n' > "$T/AGENTS.md"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1
 [ "$(cat "$T/AGENTS.md")" = "$(printf '# AGENTS.md\n- mine')" ] || fail "install must not add a block uninvited"
-for s in super-board-skills-ready.py super-board-host.sh super-board-codex-wave.sh super-board-codex-lane.sh super-board-env-check.sh super-board-merge-policy.py super-board-agents-md.py super-board-settings.py super-board-setup.py; do
+for s in super-board-skills-ready.py super-board-host.sh super-board-codex-wave.sh super-board-codex-lane.sh super-board-env-check.sh super-board-merge-policy.py super-board-settings.py super-board-setup.py; do
   [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed"
 done
 rm -rf "$T"

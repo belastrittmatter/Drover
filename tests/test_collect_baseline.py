@@ -1,8 +1,7 @@
 """Baseline regression suite for super-collect's fetchers, driven by canned payloads.
 
 Pins today's behaviour of collect_sentry.py, collect_posthog.py and collect_prs.py end to end
-(CLI `main()` included) against the fixtures in tests/fixtures/collect/ — the same payloads the
-behavioural evals in evals/collect-* serve. No network: urlopen is the fixture router and `gh`
+(CLI `main()` included) against the fixtures in tests/fixtures/collect/. No network: urlopen is the fixture router and `gh`
 is a fake runner.
 
 Tests named `test_known_bug_*` assert the behaviour SKILL.md promises where the code does not
@@ -251,7 +250,7 @@ class PRsFixture(unittest.TestCase):
 
     def test_script_does_not_cluster(self):
         """Clustering (2+ PRs, one root cause) is the agent's job, not the script's: the JSON is
-        per-PR only. Behaviour is pinned by evals/collect-prs-pattern."""
+        per-PR only."""
         out, _ = self.prs()
         self.assertTrue(all(set(p) == set(out[0]) for p in out))
 

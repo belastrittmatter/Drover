@@ -62,7 +62,7 @@ def route(args):
     if missing:
         out["reason"] = (" and ".join("/" + n for n in missing) + " not installed in " + str(Path(args.root).resolve())
                          + " — filing each finding straight into Backlog instead. "
-                         + "Install Matt Pocock's skills (get.sh, or npx skills@latest add mattpocock/skills) to use the planning chain.")
+                         + "Install Matt Pocock's skills (/super-board onboard, or npx skills@latest add mattpocock/skills) to use the planning chain.")
     print(json.dumps(out))
     return 0
 

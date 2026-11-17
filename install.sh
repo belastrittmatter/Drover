@@ -23,7 +23,7 @@
 #
 # Output is grouped with emojis, one line per group of files (failures still name
 # the file). Environment: SUPER_BOARD_QUIET_NEXT=1 prints only the "🔧 installing"
-# group — get.sh sets it and prints its own header and summary around it.
+# group, for a wrapper that prints its own header and summary around it.
 #
 # An older super-board already in the target (a different skills/super-board/VERSION,
 # or one with no VERSION) is recorded in .claude/super-board/upgrade.json
@@ -226,7 +226,7 @@ for skill in $PRIMARY_SKILLS $SECONDARY_SKILLS; do
   install_skill "$skill" "$SHARED/skills/$skill" || true
 done
 
-SCRIPTS="super-board-project-verifier.py super-board-skills-ready.py super-board-verification-ready.py super-board-github-read.py super-board-collect-state.py super-board-run.sh super-board-gh-guard.sh super-board-card.sh super-board-status.py super-board-wave-plan.sh super-board-lane.sh super-board-codex-lane.sh super-board-codex-wave.sh super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-merge-policy.py super-board-approval.py super-board-env-check.sh super-board-agents-md.py super-board-settings.py super-board-setup.py super-board-usage.sh super-board-throttle.sh super-board-host.sh super-board-pr-body.sh super-review-file-refactor.sh super-qa-file-bug.sh super-board-stop.sh"
+SCRIPTS="super-board-project-verifier.py super-board-skills-ready.py super-board-verification-ready.py super-board-github-read.py super-board-collect-state.py super-board-run.sh super-board-gh-guard.sh super-board-card.sh super-board-status.py super-board-wave-plan.sh super-board-lane.sh super-board-codex-lane.sh super-board-codex-wave.sh super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-merge-policy.py super-board-approval.py super-board-env-check.sh super-board-settings.py super-board-setup.py super-board-usage.sh super-board-throttle.sh super-board-host.sh super-board-pr-body.sh super-review-file-refactor.sh super-qa-file-bug.sh super-board-stop.sh"
 for script in $SCRIPTS; do
   if [ -f "$REPO_ROOT/scripts/$script" ]; then
     copy_file "$REPO_ROOT/scripts/$script" "$SHARED/bin/$script"
@@ -242,7 +242,6 @@ done
 
 HOOK_FILES=""
 if [ "$HOOKS" -eq 1 ]; then
-  # hooks/*.py only: hooks/dev/ holds gates for repos that author skills, never installed.
   for h in "$REPO_ROOT"/hooks/*.py; do [ -f "$h" ] && HOOK_FILES="$HOOK_FILES $(basename "$h")"; done
 elif [ "$PROTECT" -eq 1 ]; then
   HOOK_FILES="guard-protected-push.py"
@@ -306,19 +305,6 @@ elif [ "$PROTECT" -eq 1 ]; then
   echo "   🛡️  --no-hooks: only the push guard → .claude/settings.json ($(merge_settings "$REPO_ROOT/hooks/settings-protect-main.json"))"
 else
   echo "   ⏭️  guard hooks skipped (--no-hooks)"
-fi
-
-# AGENTS.md: a re-install refreshes the managed super-board block and touches
-# nothing outside its markers. No block yet → onboard writes it (with consent).
-if [ -f "$TARGET/AGENTS.md" ] && grep -q '^<!-- super-board:begin' "$TARGET/AGENTS.md"; then
-  python3 "$REPO_ROOT/scripts/super-board-agents-md.py" block --root "$TARGET" \
-    --template "$REPO_ROOT/skills/super-board/references/agents-md-block.md" \
-    --version "$PACK_VERSION" >/dev/null 2>&1 \
-    && echo "   📜 AGENTS.md: super-board block refreshed" \
-    || echo "   ! AGENTS.md: couldn't refresh the super-board block — onboard repairs it"
-fi
-if [ -f "$TARGET/CLAUDE.md" ] && ! grep -m1 -v '^[[:space:]]*$' "$TARGET/CLAUDE.md" | grep -qx '@AGENTS.md'; then
-  echo "   ! CLAUDE.md holds its own rules — onboard offers a merge"
 fi
 
 # Upgrade record for onboard's 🔍 Checks (it migrates config, labels, columns).

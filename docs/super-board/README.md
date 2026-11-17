@@ -46,8 +46,8 @@ merge with a hand-off; a card labelled `qa` skips Building.
 
 ## Onboarding
 
-`/super-board onboard` is an 8-step wizard. Each step opens with a numbered agenda strip and
-`N of 8 · <emoji> <Name> — <why>`, then one question with the recommended answer first.
+`/super-board onboard` is a 7-step wizard. Each step opens with a numbered agenda strip and
+`N of 7 · <emoji> <Name> — <why>`, then one question with the recommended answer first.
 
 | # | Step | What happens |
 |---|---|---|
@@ -55,10 +55,9 @@ merge with a hand-off; a card labelled `qa` skips Building.
 | 2 | 🔑 GitHub | Signs in and adds board access (`gh auth refresh -s project,read:project,repo`) only when missing; offers to create the repo. |
 | 3 | 🗂️ Board | Ranks your GitHub Projects by matching columns and recommends reusing the best (adds what is missing, keeps cards), or creates one with a name taken from package.json / README. |
 | 4 | 🌿 Branch | Finds branches and the deploy source; no staging → "Create staging from main" (Recommended). |
-| 5 | 📜 AGENTS.md | "Move your N CLAUDE.md rules into AGENTS.md?" — one short question per conflict, nothing lost (coverage-checked). |
-| 6 | 🛡️ Policies | Two questions: safe defaults (merge rule, push guard, migrations), and the permission lines. |
-| 7 | 📥 Bug sources | Sentry, PostHog, GitHub issues, past PRs, architecture, plus "➕ Add another source": a link, app, API URL, MCP server or command, pinged read-only before it is saved. |
-| 8 | ✅ Review | One compact table, then "Write everything?" — files change once, here. |
+| 5 | 🛡️ Policies | Two questions: safe defaults (merge rule, push guard, migrations), and the permission lines. |
+| 6 | 📥 Bug sources | Sentry, PostHog, GitHub issues, past PRs, architecture, plus "➕ Add another source": a link, app, API URL, MCP server or command, pinged read-only before it is saved. |
+| 7 | ✅ Review | One compact table, then "Write everything?" — files change once, here. |
 
 Stop at any step: the answers are saved, and the next run shows them and continues. Testing a
 live site with no repo is not a board: `/super-qa <url>`. The full screen-by-screen contract is
@@ -78,10 +77,10 @@ card dropped on purpose is closed as not planned and moved to Done with a 🤷 c
 - Three labels route cards: `qa` skips Building (test what exists), `bug` and `feature` are built first; no label is built too.
 - Default backend is in-session dynamic workflows: turn them on in `/config`. Headless `claude -p` is opt-in (`worker_backend: "claude-p"`).
 - Set `verify_commands` in the config. Without them the merge gate cannot prove the result builds, and says so.
-- `onboard` fixes what the board needs without asking (skills, scripts, workflows, guards, settings, old folders, config keys) and asks only to install a system tool or sign in. An older super-board is upgraded in place (see [Upgrading from 2.x](../../RELEASE-NOTES.md#upgrading-from-2x)).
+- `onboard` fixes what the board needs without asking (skills, scripts, workflows, guards, settings, old folders, config keys) and asks only to install a system tool or sign in. An older super-board is upgraded in place.
 - `onboard` asks once what the robot may do: auto-merge normal changes up to 400 changed lines (money, auth, destructive schema like DROP/TRUNCATE/RENAME, and bigger PRs wait for you; additive migrations run only on the databases you allow, never live), protect main, and which databases it may migrate (default test + staging). Anything only you may run lands in Blocked tagged 🙋 with the exact command; comment `done` and the next wave merges.
 - Auto-merge needs the merge-gate and `gh pr merge` lines in your allowlist; `onboard` offers them as a diff.
-- `onboard` can make AGENTS.md the source of truth (CLAUDE.md becomes `@AGENTS.md`) and keeps a managed super-board section in it. Plugin install: the command is `/super-board:super-board onboard`, and its 🔍 Checks step installs the missing scripts, workflows and hooks.
+- Plugin install: the command is `/super-board:super-board onboard`, and its 🔍 Checks step installs the missing scripts, workflows and hooks.
 - Bug sources take any extra source in onboard — a link, app name, API URL, MCP server or command — proven readable (read-only) before it is saved; `/super-collect` runs it like the built-ins.
 - Testing a live site with no repo is not a board: `/super-qa <url>` runs on its own.
 - To enable the usage check, add `printf '%s' "$input" | bash <repo>/.claude/bin/super-board-usage.sh record` to your status-line script.
@@ -323,7 +322,7 @@ Missing, unreadable or stale evidence is a hold for a person, never a pass.
 - The usage guard reads only what an interactive status line recorded; headless runs see no usage.
 - `verify_commands` are only as good as your test suite. Without them the gate says it proved nothing.
 - Lanes call [mattpocock/skills](https://github.com/mattpocock/skills) by name; without that pack a worker fails when it reaches for one.
-- The Tester (QA lane) runs the bundled `pr-security-review` on every PR, and a finding fails QA; it reports only high-confidence findings, so it is not a full audit. Cloudflare's `security-audit` (added by get.sh and onboard) covers the whole repo, and only runs when you ask.
+- The Tester (QA lane) runs the bundled `pr-security-review` on every PR, and a finding fails QA; it reports only high-confidence findings, so it is not a full audit. Cloudflare's `security-audit` (added by onboard) covers the whole repo, and only runs when you ask.
 - `bash` 3.2+ (stock macOS is fine), `jq` and Python 3 are required on the machine running the loop.
 
 ## Pack layout and tests
@@ -331,12 +330,11 @@ Missing, unreadable or stale evidence is a hold for a person, never a pass.
 ```
   skills/<name>/   SKILL.md (agent prompt) · README.md · references/ · scripts/
   workflows/       super-board-wave.js, ui-refine-loop.js
-  scripts/         dispatcher, planner, merge gate, usage check, filers, README sync
-  hooks/           guard hooks, cleanup-wt, settings snippets; dev/ = skill-eval gate (never installed)
+  scripts/         dispatcher, planner, merge gate, usage check, filers
+  hooks/           guard hooks, cleanup-wt, settings snippets
   tests/           bash/python tests, no network: bash tests/test-*.sh
-  evals/           behavioural evals for `claude plugin eval` (evals/README.md)
 ```
 
-The minimal `.claude-plugin/plugin.json` exists so `claude plugin eval` can load the pack;
+The minimal `.claude-plugin/plugin.json` exists for plugin installs;
 `install.sh` stays the install path. The full lane-to-skill mapping, including the skills kept
 because Matt's pack has no equivalent, is in `skills/super-build/references/decision-policy.md`.

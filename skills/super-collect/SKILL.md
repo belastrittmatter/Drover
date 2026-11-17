@@ -162,7 +162,7 @@ python3 $S/collect_handoff.py route --root .     # {"route": "planning" | "backl
 ```
 
 It resolves `to-spec`, `to-tickets` and `implement-spec` (Matt Pocock's skills, installed by
-`get.sh`) with the pack's skills-ready resolver. `route: backlog` (either of the first two
+onboard) with the pack's skills-ready resolver. `route: backlog` (either of the first two
 missing) or `--direct` → skip to **Filing** below and print the `reason` line in the report.
 
 `route: planning`:
