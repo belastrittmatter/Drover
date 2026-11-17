@@ -799,7 +799,7 @@ Suspected causes:
 
 ### Known issue — lane-zombie workers (added 2026-05-24, auto-remediated)
 
-**Symptom seen on fitbox-v4 first run:** a Tester worker successfully moved #81 QA → Review and the Reviewer subsequently merged it to Done — but the original Tester's `claude -p` process kept running for 30+ minutes afterward. The dispatcher's `lane_idle()` check uses `kill -0` on the lane PID and saw the zombie as "still busy," so the QA lane never re-dispatched. By the time it was noticed, the QA column had grown 1 → 2 → 3 cards with no Tester picking them up.
+**Symptom seen on a live board's first run:** a Tester worker successfully moved #81 QA → Review and the Reviewer subsequently merged it to Done — but the original Tester's `claude -p` process kept running for 30+ minutes afterward. The dispatcher's `lane_idle()` check uses `kill -0` on the lane PID and saw the zombie as "still busy," so the QA lane never re-dispatched. By the time it was noticed, the QA column had grown 1 → 2 → 3 cards with no Tester picking them up.
 
 Different from the multi-attempt-move issue above: there the worker exited without moving the card; here the worker moved the card but didn't exit.
 

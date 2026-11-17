@@ -11,7 +11,7 @@
 #   4. Rate-limit guard — sleeps until reset when GraphQL remaining < 200.
 #   5. Per-tick project-items cache — one gh call per tick, not per column lookup.
 #   6. Tick interval bumped from 30s → 120s (GraphQL ProjectsV2 query is ~103 pts; 120s keeps usage <3.1k/hr vs 5k budget).
-#   7. Lane-zombie watchdog (added 2026-05-24 after fitbox-v4 first-run hang) — kills lane PIDs whose
+#   7. Lane-zombie watchdog (added 2026-05-24 after a first-run hang on a live board) — kills lane PIDs whose
 #      claimed issue has already moved out of the lane's expected source column. The worker's logical
 #      work is done; if the claude -p process lingers, lane appears busy forever and downstream cards
 #      pile up unprocessed. Uses the project-items cache so it costs zero extra API calls per tick.
