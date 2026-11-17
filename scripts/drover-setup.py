@@ -77,7 +77,7 @@ BIN = ["drover-project-verifier.py", "drover-skills-ready.py", "drover-host.sh",
        "drover-deps.sh", "drover-preflight.sh", "drover-merge-gate.sh",
        "drover-merge-policy.py", "drover-approval.py", "drover-env-check.sh",
        "drover-settings.py", "drover-setup.py", "drover-usage.sh", "drover-pr-body.sh",
-       "drover-review-file-refactor.sh", "drover-qa-file-bug.sh", "drover-stop.sh"]
+       "drover-review-file-refactor.sh", "drover-qa-file-bug.sh", "drover-stop.sh", "drover-reasons.json"]
 WORKFLOWS = ["drover-wave.js", "ui-refine-loop.js"]
 HELPERS_CMD = "npx -y skills@latest add mattpocock/skills --skill '*' -a claude-code -y"
 # Cloudflare's standalone whole-repo audit. Optional: installed by default, never

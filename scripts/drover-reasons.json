@@ -1,0 +1,21 @@
+{
+  "_doc": "The one list of Blocked reason tags (specs/board.md FR-BRD-6). Writers: block-template.md and every lane that moves a card to Blocked. Readers: drover-status.py (grouping), drover-approval.py and drover-deps.sh (needs_you). Add or rename a tag here only.",
+  "needs_you": "[needs-you]",
+  "dropped": "[dropped]",
+  "tags": {
+    "[blocked:creds]": "credentials or secrets: missing API key, expired token, no test login",
+    "[blocked:quota]": "billing or quota: paid API rate limit hit, free tier used up, plan upgrade needed",
+    "[blocked:access]": "permissions: gh scope denied, org admin required, write access missing",
+    "[blocked:unclear]": "ambiguity or spec gap: two valid readings, AC contradicts PROJECT.md, dependency unclear",
+    "[blocked:unsafe]": "safety or destructive step: would drop a table, push to prod, rotate live secrets",
+    "[blocked:review]": "human review needed: unresolved human PR comment, product or branding decision, truth-check below threshold",
+    "[blocked:design]": "pure design: no measurable AC, needs a design pass first",
+    "[blocked:duplicate]": "pre-flight: a merged PR already delivers it, or an open PR or card is building it",
+    "[blocked:sequenced]": "pre-flight: an open PR touches the same files; waits on the issue that PR closes",
+    "[blocked:too-big]": "over the merge_policy.auto_max_lines cap or spans many areas; split it with /to-tickets",
+    "[blocked:ci]": "CI cannot run or stays red for a reason outside the diff (Actions budget, broken runner)",
+    "[blocked:schema]": "destructive schema or API contract change that needs a human ruling",
+    "[blocked:rebuild-cap]": "rebuild_cap reached on the same card with the same root-cause hash",
+    "[needs-you]": "a step only a human may run: merge gate exit 7 (merge_policy holds the merge) or exit 8 (a migration the robot may not run, a failed migrate, a declared needs-you step)"
+  }
+}

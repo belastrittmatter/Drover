@@ -60,7 +60,7 @@ except Exception:
 # Source of truth — never inline these as dict literals at call sites.
 
 LANE_ORDER: tuple[str, ...] = ("build", "qa", "review")
-LANE_GLYPH = {"build": "🔨", "qa": "🔍", "review": "✏️"}
+LANE_GLYPH = {"build": "[B]", "qa": "[Q]", "review": "[R]"}
 LANE_LABEL = {"build": "Building", "qa": "QA", "review": "Review"}
 LANE_ROLE = {"build": "Builder ", "qa": "Tester  ", "review": "Reviewer"}
 
@@ -125,7 +125,7 @@ def parse_manifest(text: str, today_iso: str) -> dict[str, Any]:
     Pure function (no I/O, no global state) so it can be unit-tested with
     hand-crafted fixtures. Returns a dict with:
       inflight: {lane → {pid, issue, ts}}    — workers currently dispatched
-      recents: [{epoch, verb, glyph, issue, target, detail}, ...]
+      recents: [{epoch, verb, issue, target, detail}, ...]
       last_tick: HH:MM:SS of the most recent `tick —` line, or None
       start_hms: HH:MM:SS of the most recent `drover run started`, or None
       exited: True if the run has logged `exiting cleanly`
@@ -169,7 +169,7 @@ def parse_manifest(text: str, today_iso: str) -> dict[str, Any]:
                     del inflight[prior]
             inflight[lane] = {"pid": pid, "issue": issue, "ts": hms}
             recents.append({
-                "epoch": ep, "verb": "dispatch", "glyph": LANE_GLYPH[lane],
+                "epoch": ep, "verb": "dispatch",
                 "issue": f"#{issue}", "target": LANE_LABEL[lane],
                 # `attempt N/3` is filled in at render time from current
                 # labels — the manifest doesn't encode it at dispatch time.
@@ -189,7 +189,7 @@ def parse_manifest(text: str, today_iso: str) -> dict[str, Any]:
                     if v["pid"] == pid:
                         del inflight[lane]
             recents.append({
-                "epoch": ep, "verb": "reap", "glyph": "♻",
+                "epoch": ep, "verb": "reap",
                 "issue": f"#{issue}", "target": "",
                 "detail": "stale lock + assignee swept",
             })
@@ -200,13 +200,13 @@ def parse_manifest(text: str, today_iso: str) -> dict[str, Any]:
                 if v["pid"] == pid:
                     del inflight[lane]
             recents.append({
-                "epoch": ep, "verb": "zombie", "glyph": "💀",
+                "epoch": ep, "verb": "zombie",
                 "issue": f"#{issue}", "target": "", "detail": det.strip(" —"),
             })
             continue
         if am := ALERT_RE.search(rest):
             recents.append({
-                "epoch": ep, "verb": "alert", "glyph": "⚠",
+                "epoch": ep, "verb": "alert",
                 "issue": "", "target": "", "detail": am.group(1),
             })
 
@@ -288,21 +288,43 @@ def rebuild_suffix(item: dict[str, Any]) -> str:
     return f"↻ {min(k + 1, 3)}/3" if k else ""
 
 
-REASON_TABLE: list[tuple[str, str]] = [
-    ("🛡", "dependency gate"),
-    ("🔐", "missing creds"),
-    ("💳", "quota / billing"),
-    ("❓", "ambiguous AC"),
-    ("⚙",  "infra / tooling"),
-]
+# The reason tags live in one file shared with the writers (block-template.md).
+REASONS = json.loads(Path(__file__).with_name("drover-reasons.json").read_text(encoding="utf-8"))
+REASON_TABLE: list[str] = list(REASONS["tags"])
+_TAG_RE = re.compile(r"\[(?:blocked:[a-z-]+|needs-you)\]")
 
 
-def reason_for(body: str) -> tuple[str, str]:
-    """Pick the leading reason emoji from a comment body; fall back to 🚫."""
-    for em, txt in REASON_TABLE:
-        if em in body:
-            return em, txt
-    return "🚫", "other"
+def reason_short(tag: str) -> str:
+    """`[blocked:creds]` -> `creds`, `[needs-you]` -> `needs-you`."""
+    return tag.strip("[]").removeprefix("blocked:")
+
+
+def reason_for(body: str) -> str:
+    """Short name of the reason tag on the `Reason tag:` line, else the first known
+    tag anywhere in the comment; `other` when none parses."""
+    for line in body.splitlines():
+        if "Reason tag:" in line:
+            for t in _TAG_RE.findall(line.split("Reason tag:", 1)[1]):
+                if t in REASONS["tags"]:
+                    return reason_short(t)
+    for t in _TAG_RE.findall(body):
+        if t in REASONS["tags"]:
+            return reason_short(t)
+    return "other"
+
+
+def render_block_reasons(reasons: list[str], numbers: list[int]) -> list[str]:
+    """`Blocked 3 · creds 1 · unclear 1 · needs-you 1`, then one line per tag."""
+    if not numbers:
+        return ["   (none)"]
+    order = [reason_short(t) for t in REASON_TABLE] + ["other"]
+    groups: dict[str, list[str]] = {}
+    for r, n in zip(reasons, numbers):
+        groups.setdefault(r, []).append(f"#{n}")
+    keys = sorted(groups, key=lambda k: (-len(groups[k]), order.index(k)))
+    out = ["   " + " · ".join([f"Blocked {len(numbers)}"] + [f"{k} {len(groups[k])}" for k in keys])]
+    out += [f"   {k:<12} {', '.join(groups[k])}" for k in keys]
+    return out
 
 
 def field_status(node: dict[str, Any]) -> str:
@@ -462,7 +484,7 @@ def render_collapsed(label: str, lane_items: list[dict[str, Any]]) -> str:
 def render_kanban(
     by_status: dict[str, list[dict[str, Any]]],
     glyph_for: Callable[[int], str],
-    reason_glyph_for: Callable[[int], str],
+    reason_for_number: Callable[[int], str],
 ) -> str:
     """The kanban boxes in BOARD_ORDER. Pure: lookups come in as callables."""
     boxes: list[str] = []
@@ -477,7 +499,7 @@ def render_kanban(
         for it in lane_items:
             n = it["number"]
             if label == "Blocked":
-                out.append(box_line(f"{reason_glyph_for(n)} #{n}  {it['title']}"))
+                out.append(box_line(f"{reason_for_number(n)} #{n}  {it['title']}"))
                 continue
             left = f"{glyph_for(n)} #{n}  {it['title']}"
             suffix = rebuild_suffix(it)
@@ -566,8 +588,8 @@ def main() -> int:
 
     # ── fetch reason-tag comments for Blocked only ──
     # Skip silently on error so a stale token doesn't break the rest of the
-    # snapshot. The body is capped at 4000 chars; emojis in the locked
-    # vocabulary land at the top of any well-formed reason-tag comment.
+    # snapshot. The body is capped at 4000 chars; the reason tag sits in the
+    # header and on the `Reason tag:` line of any well-formed block comment.
     reasons: dict[int, str] = {}
     for it in by_status["Blocked"]:
         n = it["number"]
@@ -601,7 +623,7 @@ def main() -> int:
         for lane, v in inflight.items():
             if v["issue"] == str(n):
                 return LANE_GLYPH[lane]
-        return "  "
+        return "   "
 
     def worker_dur(hms: str) -> str:
         d = now_epoch - hms_to_epoch(run_date, hms)
@@ -633,7 +655,7 @@ def main() -> int:
             return f"T-{d // 3600}h"
         return f"T-{d // 86400}d"
 
-    def reason_for_issue(n: int) -> tuple[str, str]:
+    def reason_for_issue(n: int) -> str:
         return reason_for(reasons.get(n, ""))
 
     # ── header ──
@@ -649,14 +671,14 @@ def main() -> int:
     )
     max_workers = cfg.get("max_workers", 3)
 
-    print(f"📊 drover · {proj['title']} (#{proj['number']})")
+    print(f"drover · {proj['title']} (#{proj['number']})")
     print("─" * 80)
     print(f"config: {config_slug}   labels: qa · bug · feature   base: {cfg.get('base_branch', '?')}")
     print(f"mode:   {mode_label:<22} truth gate: {gate_label}")
     print()
 
     # ── kanban ──
-    print(render_kanban(by_status, glyph_for_issue, lambda n: reason_for_issue(n)[0]))
+    print(render_kanban(by_status, glyph_for_issue, reason_for_issue))
 
     # ── workers ──
     print()
@@ -691,18 +713,8 @@ def main() -> int:
     # ── block reasons ──
     print()
     print("▎Block reasons")
-    blockers = by_status["Blocked"]
-    if not blockers:
-        print("   (none)")
-    else:
-        groups: dict[str, dict[str, Any]] = {}
-        for it in blockers:
-            em, txt = reason_for_issue(it["number"])
-            g = groups.setdefault(em, {"text": txt, "issues": []})
-            g["issues"].append(f"#{it['number']}")
-        for em, g in sorted(groups.items(), key=lambda kv: -len(kv[1]["issues"])):
-            issues_str = ", ".join(g["issues"])
-            print(f"   {em} ×{len(g['issues'])}  {g['text']:<18}  {issues_str}")
+    nums = [it["number"] for it in by_status["Blocked"]]
+    print("\n".join(render_block_reasons([reason_for_issue(n) for n in nums], nums)))
 
     # ── recent events ──
     print()
@@ -723,12 +735,12 @@ def main() -> int:
                 detail = f"attempt {attempt_str(item_by_number(issue_num))}"
             if r["target"]:
                 print(
-                    f"   {t:<7} {r['glyph']} {r['verb']:<9} {r['issue']:<4} → "
+                    f"   {t:<7} {r['verb']:<9} {r['issue']:<4} → "
                     f"{r['target']:<9} {detail}"
                 )
             else:
                 print(
-                    f"   {t:<7} {r['glyph']} {r['verb']:<9} {r['issue']:<4}   "
+                    f"   {t:<7} {r['verb']:<9} {r['issue']:<4}   "
                     f"        {detail}"
                 )
 

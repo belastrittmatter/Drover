@@ -9,6 +9,7 @@ Run directly:  python3 tests/test_writing_format.py
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -197,19 +198,41 @@ def test_block_template_uses_the_header():
     for h in heads:
         assert re.match(r"^\[(<role>|builder|qa|reviewer|collect|orchestrator)\] \[blocker\] \S", h), h
     assert "Reason tag:" in text, "drover-deps.sh parses 'Reason tag:'"
+    assert "drover-reasons.json" in text, "block-template.md must point at the one tag list"
+
+
+REASONS = json.loads((ROOT / "scripts" / "drover-reasons.json").read_text(encoding="utf-8"))
+
+
+def test_reason_tags_are_defined_once():
+    """Every tag a writer or reader names is in drover-reasons.json, and no file keeps its own table."""
+    known = set(REASONS["tags"]) | {REASONS["dropped"]}
+    tag = re.compile(r"\[(?:blocked:[a-z-]+|needs-you|dropped)\]")
+    paths = [p for p in list((ROOT / "skills").rglob("*")) + list((ROOT / "scripts").glob("*")) + list((ROOT / "workflows").glob("*"))
+             if p.is_file() and p.suffix in (".md", ".sh", ".py", ".js")]
+    for p in paths:
+        for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+            for t in tag.findall(line):
+                assert t in known, f"unknown reason tag {t} at {p.relative_to(ROOT)}:{n}"
+    template = (REF / "block-template.md").read_text(encoding="utf-8")
+    listed = [t for t in REASONS["tags"] if t in template]
+    assert len(listed) < len(REASONS["tags"]) // 2, "block-template.md copies the tag list; point at drover-reasons.json"
+    for script in ("drover-status.py", "drover-approval.py", "drover-deps.sh"):
+        src = (ROOT / "scripts" / script).read_text(encoding="utf-8")
+        assert "drover-reasons.json" in src, f"{script} must read the tags from drover-reasons.json"
 
 
 def test_needs_you_comment_is_checklist_first():
-    """The 🙋 comment shows what to do first; why and evidence fold away; the planner's lines stay."""
+    """The [needs-you] comment shows what to do first; why and evidence fold away; the planner's lines stay."""
     text = (REF / "block-template.md").read_text(encoding="utf-8")
-    block = next(b for b in fenced(text) if "🙋 Your turn on" in b)
+    block = next(b for b in fenced(text) if "Your turn on" in b)
     lines = block.splitlines()
-    assert re.match(r"^\[reviewer\] \[blocker\] 🙋 Your turn on #<N> — ", lines[0]), lines[0]
+    assert re.match(r"^\[reviewer\] \[blocker\] Your turn on #<N> — ", lines[0]), lines[0]
     assert lines[1].startswith("- [ ] "), "the first line after the header is a checklist item"
     assert any(l == "- [ ] Comment `done` here" for l in lines), "the checklist ends with: comment done"
     fold = block.index("<details><summary>Why, and what I checked</summary>")
     assert block.index("- [ ] ") < fold, "checklist before the fold"
-    assert re.search(r"Reason tag:[^\n]*🙋", block[fold:]), "deps.sh reads 'Reason tag: 🙋'"
+    assert re.search(r"Reason tag:[^\n]*\[needs-you\]", block[fold:]), "deps.sh reads 'Reason tag: [needs-you]'"
     assert re.search(r"^blocked-by: -$", block[fold:], flags=re.M), "deps.sh reads 'blocked-by: -'"
 
 

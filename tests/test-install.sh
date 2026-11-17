@@ -171,7 +171,7 @@ T=$(mktemp -d)
 for s in drover-run.sh drover-stop.sh drover-wave-plan.sh \
          drover-lane.sh drover-codex-lane.sh drover-codex-wave.sh drover-card.sh drover-throttle.sh drover-host.sh \
          drover-deps.sh drover-preflight.sh drover-merge-gate.sh drover-usage.sh drover-pr-body.sh \
-         drover-review-file-refactor.sh drover-qa-file-bug.sh; do
+         drover-review-file-refactor.sh drover-qa-file-bug.sh drover-status.py drover-reasons.json; do
   [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed, or is not executable"
 done
 # The Codex shim runs the shared launcher installed beside it.

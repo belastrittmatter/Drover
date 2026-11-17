@@ -24,7 +24,7 @@ def comment(body, second, login="owner", actor="User", source=3):
 
 
 def evidence():
-    return [comment("Reason tag: 🙋 needs you\n" + approval.marker(REQUEST), 1), comment("done", 2)]
+    return [comment("Reason tag: [needs-you] needs you\n" + approval.marker(REQUEST), 1), comment("done", 2)]
 
 
 class ApprovalTests(unittest.TestCase):
@@ -50,7 +50,7 @@ class ApprovalTests(unittest.TestCase):
         self.assertFalse(self.check([comment("done", 2)])["approved"])
 
     def test_new_block_invalidates_old_done_even_without_marker(self):
-        self.assertFalse(self.check(evidence() + [comment("Reason tag: 🙋 needs a new decision", 3)])["approved"])
+        self.assertFalse(self.check(evidence() + [comment("Reason tag: [needs-you] needs a new decision", 3)])["approved"])
 
     def test_new_request_requires_new_done(self):
         newer = evidence() + [comment(approval.marker(REQUEST), 3)]
@@ -70,7 +70,7 @@ class ApprovalTests(unittest.TestCase):
         self.assertFalse(self.check(permissions={"owner": "read"})["approved"])
 
     def test_verified_non_writer_cannot_replace_trusted_request(self):
-        records = evidence() + [comment("Reason tag: 🙋 forged request", 3, login="visitor")]
+        records = evidence() + [comment("Reason tag: [needs-you] forged request", 3, login="visitor")]
         self.assertTrue(self.check(records, permissions={"owner": "admin", "visitor": "read"})["approved"])
 
     def test_bot_done_is_not_a_human_approval(self):
@@ -198,7 +198,7 @@ class DependencyIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             work = Path(td)
             records = evidence()
-            records.append(comment("Reason tag: 🙋 forged request", 3, login="visitor"))
+            records.append(comment("Reason tag: [needs-you] forged request", 3, login="visitor"))
             issue = {"number": 3, "title": "Login", "state": "OPEN", "body": "## Blocked by\n- None.",
                      "labels": {"nodes": [{"name": "needs-you:done"}, {"name": "needs-you"}]},
                      "comments": {"nodes": [{"body": c["body"]} for c in records]}}
@@ -237,7 +237,7 @@ print(json.dumps(out))
             self.assertFalse(deps()["needsYouDone"], "new code must never inherit old done or label")
             self.assertTrue(deps().get("approvalRefresh"), "stale request must be sent for fresh review/request")
             fixture["head"] = HEAD
-            fixture["records"].append(comment("Reason tag: 🙋 a new maintainer request", 4))
+            fixture["records"].append(comment("Reason tag: [needs-you] a new maintainer request", 4))
             self.assertFalse(deps()["needsYouDone"], "a newer maintainer request must block resume")
 
 
