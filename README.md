@@ -65,11 +65,6 @@ Claude Code's built-in `/security-review` is left as it is.
 
 Running from Codex or OpenCode? See [supported hosts](docs/hosts.md) for tested versions, sign-in and gaps.
 
-Optional post-run learning can delegate an already installed `calibrate` skill after
-verified selected work completes. It applies only to explicitly permitted existing
-canonical skill files; the package bundles no private skill. See
-[post-run calibration](skills/super-board/references/calibration.md).
-
 ## Quick start
 
 ### 1. Install
