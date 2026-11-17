@@ -128,12 +128,12 @@ mode:   <auto-merge|human-approves>        truth gate: <off|non-trivial (≥N)|a
    last tick: <time>    run started: <time>    workers: <a>/<m>    worktrees cleaned: <n>
 ```
 
-### Sample render (today's live NSAdashboard board)
+### Sample render (today's live board)
 
 ```
-📊 drover · NSAdashboard Drover (#1)
+📊 drover · My App Board (#1)
 ────────────────────────────────────────────────────────────────────────────────
-config: nsadashboard-drover   labels: qa · bug · feature   base: staging
+config: my-app-drover   labels: qa · bug · feature   base: staging
 mode:   auto-merge                 truth gate: non-trivial (≥70)
 
 ┌─ Backlog  [3] ───────────────────────────────────────────────────────────────┐

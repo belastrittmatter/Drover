@@ -22,7 +22,7 @@ on missing requirements and recheck each conditional helper before use.
 Before iter 1, resolve a test login. **Never ask the user; discover or create.** Order:
 
 1. **Cached creds** at `.claude/settings.local.json` `.e2e.user` / `.e2e.pass` — use them as-is.
-2. **Env-file fallback** — read in order: `.env.production.local`, `.env.local`, `.env`. Pull `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`. If both present, auto-create `e2e-test@<owner-domain>` (owner from `git config user.email` domain, fallback `erictech.ca`) via:
+2. **Env-file fallback** — read in order: `.env.production.local`, `.env.local`, `.env`. Pull `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`. If both present, auto-create `e2e-test@<owner-domain>` (owner from `git config user.email` domain, fallback `example.com`) via:
    ```bash
    curl -sS -X POST "$SUPABASE_URL/auth/v1/admin/users" \
      -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \

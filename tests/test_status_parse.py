@@ -161,7 +161,7 @@ def test_empty_manifest_returns_defaults() -> None:
 
 
 def test_real_live_manifest_lines() -> None:
-    """Two-line manifest matching the live NSAdashboard 2026-05-27 board.
+    """Two-line manifest matching a live 2026-05-27 board.
 
     This is the case the original PR shipped broken: with the old
     DISPATCH_RE (`.*attempt=(\\d+)/3`) and the old reap prefix check
@@ -210,7 +210,7 @@ def test_field_status_picks_status_select() -> None:
 
 def test_valid_slug_accepts_normal_slugs() -> None:
     assert sbs.valid_slug("my-project")
-    assert sbs.valid_slug("nsadashboard-drover")
+    assert sbs.valid_slug("my-app-drover")
     assert sbs.valid_slug("Project_1.0")
     assert sbs.valid_slug("a")
 
