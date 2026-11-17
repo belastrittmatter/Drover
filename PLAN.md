@@ -121,11 +121,14 @@ hits only LICENSE; tests green.
   regex in `tests/test_writing_format.py` with per-style checks.
 - Blocked reasons: the plain tags in specs/board.md FR-BRD-6 in `block-template.md` and `status.md`; update the grouping
   parser in the status script.
-- Builder success detection in `skills/super-build/scripts/super-build-dispatch.sh`
-  and `skills/super-build/SKILL.md` matches the `[chore] loop: close #N`
-  subject; change it with the commit style (audit section 15.8).
-- Strip emoji from every drover-written comment, log line and PR body;
-  drop the footer boilerplate in the PR body script. Manifest lines keep
+- Builder done / partial detection moves from the commit subject to the
+  `Drover: done #N` / `Drover: partial #N` body trailer (FR-CNV-6): writer
+  (`skills/drover-build/references/worker-preamble.md`, SKILL.md) and every
+  reader (`skills/drover-build/scripts/drover-build-dispatch.sh`, runner,
+  workflow) together (audit section 15.8).
+- `Next:` / `Owner:` / status alert name `owner`, not `Eric` (FR-CNV-7).
+- Strip emoji from every drover-written comment, log line, PR body and the
+  skills' chat output (FR-CNV-3); no footer or attribution lines. Manifest lines keep
   their format (specs/metrics.md FR-MET-2).
 
 Spec: specs/conventions.md, specs/board.md FR-BRD-6.

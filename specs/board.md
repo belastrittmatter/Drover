@@ -29,9 +29,14 @@ Part of the [drover spec](README.md).
   open-card side.)
 - **FR-BRD-6 (changed)** Reason tags shall be plain text from one fixed list
   defined in a single file read by both writers and the status parser:
-  `[blocked:duplicate]`, `[blocked:unclear]`, `[blocked:too-big]`,
-  `[blocked:sequenced]`, `[blocked:ci]`, `[blocked:creds]`,
-  `[blocked:schema]`, `[blocked:rebuild-cap]`, `[needs-you]`. They replace
-  upstream's emoji vocabulary (`block-template.md`, `status.md` section I).
+  `[blocked:creds]`, `[blocked:quota]`, `[blocked:access]`,
+  `[blocked:unclear]`, `[blocked:unsafe]`, `[blocked:review]`,
+  `[blocked:design]`, `[blocked:duplicate]`, `[blocked:sequenced]`,
+  `[blocked:too-big]`, `[blocked:ci]`, `[blocked:schema]`,
+  `[blocked:rebuild-cap]`, `[needs-you]`. `drover status` groups Blocked
+  cards by these tags. They replace upstream's 12 reason emoji
+  (`block-template.md`, `status.md` section I); upstream's out-of-scope and
+  wrong-place reasons become `[dropped]`: the card is closed as not planned
+  and moves to Done, as upstream already does for dropped cards.
 - **FR-STS-2 (new)** Where hc is enabled, `drover status` shall show each
   live worker's hc terminal name so the owner can attach to it.
