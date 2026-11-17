@@ -10,6 +10,7 @@ Run directly:  python3 tests/test_writing_format.py
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -125,29 +126,37 @@ def test_no_attribution_lines():
 
 
 def test_dispatcher_reads_the_done_trailer_not_the_subject():
-    """FR-CNV-6: done / partial come from the `Drover:` body trailer; the subject is free."""
+    """FR-CNV-6: done / partial come from the `Drover:` line in the commit body, never the subject."""
     src = (ROOT / "skills" / "drover-build" / "scripts" / "drover-build-dispatch.sh").read_text(encoding="utf-8")
-    pats = dict(re.findall(r'--grep="\^Drover: (done|partial) (#\$N\[\[:space:\]\]\*\\\$)"', src))
-    assert set(pats) == {"done", "partial"}, f"expected the done and partial trailer greps, found {pats}"
+    fn = re.search(r"^trailer_commit\(\) \{\n.*?^\}\n", src, flags=re.S | re.M)
+    assert fn, "drover-build-dispatch.sh must define trailer_commit()"
+    assert "trailer_commit done" in src and "trailer_commit partial" in src
     with tempfile.TemporaryDirectory() as d:
         def git(*a):
             return subprocess.run(["git", "-C", d, *a], capture_output=True, text=True, check=True).stdout
-        git("init", "-q")
-        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "base")
-        base = git("rev-parse", "HEAD").strip()
-        for msg in ("chore(loop): close #42 — subject only, no trailer",
-                    "feat(cart): other card\n\n- bullet\nCloses #421\nDrover: done #421",
-                    "Add schema for carts\n\n- bullet\nDrover: partial #42"):
+
+        def commit(msg):
             git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", msg)
 
-        def found(kind: str) -> str:
-            pat = "^Drover: " + kind + " " + pats[kind].replace("$N", "42").replace("\\$", "$")
-            return git("log", "-E", "--grep=" + pat, "--format=%s", f"{base}..HEAD").strip()
+        git("init", "-q")
+        commit("before the range\n\nDrover: done #42")
+        base = git("rev-parse", "HEAD").strip()
+        for msg in ("chore(loop): close #42 — subject only, no trailer",
+                    "Drover: done #42",
+                    "feat(cart): other card\n\n- bullet\nCloses #421\nDrover: done #421",
+                    "Add schema for carts\n\n- bullet\nDrover: partial #42"):
+            commit(msg)
 
-        assert found("done") == "", "a subject or another card's trailer must not count as done"
+        def found(kind: str) -> str:
+            script = fn.group(0) + f"trailer_commit {kind}\n"
+            out = subprocess.run(["bash", "-c", script], capture_output=True, text=True, check=True,
+                                 env={"PATH": os.environ["PATH"], "WORKTREE_DIR": d, "N": "42",
+                                      "COMMITS_RANGE": f"{base}..HEAD"}).stdout.strip()
+            return out.split(" ", 1)[1] if out else ""
+
+        assert found("done") == "", "a subject, another card's trailer or a commit before the range is not done"
         assert found("partial") == "Add schema for carts"
-        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty",
-            "-m", "Show a size error for receipts over 10 MB\n\n- client checks size\nCloses #42\nDrover: done #42")
+        commit("Show a size error for receipts over 10 MB\n\n- client checks size\nCloses #42\nDrover: done #42")
         assert found("done") == "Show a size error for receipts over 10 MB"
 
 

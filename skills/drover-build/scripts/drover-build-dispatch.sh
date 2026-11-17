@@ -7,6 +7,7 @@
 #          REPO_DIR    (optional) — defaults to PWD; the working repo root
 #          SKILL_DIR   (optional) — defaults to the dir this script lives in's parent
 #          MAX_TURNS   (optional) — default 250
+#          CONFIG_PATH (optional) — drover config; defaults to the one .claude/drover/active names
 #   - Side effects:
 #       * git worktree add -b loop/issue-N .drover/worktrees/issue-N BASE_BRANCH
 #       * runs `claude -p` inside that worktree with the composed prompt
@@ -46,6 +47,11 @@ if [[ -z "$BASE_BRANCH" ]]; then
 fi
 
 REPO_DIR="${REPO_DIR:-$PWD}"
+CONFIG_PATH="${CONFIG_PATH:-}"
+if [[ -z "$CONFIG_PATH" && -f "$REPO_DIR/.claude/drover/active" ]]; then
+  CONFIG_PATH="$REPO_DIR/.claude/drover/configs/$(tr -d '[:space:]' < "$REPO_DIR/.claude/drover/active").json"
+fi
+[[ -f "$CONFIG_PATH" ]] || CONFIG_PATH=""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="${SKILL_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 MAX_TURNS="${MAX_TURNS:-250}"
@@ -116,7 +122,7 @@ ISSUE_BODY=$(printf '%s' "$ISSUE_JSON" | jq -r '.body')
   printf 'First operation: repeat drover-skills-ready.py --root %s --host claude --cards - --lane build with %s as stdin. Halt on exit 10 before any lifecycle writes. Recheck conditional helpers with --require before use.\n' "$REPO_DIR" "$CARD_JSON"
   cat "$PREAMBLE"
   # FR-CNV-2: the repo's commit style and three real subjects from the base branch.
-  printf '\n%s\n' "$(python3 "$SB_BIN/drover-commit-style.py" --root "$REPO_DIR" --base "$BASE_BRANCH" --prompt 2>/dev/null || true)"
+  printf '\n%s\n' "$(python3 "$SB_BIN/drover-commit-style.py" --root "$REPO_DIR" --base "$BASE_BRANCH" ${CONFIG_PATH:+--config "$CONFIG_PATH"} --prompt 2>/dev/null || true)"
   printf '\n# Issue #%s — %s\n\n' "$N" "$ISSUE_TITLE"
   printf '%s\n' "$ISSUE_BODY"
   printf '\n---\n\n'
@@ -153,11 +159,21 @@ echo "worker for issue #$N exited with code $WORKER_EXIT" | tee -a "$LOG_FILE"
 HEAD_SHA=$(git -C "$WORKTREE_DIR" rev-parse HEAD)
 COMMITS_RANGE="${BASE_SHA}..${HEAD_SHA}"
 
+# "<sha> <subject>" of the newest commit in COMMITS_RANGE whose BODY (never the subject)
+# has the line `Drover: <kind> #N` (FR-CNV-6). Records end in 0x1e, fields split on 0x1f.
+trailer_commit() {
+  git -C "$WORKTREE_DIR" log --format='%H%x1f%s%x1f%b%x1e' "$COMMITS_RANGE" 2>/dev/null \
+    | awk -v RS='\036' -v FS='\037' -v want="Drover: $1 #$N" '
+        { n = split($3, lines, "\n")
+          for (i = 1; i <= n; i++) { l = lines[i]; sub(/[ \t\r]+$/, "", l)
+            if (l == want) { sha = $1; gsub(/[^0-9a-f]/, "", sha); print sha " " $2; exit } } }'
+}
+
 CLOSE_COMMIT=""
 WIP_COMMIT=""
 if [[ "$BASE_SHA" != "$HEAD_SHA" ]]; then
-  CLOSE_COMMIT=$(git -C "$WORKTREE_DIR" log -E --grep="^Drover: done #$N[[:space:]]*\$" --format="%H %s" "$COMMITS_RANGE" 2>/dev/null | head -1 || true)
-  WIP_COMMIT=$(git -C "$WORKTREE_DIR" log -E --grep="^Drover: partial #$N[[:space:]]*\$" --format="%H %s" "$COMMITS_RANGE" 2>/dev/null | head -1 || true)
+  CLOSE_COMMIT=$(trailer_commit done || true)
+  WIP_COMMIT=$(trailer_commit partial || true)
 fi
 
 # Detect HUMAN GATE in log
