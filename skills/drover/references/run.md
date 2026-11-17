@@ -307,8 +307,11 @@ column), never built unchecked. `qa` cards are not pre-flighted: nothing is buil
    (`merge_policy.auto_max_lines`, default 400 changed lines). Growing past it mid-build → stop,
    push what you have, propose the split (vertical slices via `/to-tickets`) in a PR comment and
    move the card to Blocked `❓` — never push on past the cap (drover-build → "Keep each PR small").
-5. Commit + push (always). Commits follow writing-standard.md § 1 (`✨ [feat] chat: stream replies` + short bullets).
-6. Open draft PR linked to the issue with the PR description template (title in commit-subject format, every block filled).
+5. Commit + push (always). Commits follow writing-standard.md § 1: the subject in the repo's
+   `commit_style` (your prompt gives the style and three real subjects) + short bullets. The last
+   commit of a finished build ends its body with `Drover: done #<N>`; partial work with
+   `Drover: partial #<N>`.
+6. Open draft PR linked to the issue with the PR description template (title in `commit_style`, every block filled).
 7. Follow [PR author notes](pr-author-notes.md), then post the `[builder] [report]` PR comment (see "Commenting cadence").
 8. Post a short status comment on the issue with the PR URL.
 9. Clean up worktree. Keep branch + PR open.

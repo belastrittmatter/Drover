@@ -56,14 +56,15 @@ Subject regex (checked by `tests/test_writing_format.py`):
 `^(✨|🐛|🔧|♻️|🧪|⚡|📝|👷|💄|🔒|⏪|🚧) \[(feat|fix|chore|refactor|test|perf|docs|ci|ui|security|revert|wip)\] [a-z0-9][a-z0-9._/-]*: \S`
 The emoji must match its type.
 
-Machine-read subjects (scripts grep these exact shapes):
+Machine-read trailers. Scripts and orchestrators read these from the commit body
+(`git log --format=%B`), never from the subject. One trailer line, last in the body:
 
-| Commit | Subject |
-|---|---|
-| Builder done | `🔧 [chore] loop: close #<N> — <summary>` |
-| Builder partial | `🚧 [wip] loop: #<N> partial — <slice or reason>` |
-| drover-qa iteration done | `🧪 [test] drover-qa: iter <N> (<X> bugs, <Y> items, <Z> PRs opened)` |
-| drover-qa checkpoint | `🚧 [wip] drover-qa: iter <N> — <one-liner>` |
+| Commit | Body trailer | Read by |
+|---|---|---|
+| Builder done | `Drover: done #<N>` | `drover-build-dispatch.sh` (exit 0) |
+| Builder partial | `Drover: partial #<N>` | `drover-build-dispatch.sh` (exit 5, with `WIP-PARTIAL:`) |
+| drover-qa iteration done | `Drover: qa-iter <N> (<X> bugs, <Y> items, <Z> PRs opened)` | drover-qa orchestrator |
+| drover-qa checkpoint | `Drover: qa-checkpoint <N>` | drover-qa orchestrator |
 
 **Squash merge.** Subject = the PR title. Body = the PR's commit bullets, deduplicated, plus
 `Closes #N`. The merge gate takes them as `--subject` and `--body-file`.

@@ -39,7 +39,7 @@ class WorktreePaths(unittest.TestCase):
         bin_dir.mkdir()
         for name, body in {
             "gh": '#!/bin/sh\nprintf \'%s\\n\' \'{"number":9,"title":"fixture","body":"offline","labels":[]}\'\n',
-            "claude": '#!/bin/sh\ncat >/dev/null\npwd -P > "$WORKER_CWD"\ngit commit -q --allow-empty -m "chore(loop): close #9"\n',
+            "claude": '#!/bin/sh\ncat >/dev/null\npwd -P > "$WORKER_CWD"\ngit commit -q --allow-empty -m "Build card 9" -m "Drover: done #9"\n',
         }.items():
             path = bin_dir / name
             path.write_text(body)

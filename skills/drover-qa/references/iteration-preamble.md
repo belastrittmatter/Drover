@@ -20,7 +20,7 @@ Run **one iteration** of the loop:
    classify it, write a spec, run it, mark `[x]` or `[b]`, walk the page,
    push children to the back of the queue.
 3. **Report** — write `docs/drover-qa/iter/iteration-N.md`, regenerate
-   `docs/drover-qa/report/QA-REPORT.md`, commit `🧪 [test] drover-qa: iter N (X bugs, Y items, Z PRs opened)`,
+   `docs/drover-qa/report/QA-REPORT.md`, commit with trailer `Drover: qa-iter N (X bugs, Y items, Z PRs opened)`,
    exit cleanly.
 
 ## Your iteration
@@ -218,7 +218,7 @@ assertions ("Per-spec expectations" above) onto the 5 existing specs in
 `e2e/paths/` (login, dashboard, orders, orders-new, order-detail). One
 commit:
 
-  `🧪 [test] drover-qa: retrofit forensics assertions onto existing specs`
+  `test(drover-qa): retrofit forensics assertions onto existing specs` (or the same words in the repo's `commit_style`)
 
 When a `[b]` is filed, the bug body produced for `drover-qa-file-bug.sh`
 MUST carry these artifacts in its folded Evidence table (writing-standard.md § 3):
@@ -353,14 +353,14 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
 
 **On the active branch (the loop's working branch), only commit:**
 - The forensics fixture extension (iter 2 onwards, separate commit)
-- The per-iter close-out commit `🧪 [test] drover-qa: iter N (X bugs, Y items, Z PRs opened)`
+- The per-iter close-out commit (trailer `Drover: qa-iter N (X bugs, Y items, Z PRs opened)`)
 - The per-iter `iteration-N.md` + `QA-REPORT.md` + `queue.md` updates
 - New `e2e/paths/<slug>.spec.ts` files (these ARE the deliverable)
 
 **Never on the active branch:**
 - A change to production code (`client/`, `server/`, `shared/`) — those
   go through PRs.
-- A `🚧 [wip] drover-qa:` commit for an unresolved fix — close the fix branch and leave
+- A `Drover: qa-checkpoint` commit for an unresolved fix — close the fix branch and leave
   the GH issue open instead.
 
 ### Phase 2 — Explore (bounded)
@@ -369,7 +369,7 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
 - Default 5 cells popped per iter.
 - Wall-clock cap 30 min from iter start.
 - When wall-clock hits mid-cell, finish the current cell, write the report,
-  exit. When wall-clock hits mid-fix, commit a `🚧 [wip] drover-qa:` checkpoint with the
+  exit. When wall-clock hits mid-fix, commit a checkpoint (trailer `Drover: qa-checkpoint N`) with the
   failing spec still red and exit (the orchestrator records this as status 5).
 
 **Per cell:**
@@ -768,9 +768,12 @@ git add e2e/paths/<new-or-modified specs> \
         docs/drover-qa/report/<slug>/  # if new screenshots
 ```
 
-**Final commit (mandatory format — orchestrator parses):**
+**Final commit (mandatory trailer — orchestrator parses the body, never the subject):**
 ```
-🧪 [test] drover-qa: iter N (X bugs, Y items, Z PRs opened)
+<subject in commit_style, e.g. test(drover-qa): iter N report>
+
+- <short bullet>
+Drover: qa-iter N (X bugs, Y items, Z PRs opened)
 ```
 where:
 - `X` = total bugs found in this iter (regression + explore combined)
@@ -781,16 +784,16 @@ STOP. Do NOT advance to a next iteration.
 ## Failure modes
 
 - **Found zero bugs and explored zero cells (queue empty):** valid outcome.
-  Final commit `🧪 [test] drover-qa: iter N (0 bugs, 0 items, 0 PRs)`. Exit 0. Orchestrator
+  Final commit with trailer `Drover: qa-iter N (0 bugs, 0 items, 0 PRs opened)`. Exit 0. Orchestrator
   will detect the queue is empty and terminate.
 - **Real blocker (env unreachable, BASE_URL 500s, qa-bot can't log in):**
   document the blocker in `iteration-N.md` Section 1, do NOT make a
-  `🧪 [test] drover-qa:` commit, exit non-zero.
-- **Wall-clock hit mid-fix:** make a `🚧 [wip] drover-qa: iter N — <one-liner>`
-  commit with the failing spec still red. Then make the close-out
-  `🧪 [test] drover-qa: iter N (X bugs, Y items, Z PRs opened)` commit anyway, noting in
+  `Drover: qa-iter` commit, exit non-zero.
+- **Wall-clock hit mid-fix:** make a checkpoint commit (trailer `Drover: qa-checkpoint N`)
+  with the failing spec still red. Then make the close-out commit (trailer
+  `Drover: qa-iter N (X bugs, Y items, Z PRs opened)`) anyway, noting in
   `iteration-N.md` Section 1 that one fix is in flight. Exit 0. The
-  orchestrator will see the `🚧 [wip]` and the close-out and treat it as a
+  orchestrator will see the checkpoint and the close-out and treat it as a
   successful iter (not exit 5 — exit 5 is for missing close-out commits
   that the orchestrator infers were time-clipped).
 

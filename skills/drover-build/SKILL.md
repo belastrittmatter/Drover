@@ -118,7 +118,7 @@ The dispatcher (this skill's `scripts/drover-build-dispatch.sh`) handles:
 - `gh issue view N --json title,body,labels` to compose the worker prompt
 - prepend `references/worker-preamble.md` + append working-directory footer
 - `cd` into worktree and exec `claude -p --dangerously-skip-permissions --output-format stream-json --verbose --max-turns 250`
-- verify the worker produced a `🔧 [chore] loop: close #N` commit on its branch
+- verify the worker produced a commit with the body trailer `Drover: done #N` on its branch
 - exit 0 (success) / 2 (worker non-zero) / 3 (no done-commit) / 4 (HUMAN GATE TRIPPED)
 
 **Base branch:** the orchestrator's currently-checked-out branch (e.g. `frontend-rebuild`). Pass via `BASE_BRANCH` env var to the dispatcher. Don't assume `main`.
@@ -133,7 +133,7 @@ handoff complete. Add file summaries and critical inline notes on the PR, not in
 
 **On dispatcher exit 0 (success):**
 - `git -C .drover/worktrees/issue-N push -u origin loop/issue-N`
-- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<emoji> [<type>] <scope>: <subject>" --body-file <body.md>` — title in commit-subject format, body = the marker-block template from `skills/drover/references/run.md` (writing-standard.md § 2), `Closes #N` in the status card, `Docs:` bullets in Solution, Door + Blast radius in Risk
+- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<subject in commit_style>" --body-file <body.md>` — title in the repo's commit style (writing-standard.md § 1), body = the marker-block template from `skills/drover/references/run.md` (writing-standard.md § 2), `Closes #N` in the status card, `Docs:` bullets in Solution, Door + Blast radius in Risk
 - `gh issue edit N --remove-label loop:in-progress`
 - `gh issue comment N --body "[builder] [report] ✅ built · PR <URL>"` (Next line: `qa`)
 - Move the project card to `QA`. The Tester and Reviewer take it from there; the issue closes when the Reviewer merges through the merge gate.
@@ -143,7 +143,7 @@ handoff complete. Add file summaries and critical inline notes on the PR, not in
 
 **On dispatcher exit 5 (intentional WIP-PARTIAL — open a partial PR, do NOT close):**
 - `git -C .drover/worktrees/issue-N push -u origin loop/issue-N`
-- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "🚧 [wip] <scope>: <slice from worker's final message>"` — the status card says `Refs #N`, never `Closes`, so the merge does not close the issue.
+- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<slice from worker's final message, in commit_style>"` — the status card says `Refs #N`, never `Closes`, so the merge does not close the issue.
 - `gh issue edit N --remove-label loop:in-progress --add-label human-gated`
 - `gh issue comment N --body "[builder] [report] ⚠️ partial · PR <URL>\nDid: <slice>\n❌ Not done: <worker's reason for stopping>\nNext: Eric"` — the issue stays open with `human-gated` until the rest lands.
 - Report: `🟡 Issue #N partial PR opened — issue stays open (human-gated)`

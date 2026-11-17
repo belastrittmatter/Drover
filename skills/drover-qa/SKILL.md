@@ -87,7 +87,7 @@ orchestrator pausing on `AskUserQuestion`.
 **Decide-and-proceed, don't ask, on these classes of issue:**
 
 - Harness script bugs (parser errors, broken xargs, missing
-  `chmod +x`, stale lock files). Fix locally, commit as `🐛 [fix] drover-qa: <what>`
+  `chmod +x`, stale lock files). Fix locally, commit in the repo's `commit_style` (writing-standard.md § 1)
   (writing-standard.md § 1), then continue.
 - Missing env auto-loads, leftover MCP zombies, log-dir creation.
 - Lint / formatting nits introduced by the worker that block its own commit.
@@ -302,11 +302,11 @@ Launch one sub-agent (Agent tool) in the repo root, no worktree, with
 prompt = `references/iteration-preamble.md` + a per-iteration footer (iter
 num, base SHA, mandatory final-commit format) and `DROVER_QA_FORENSICS=1`.
 When it returns, classify the iteration:
-- `0` iter complete — a `🧪 [test] drover-qa: iter N` commit is on the current branch.
+- `0` iter complete — a commit on the current branch carries the trailer `Drover: qa-iter N (…)`.
 - `2` worker failed — it errored and left no done or WIP marker.
-- `3` no done-commit — it finished but no `🧪 [test] drover-qa: iter N` commit exists.
+- `3` no done-commit — it finished but no commit carries `Drover: qa-iter N`.
 - `4` HUMAN GATE — its output contains `HUMAN GATE TRIPPED:`.
-- `5` WIP-CHECKPOINT — it hit its budget mid-fix and left a `🚧 [wip] drover-qa:` commit;
+- `5` WIP-CHECKPOINT — it hit its budget mid-fix and left a `Drover: qa-checkpoint N` commit;
   the next iter picks it up.
 
 Report: `🔍 Iter N launched`.
@@ -314,7 +314,7 @@ Report: `🔍 Iter N launched`.
 **2c. Wait, then advance**
 
 On status 0:
-- Read the close-out commit subject to extract `(X bugs, Y items)`.
+- Read the close-out commit's `Drover: qa-iter` trailer (`git log --format=%B`) to extract `(X bugs, Y items)`.
 - Report: `✅ Iter N done — X bugs, Y items processed`.
 - Loop to next iteration.
 
@@ -382,7 +382,8 @@ OR 30 min wall-clock):
 **Phase 3 — Report.** Write `docs/drover-qa/iter/iteration-N.md` (bugs
 found, items processed, queue size before/after, coverage snapshot). Run
 `npm run qa:report:render`. Commit:
-`🧪 [test] drover-qa: iter N (X bugs, Y items, Z PRs opened)` (writing-standard.md § 1).
+subject in `commit_style`, body trailer `Drover: qa-iter N (X bugs, Y items, Z PRs opened)`
+(writing-standard.md § 1).
 
 ## The bug-handling rule (non-blocking)
 
@@ -607,7 +608,7 @@ docs/drover-qa/report/
 - Default: starts a new batch numbered after the last `iteration-*.md`
   (e.g. if iters 1-5 exist, the next batch starts at 6).
 - `--resume`: only run iters whose number is greater than `max(existing)`.
-- A leftover `🚧 [wip] drover-qa:` commit on the current branch (from a status-5 iteration)
+- A leftover `Drover: qa-checkpoint` commit on the current branch (from a status-5 iteration)
   is OK — the next iter's regression phase finds the red spec and finishes
   the fix.
 

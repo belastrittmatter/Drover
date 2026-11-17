@@ -13,6 +13,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -92,26 +93,36 @@ def test_standard_examples_are_valid_subjects():
     assert seen >= 1, "expected a commit example in writing-standard.md"
 
 
-def test_dispatcher_greps_the_standard_loop_subjects():
+def test_dispatcher_reads_the_done_trailer_not_the_subject():
+    """FR-CNV-6: done / partial come from the `Drover:` body trailer; the subject is free."""
     src = (ROOT / "skills" / "drover-build" / "scripts" / "drover-build-dispatch.sh").read_text(encoding="utf-8")
-    pats = re.findall(r'grep -E "\^\[0-9a-f\]\+ (.*?)" \| head', src)
-    assert len(pats) == 2, f"expected the close and wip greps, found {pats}"
-    close_pat, wip_pat = (p.replace("$N", "42").replace("\\\\", "\\") for p in pats)
+    pats = dict(re.findall(r'--grep="\^Drover: (done|partial) (#\$N\[\[:space:\]\]\*\\\$)"', src))
+    assert set(pats) == {"done", "partial"}, f"expected the done and partial trailer greps, found {pats}"
+    with tempfile.TemporaryDirectory() as d:
+        def git(*a):
+            return subprocess.run(["git", "-C", d, *a], capture_output=True, text=True, check=True).stdout
+        git("init", "-q")
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "base")
+        base = git("rev-parse", "HEAD").strip()
+        for msg in ("chore(loop): close #42 — subject only, no trailer",
+                    "feat(cart): other card\n\n- bullet\nCloses #421\nDrover: done #421",
+                    "Add schema for carts\n\n- bullet\nDrover: partial #42"):
+            git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", msg)
 
-    def grep(pat: str, subject: str) -> bool:
-        r = subprocess.run(["grep", "-E", "^[0-9a-f]+ " + pat], input=f"abc123 {subject}\n",
-                           capture_output=True, text=True)
-        return r.returncode == 0
+        def found(kind: str) -> str:
+            pat = "^Drover: " + kind + " " + pats[kind].replace("$N", "42").replace("\\$", "$")
+            return git("log", "-E", "--grep=" + pat, "--format=%s", f"{base}..HEAD").strip()
 
-    assert grep(close_pat, "🔧 [chore] loop: close #42 — add streaming")
-    assert not grep(close_pat, "🔧 [chore] loop: close #421 — other card")
-    assert grep(wip_pat, "🚧 [wip] loop: #42 partial — schema only")
-    assert grep(close_pat, "chore(loop): close #42 — legacy branch")
+        assert found("done") == "", "a subject or another card's trailer must not count as done"
+        assert found("partial") == "Add schema for carts"
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty",
+            "-m", "Show a size error for receipts over 10 MB\n\n- client checks size\nCloses #42\nDrover: done #42")
+        assert found("done") == "Show a size error for receipts over 10 MB"
 
 
 def test_no_old_commit_shapes_in_templates():
     old = re.compile(r"chore\(loop\)|wip\(loop\)|fix\(drover-qa\)|feat\(drover-qa\)|refine\(\$?\{?[a-z<]")
-    allowed = {"drover-build-dispatch.sh"}  # documents and still accepts the legacy shapes
+    allowed: set[str] = set()
     for p in list((ROOT / "skills").rglob("*.md")) + list((ROOT / "skills").rglob("*.sh")) + list((ROOT / "workflows").glob("*.js")):
         if p.name in allowed or "visual" in p.parts:
             continue
