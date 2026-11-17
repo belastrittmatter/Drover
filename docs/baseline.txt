@@ -105,73 +105,73 @@ PASS: test-codex-wave-contract.sh (normal/bounced/halted summaries carry the wor
 passed: 63  failed: 0  known bugs (xfail): 0
 ::endgroup::
 ::group::tests/test-collect-custom.sh
-/Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpw00v7wby/cfg.json' mode='w' encoding='UTF-8'>
+~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpw00v7wby/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:136: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpw00v7wby/cfg.json' mode='r' encoding='UTF-8'>
+~/projects/drover/tests/test_collect_custom.py:136: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpw00v7wby/cfg.json' mode='r' encoding='UTF-8'>
   cfg = json.load(open(self.cfg))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpvlx55hmr/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpvlx55hmr/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:141: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpvlx55hmr/cfg.json' mode='w' encoding='UTF-8'>
+~/projects/drover/tests/test_collect_custom.py:141: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpvlx55hmr/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["status"], "custom": [
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpqezy309n/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpqezy309n/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:162: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpqezy309n/cfg.json' mode='w' encoding='UTF-8'>
+~/projects/drover/tests/test_collect_custom.py:162: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpqezy309n/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"custom": [{"name": "linear", "kind": "mcp", "target": "linear",
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmplzxft_sz/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmplzxft_sz/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpy129gtoa/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpy129gtoa/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:172: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpy129gtoa/cfg.json' mode='w' encoding='UTF-8'>
+~/projects/drover/tests/test_collect_custom.py:172: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpy129gtoa/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"custom": [{"name": "gone", "kind": "cli", "target": "no-such-binary-xyz --json"}]}},
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp5xo4p93a/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp5xo4p93a/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpf9pfm6cp/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpf9pfm6cp/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpec3c9ta8/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpec3c9ta8/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpghab15hf/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpghab15hf/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpyn_gqinz/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpyn_gqinz/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:72: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpyn_gqinz/.mcp.json' mode='w' encoding='UTF-8'>
+~/projects/drover/tests/test_collect_custom.py:72: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpyn_gqinz/.mcp.json' mode='w' encoding='UTF-8'>
   json.dump({"mcpServers": {"bugbase": {"command": "x"}}}, open(os.path.join(self.tmp, ".mcp.json"), "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/Users/belastrittmatter/projects/drover/tests/../skills/super-collect/scripts/collect_custom.py:67: ResourceWarning: unclosed file <_io.TextIOWrapper name='.mcp.json' mode='r' encoding='UTF-8'>
+~/projects/drover/tests/../skills/super-collect/scripts/collect_custom.py:67: ResourceWarning: unclosed file <_io.TextIOWrapper name='.mcp.json' mode='r' encoding='UTF-8'>
   data = json.load(open(path))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpvu99d072/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpvu99d072/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmprbq97dmv/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmprbq97dmv/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpz325zwbx/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpz325zwbx/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpc154bxa4/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpc154bxa4/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp8jxpwndf/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp8jxpwndf/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp495z3jas/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp495z3jas/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpim4e3gbi/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpim4e3gbi/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
 .
@@ -534,7 +534,7 @@ PASS: test-settings.sh (3 scenarios)
 ::group::tests/test-setup.sh
 {
  "root": "/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp.PTq06vroeB/bare",
- "pack": "/Users/belastrittmatter/projects/drover",
+ "pack": "~/projects/drover",
  "pack_version": "3.3.0",
  "installed_version": "3.3.0",
  "upgrade": false,
@@ -1139,73 +1139,73 @@ Ran 21 tests in 0.030s
 OK
 ::endgroup::
 ::group::tests/test_collect_custom.py
-/Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpe6yjuyja/cfg.json' mode='w' encoding='UTF-8'>
+~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpe6yjuyja/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:136: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpe6yjuyja/cfg.json' mode='r' encoding='UTF-8'>
+~/projects/drover/tests/test_collect_custom.py:136: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpe6yjuyja/cfg.json' mode='r' encoding='UTF-8'>
   cfg = json.load(open(self.cfg))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpzor80eq0/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpzor80eq0/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:141: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpzor80eq0/cfg.json' mode='w' encoding='UTF-8'>
+~/projects/drover/tests/test_collect_custom.py:141: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpzor80eq0/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["status"], "custom": [
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp4thygn3z/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp4thygn3z/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:162: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp4thygn3z/cfg.json' mode='w' encoding='UTF-8'>
+~/projects/drover/tests/test_collect_custom.py:162: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp4thygn3z/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"custom": [{"name": "linear", "kind": "mcp", "target": "linear",
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmps507uhpt/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmps507uhpt/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpw2t9fxhl/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpw2t9fxhl/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:172: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpw2t9fxhl/cfg.json' mode='w' encoding='UTF-8'>
+~/projects/drover/tests/test_collect_custom.py:172: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpw2t9fxhl/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"custom": [{"name": "gone", "kind": "cli", "target": "no-such-binary-xyz --json"}]}},
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpf9ck9lz_/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpf9ck9lz_/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpttaqhrok/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpttaqhrok/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmphm344d8k/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmphm344d8k/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpbd837y3_/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpbd837y3_/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpop0pnkde/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpop0pnkde/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:72: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpop0pnkde/.mcp.json' mode='w' encoding='UTF-8'>
+~/projects/drover/tests/test_collect_custom.py:72: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpop0pnkde/.mcp.json' mode='w' encoding='UTF-8'>
   json.dump({"mcpServers": {"bugbase": {"command": "x"}}}, open(os.path.join(self.tmp, ".mcp.json"), "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-/Users/belastrittmatter/projects/drover/tests/../skills/super-collect/scripts/collect_custom.py:67: ResourceWarning: unclosed file <_io.TextIOWrapper name='.mcp.json' mode='r' encoding='UTF-8'>
+~/projects/drover/tests/../skills/super-collect/scripts/collect_custom.py:67: ResourceWarning: unclosed file <_io.TextIOWrapper name='.mcp.json' mode='r' encoding='UTF-8'>
   data = json.load(open(path))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpzhczj5lr/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpzhczj5lr/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp9vcn52wx/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp9vcn52wx/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpgsbkwtg6/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpgsbkwtg6/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmps5pvr89d/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmps5pvr89d/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpwzywrzg7/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpwzywrzg7/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpfilf29bf/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpfilf29bf/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
-./Users/belastrittmatter/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpwy5h8pde/cfg.json' mode='w' encoding='UTF-8'>
+.~/projects/drover/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpwy5h8pde/cfg.json' mode='w' encoding='UTF-8'>
   json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
 ResourceWarning: Enable tracemalloc to get the object allocation traceback
 .
