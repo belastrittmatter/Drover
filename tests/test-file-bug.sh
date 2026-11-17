@@ -68,6 +68,11 @@ Make the import job reach a terminal state; see `server/imports/job-handler.ts`.
 🟢 **Low** · one handler, covered by the imports spec.
 BODY
 
+# A valid body padded to ~460 KB inside Evidence and Acceptance Criteria, so a
+# check that pipes the body into `grep -q` loses the race (SIGPIPE + pipefail).
+awk 'BEGIN { for (i = 0; i < 6000; i++) pad = pad "padding line " i " of the evidence log\n" }
+  { print } /^<\/details>$|^- \[ \] Super QA rerun/ { printf "```\n%s```\n", pad }' \
+  "$WORK/good.md" > "$WORK/big.md"
 sed '/## Evidence/,/## Fix/d' "$WORK/good.md" > "$WORK/no-evidence.md"
 sed 's|CSV upload reports success but no rows land in the imports table.|<one sentence: what is wrong and where>|' "$WORK/good.md" > "$WORK/placeholder.md"
 sed 's|Make the import job reach a terminal state|TBD|' "$WORK/good.md" > "$WORK/tbd.md"
@@ -151,6 +156,10 @@ is "rejects arrows in steps"        66 "$(code --title T --body-file "$WORK/arro
 is "rejects an Evidence row missing" 66 "$(code --title T --body-file "$WORK/short-evidence.md")"
 has "names the missing row"         "$(cat "$WORK/err")" "posthog replay"
 is "rejects an unfolded Evidence table" 66 "$(code --title T --body-file "$WORK/open-evidence.md")"
+
+BIG_RC=0
+for _ in 1 2 3 4 5; do [ "$(code --title T --body-file "$WORK/big.md" --check-body)" = 0 ] || BIG_RC=1; done
+is "accepts a large valid body (5 runs, no broken-pipe false reject)" 0 "$BIG_RC"
 
 echo "── happy path"
 OUT=$(run "${BASE[@]}" --kind bug --priority high --category functional \
