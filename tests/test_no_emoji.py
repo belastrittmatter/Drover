@@ -1,7 +1,8 @@
 """No emoji in text drover writes (specs/conventions.md FR-CNV-3, specs/README.md SC-7).
 
-Scans every shipped file under scripts/, skills/, hooks/, workflows/ and install.sh: the
-comments, block notes, PR body text, logs, status output and chat output all come from there.
+Scans every shipped file under scripts/, skills/, hooks/, workflows/, .github/, .claude-plugin/,
+install.sh, README.md and CLAUDE.md: the comments, block notes, PR body text, logs, status
+output and chat output all come from there.
 Exempt (FR-CNV-3): the visual skill's page assets, which are page design. Arrows (→ ↳ ←) and
 box-drawing characters are not emoji and stay.
 
@@ -15,7 +16,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SCOPE = ("scripts/", "skills/", "hooks/", "workflows/", "install.sh")
+SCOPE = ("scripts/", "skills/", "hooks/", "workflows/", "install.sh", "README.md", "CLAUDE.md", ".github/", ".claude-plugin/")
 EXEMPT = ("skills/visual/assets/",)
 
 # Unicode Emoji=Yes code points, minus the ASCII keycap bases, (c) (R) (TM) and the arrows.
