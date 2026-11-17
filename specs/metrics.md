@@ -27,6 +27,8 @@ use, human effort and PR outcomes, and compares configs. Two inputs:
   `drover status` and by FactoryBench. Changing them is an "ask first"
   change. `pid=` shall always be a number unique within the run (the
   process id for the `process` backend, a run counter for hc).
+  (Approved 2026-11-17: the zombie, clean-exit and block-rate lines lost
+  their leading emoji in stage 4; both parsers match the words after it.)
 
 ## New or changed
 

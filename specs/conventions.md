@@ -6,7 +6,8 @@ Part of the [drover spec](README.md). All of this is new or changed.
 
 - **FR-CNV-1** At onboard, the system shall classify the base branch's last
   50 commit subjects as conventional, plain imperative, bracket-tag, or
-  other, and store the result as `commit_style`. Fewer than 10 commits or
+  other, and store the result as `commit_style` (`conventional`, `plain`,
+  `bracket-tag`, `other`). Fewer than 10 commits or
   no clear majority defaults to conventional.
 - **FR-CNV-2** Workers shall write commit subjects and PR titles in
   `commit_style`, given 3 real subjects from the repo as examples.
@@ -17,7 +18,8 @@ Part of the [drover spec](README.md). All of this is new or changed.
   such as the onboard wizard and run progress lines) shall contain no emoji.
   GitHub alert boxes (`[!NOTE]`, `[!WARNING]`, `[!TIP]`) stay. The visual
   skill's HTML template is page design and keeps its glyphs. Run manifest
-  lines keep their format (metrics.md FR-MET-2).
+  lines keep their format apart from the approved emoji removal
+  (metrics.md FR-MET-2).
 - **FR-CNV-4** Every machine-read marker (thread prefixes, report marker,
   reason tags, gate output lines) shall be defined once, in a file used by
   both its writer and its parser. Upstream spreads these across

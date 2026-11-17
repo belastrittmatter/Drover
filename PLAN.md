@@ -133,8 +133,11 @@ hits only LICENSE; tests green.
 
 Spec: specs/conventions.md, specs/board.md FR-BRD-6.
 
-Exit: no emoji in `lib/`, `skills/`, `hooks/` output; parser tests cover the
-new tags; tests green.
+Exit: no emoji in `scripts/`, `skills/`, `hooks/`, `workflows/` output
+(`tests/test_no_emoji.py`); parser tests cover the new tags; tests green.
+The reason tags are defined once (`scripts/drover-reasons.json`); the other
+FR-CNV-4 markers (thread prefixes, report marker, gate output lines) move
+to a shared definition in stage 7.
 
 ## Stage 5: CLI core + harness layer (2 days)
 
@@ -218,6 +221,8 @@ build in parallel with `max_workers: 2`; tests green.
   commit and bounces if it passes there (FR-BLD-7).
 - Review report lists test-file changes by non-QA commits since QA's last
   pass, visibility only (FR-REV-12).
+- FR-CNV-4 for the remaining markers: thread prefixes, the review report
+  marker and gate output lines, each defined once for writer and parser.
 - Context packs (FR-CTX): `drover context <role> <issue>`, per-role rules
   files split out of upstream's `run.md`, `--claims` gated on recorded
   hypotheses, tests asserting each pack's contents. Adds about 1 day.
