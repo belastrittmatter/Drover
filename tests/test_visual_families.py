@@ -135,7 +135,7 @@ const failures=[],facts={}; let ws;
 const check=(ok,message)=>{if(!ok)failures.push(message);};
 try {
   let port;
-  for(let i=0;i<100;i++){try{port=(await readFile(profile+'/DevToolsActivePort','utf8')).split('\n')[0];break;}catch{}await delay(50);}
+  for(let i=0;i<400;i++){try{port=(await readFile(profile+'/DevToolsActivePort','utf8')).split('\n')[0];break;}catch{}await delay(50);}
   if(!port)throw Error('Chrome debugger did not start');
   const tabs=await(await fetch('http://127.0.0.1:'+port+'/json')).json();
   ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);

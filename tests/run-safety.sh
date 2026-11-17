@@ -11,15 +11,22 @@ done
 shopt -s nullglob
 suites=(tests/test-*.sh tests/test_*.py)
 [ "${#suites[@]}" -gt 0 ] || { echo 'No safety suites found' >&2; exit 1; }
+jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+tmp=$(mktemp -d) || exit 1
+trap 'rm -rf "$tmp"' EXIT
+# Each worker writes <i>.log and <i>.rc; xargs -P keeps it Bash 3.2 friendly.
+for i in "${!suites[@]}"; do echo "$i ${suites[$i]}"; done |
+  xargs -n2 -P "$jobs" bash -c 's=$SECONDS
+    case "$2" in *.sh) bash "$2" ;; *.py) python3 "$2" ;; esac >"$0/$1.log" 2>&1 </dev/null
+    rc=$?; echo "$rc" >"$0/$1.rc"
+    [ "$rc" -eq 0 ] && r=ok || r=FAIL; echo "$r $2 $((SECONDS - s))s"' "$tmp"
 failed=()
-for suite in "${suites[@]}"; do
+for i in "${!suites[@]}"; do
+  suite=${suites[$i]}
   echo "::group::$suite"
-  case "$suite" in
-    *.sh) bash "$suite" ;;
-    *.py) python3 "$suite" ;;
-  esac
-  rc=$?
+  cat "$tmp/$i.log"
   echo '::endgroup::'
+  rc=$(cat "$tmp/$i.rc" 2>/dev/null || echo 1)
   if [ "$rc" -ne 0 ]; then
     failed+=("$suite")
     echo "::error::$suite failed (exit $rc)"
