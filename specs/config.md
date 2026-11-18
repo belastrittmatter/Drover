@@ -80,6 +80,7 @@ audit: it only fed an outside skill drover does not ship).
 | `evidence` | New (conventions.md FR-EVD-1) |
 | `metrics.commit_email` | New (metrics.md FR-MET-11) |
 | `hc.enabled`, `hc.view` | New (runner.md FR-WRK-3, FR-WRK-9) |
+| `permissions.allow_commands` | New, optional: extra command words merged into the harness allow list (FR-HRN-4), for global hooks that rewrite commands (e.g. a wrapper that turns `git status` into `<wrapper> git status`) |
 
 ## Harnesses
 

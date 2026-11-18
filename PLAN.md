@@ -139,7 +139,7 @@ The reason tags are defined once (`scripts/drover-reasons.json`); the other
 FR-CNV-4 markers (thread prefixes, report marker, gate output lines) move
 to a shared definition in stage 7.
 
-## Stage 5: CLI core + harness layer (2 days)
+## Stage 5: CLI core + harness layer (done)
 
 - `bin/drover` entry point; scripts move to `lib/`. `install.sh` only links
   `bin/drover` into `~/.local/bin` (brew tap later).
@@ -169,6 +169,12 @@ Spec: specs/config.md.
 Exit: a fresh repo onboards with only `.drover/config.json` added; tests green.
 
 ## Stage 6: runner (2.5 days)
+
+Two PRs. 6a: worker interface, per-role slots, the failed-dispatch halt, the grace
+tick, closed-without-merge, runs in `.drover/runs/`, and the stage 5 smoke fixes
+(deny rules as `Edit(<install>/**)` only, worker stdin from `/dev/null`,
+`permissions.allow_commands`). 6b: the ports, deleting the workflow and Codex
+backends, usage pause, FactoryBench.
 
 - `lib/worker.sh start|alive|stop` with the `process` backend; route every
   `nohup claude -p`, `kill -0` and `pgrep` site in the runner and stop
