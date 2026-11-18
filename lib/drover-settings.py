@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""drover-settings.py — merge into .claude/settings.json without losing anything.
+"""drover-settings.py — merge into a Claude settings file without losing anything.
 
     drover-settings.py hooks <settings.json> <snippet.json> [...] [--dry-run]
     drover-settings.py allow <settings.json> <rule> [<rule> ...]  [--dry-run]
 
 `hooks` adds each hook command from the snippets once per event + matcher
-(install.sh and onboard's protect-main step). `allow` adds permission rules to
+(`drover onboard`, which writes the harness's .claude/settings.local.json). `allow` adds permission rules to
 `permissions.allow` once each (onboard's Permissions step, after the user
 approved the printed diff). Both keep every existing key, back the file up
 (`settings.json.bak-<ts>`) before writing, write atomically, and leave an
@@ -93,7 +93,9 @@ def main(argv: list[str]) -> int:
     verb, path, rest = args[0], args[1], args[2:]
     settings = load(path)
     if verb == "hooks":
-        added = merge_hooks(settings, [json.load(open(p)) for p in rest])
+        # {drover_home} in a snippet is this install folder: hooks run from it, nothing is copied.
+        home = json.dumps(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))[1:-1]
+        added = merge_hooks(settings, [json.loads(open(p).read().replace("{drover_home}", home)) for p in rest])
         noun = "hook command(s)"
     else:
         added = merge_allow(settings, rest)

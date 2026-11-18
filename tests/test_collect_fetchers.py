@@ -102,13 +102,13 @@ class Common(unittest.TestCase):
             self.assertEqual(cc.secret("SENTRY_AUTH_TOKEN"), "tok")
             self.assertEqual(cc.secret("MISSING"), "")
 
-    def test_active_config_follows_pointer(self):
-        files = {".claude/drover/active": "app\n",
-                 ".claude/drover/configs/app.json": json.dumps({"collect": {"window_days": 30}})}
-        with in_dir(files):
+    def test_active_config_is_the_repo_config(self):
+        files = {".drover/config.json": json.dumps({"collect": {"window_days": 30}}), "app/x": ""}
+        with in_dir(files) as d:
+            os.chdir(os.path.join(d, "app"))
             cfg, path = cc.active_config()
             self.assertEqual(cc.window_days(cfg), 30)
-            self.assertTrue(path.endswith("app.json"))
+            self.assertTrue(path.endswith(os.path.join(".drover", "config.json")))
 
 
 SENTRY_CFG = {"collect": {"sentry": {"org": "acme", "project": "web", "host": "https://us.sentry.io/",

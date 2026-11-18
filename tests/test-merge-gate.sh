@@ -10,13 +10,13 @@
 # merge at a time, and the proof happens under the lock.
 set -euo pipefail
 cd "$(dirname "$0")"
-GATE="../scripts/drover-merge-gate.sh"
+GATE="../lib/drover-merge-gate.sh"
 
 fail() { echo "FAIL: $1" >&2; exit 1; }
 
 setup() {  # $1 = verify_commands JSON array
   TMP=$(mktemp -d)
-  export SB_GITHUB_HALT_FILE="$TMP/halt.json" SB_GITHUB_RETRY_DELAY=0
+  export SB_GITHUB_HALT_FILE="$TMP/halt.json" SB_GITHUB_RETRY_DELAY=0 DROVER_CLEANUP_WT="$TMP/.claude/hooks/cleanup-wt.py"
   mkdir -p "$TMP/bin"
   printf '#!/usr/bin/env bash\nexit 1\n' > "$TMP/bin/gh"
   chmod +x "$TMP/bin/gh"
@@ -312,14 +312,14 @@ RC=0; STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts)" gate --expect-head "$SHA" 
 [ "$RC" -eq 0 ] || fail "host codex with merge_policy.default auto should merge, got $RC"
 teardown
 T15=$(mktemp -d); printf '%s' "$(meta "" src/x.ts)" > "$T15/m.json"
-for c in '{"host":"claude"}' '{}' '{"host":"claude","merge_policy":{}}' '{"host":"opencode","merge_policy":{"default":"auto"}}'; do
+for c in '{"harness":"claude"}' '{}' '{"host":"claude","merge_policy":{}}' '{"harness":"opencode","merge_policy":{"default":"auto"}}'; do
   echo "$c" > "$T15/c.json"
-  python3 ../scripts/drover-merge-policy.py --config "$T15/c.json" --meta "$T15/m.json" --diff /dev/null \
+  python3 ../lib/drover-merge-policy.py --config "$T15/c.json" --meta "$T15/m.json" --diff /dev/null \
     | jq -e '.human == []' >/dev/null || fail "config $c should leave a small clean PR ungated"
 done
-for c in '{"host":"codex"}' '{"host":"opencode","merge_policy":{"auto_max_lines":0}}'; do
+for c in '{"harness":"codex"}' '{"host":"opencode","merge_policy":{"auto_max_lines":0}}'; do
   echo "$c" > "$T15/c.json"
-  python3 ../scripts/drover-merge-policy.py --config "$T15/c.json" --meta "$T15/m.json" --diff /dev/null \
+  python3 ../lib/drover-merge-policy.py --config "$T15/c.json" --meta "$T15/m.json" --diff /dev/null \
     | jq -e '.human | length == 1 and .[0].category == "default"' >/dev/null \
     || fail "config $c should add one default human entry"
 done
@@ -521,7 +521,7 @@ echo "$OUT" | grep -q "would migrate staging" || fail "a dry run should say what
 teardown
 
 # 25 — the glob dialect: **/ spans zero or more directories; * stays in one segment.
-P="../scripts/drover-merge-policy.py"
+P="../lib/drover-merge-policy.py"
 pol() { printf '%s' "$1" > "$T25/m.json"; python3 "$P" --config "$T25/c.json" --meta "$T25/m.json" --diff /dev/null; }
 T25=$(mktemp -d); echo '{"base_branch":"staging","migrations":{"globs":["**/migrations/*.sql"]}}' > "$T25/c.json"
 pol "$(meta "" migrations/1.sql)"          | jq -e '.migrations == ["migrations/1.sql"]' >/dev/null || fail "**/ should match zero directories"

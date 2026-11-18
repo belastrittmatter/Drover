@@ -74,7 +74,7 @@ output.write_text(json.dumps(result))
         return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
 
     def invoke(self,script,*args):
-        return subprocess.run(['bash',str(KIT/'scripts'/script),*args],cwd=self.root,env=self.env,text=True,capture_output=True)
+        return subprocess.run(['bash',str(KIT/'lib'/script),*args],cwd=self.root,env=self.env,text=True,capture_output=True)
 
     def preserved(self):
         self.assertEqual((self.state/'inflight/99').read_text(),'PID=99999\nLANE=review\n')
@@ -130,7 +130,7 @@ output.write_text(json.dumps(result))
 
     def test_legacy_dispatch_missing_skills_stops_before_claim(self):
         body='''export SB_LIB_ONLY=1
-source "$1/scripts/drover-run.sh"
+source "$1/lib/drover-run.sh"
 BOT_LOGIN=bot
 PROJECT_ITEMS_JSON='{"items":[{"status":"Ready","content":{"number":1},"labels":["docs"]}]}'
 INFLIGHT_DIR=.claude/drover/inflight
@@ -145,9 +145,6 @@ dispatch_lane build 1
 
     def test_standalone_missing_skills_creates_no_log_or_worktree(self):
         subprocess.run(['git','-C',str(self.root),'-c','user.name=Fixture','-c','user.email=fixture@example.com','commit','--allow-empty','-qm','fixture'],check=True)
-        directory=self.root/'.claude/bin';directory.mkdir()
-        for name in ['drover-github-read.py','drover-skills-ready.py']:
-            shutil.copy2(KIT/'scripts'/name,directory/name)
         self.env.update(REPO_DIR=str(self.root),BASE_BRANCH=subprocess.check_output(['git','-C',str(self.root),'branch','--show-current'],text=True).strip())
         result=subprocess.run(['bash',str(KIT/'skills/drover-build/scripts/drover-build-dispatch.sh'),'1'],cwd=self.root,env=self.env,text=True,capture_output=True)
         self.assertEqual(result.returncode,10,result.stderr)
@@ -219,9 +216,9 @@ dispatch_lane build 1
             unrelated.wait(timeout=3)
         self.addCleanup(reap_unrelated)
         (self.state / 'inflight/99').write_text(f'PID={unrelated.pid}\nLANE=review\n')
-        config_dir = self.state / 'configs'; config_dir.mkdir()
-        (config_dir / 'fixture.json').write_text(json.dumps(dict(project=dict(owner='fixture',number=1),
-            base_branch='main',worker_backend='claude-p',max_workers=3,bot_identity='bot',
+        (self.root / '.drover').mkdir(exist_ok=True)
+        (self.root / '.drover/config.json').write_text(json.dumps(dict(project=dict(owner='fixture',number=1),
+            base_branch='main',notifications=dict(bot_identity='bot'),
             verify_commands=['git diff --check'],tick_seconds=1)))
         self.tool('pgrep', 'import sys; sys.exit(1)')
         self.env['ROOT_FIXTURE'] = str(self.root)
@@ -263,7 +260,7 @@ elif args[:2]==['issue','view']:
 elif args[:2]==['issue','edit'] and '--add-assignee' in args:pass
 else:sys.exit('unexpected gh call: '+str(args))
 """)
-        result = subprocess.run(['bash',str(KIT/'scripts/drover-run.sh'),'fixture'],cwd=self.root,
+        result = subprocess.run(['bash',str(KIT/'lib/drover-run.sh')],cwd=self.root,
                                 env=self.env,text=True,capture_output=True,timeout=15)
         self.assertEqual(result.returncode,10,result.stderr + result.stdout)
         deadline = __import__('time').monotonic()+3
@@ -279,7 +276,7 @@ else:sys.exit('unexpected gh call: '+str(args))
     def test_setup_fix_reports_missing_even_after_successful_installer(self):
         (self.root/'skills-lock.json').write_text('{"mattpocock/skills":true}')
         for command,extra in [('check',[]),('fix',['--no-helpers']),('fix',[])]:
-            result=subprocess.run([sys.executable,str(KIT/'scripts/drover-setup.py'),command,'--root',str(self.root),'--pack',str(KIT),'--home',str(self.home),*extra],env=self.env,text=True,capture_output=True)
+            result=subprocess.run([sys.executable,str(KIT/'lib/drover-setup.py'),command,'--root',str(self.root),'--pack',str(KIT),'--home',str(self.home),*extra],env=self.env,text=True,capture_output=True)
             self.assertEqual(result.returncode,1,result.stderr)
             output=json.loads(result.stdout)
             self.assertFalse(output['helper_skills']);self.assertFalse(output['green'])
@@ -295,11 +292,10 @@ else:sys.exit('unexpected gh call: '+str(args))
         self.full('claude')
         (self.root/'skills-lock.json').write_text('{"mattpocock/skills":true,"cloudflare/security-audit-skill":true}')
         for command,extra in [('check',[]),('fix',[])]:
-            result=subprocess.run([sys.executable,str(KIT/'scripts/drover-setup.py'),command,'--root',str(self.root),'--pack',str(KIT),'--home',str(self.home),*extra],env=self.env,text=True,capture_output=True)
+            result=subprocess.run([sys.executable,str(KIT/'lib/drover-setup.py'),command,'--root',str(self.root),'--pack',str(KIT),'--home',str(self.home),*extra],env=self.env,text=True,capture_output=True)
             output=json.loads(result.stdout)
             self.assertTrue(output['security_audit'],result.stdout)
-            entry=next(e for e in output['helper_readiness']['entries'] if e['name']=='security-audit')
-            self.assertEqual(entry['requirement'],'optional')
+            self.assertNotIn('security-audit',[e['name'] for e in output['helper_readiness']['entries']])
         self.assertEqual([c for c in self.calls() if c['tool']=='npx'],[])
 
 if __name__=='__main__':unittest.main()

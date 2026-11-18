@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Tests scripts/drover-setup.py — onboard's Checks step, the upgrade path, config
-# migration, board names, branch detection, and the GitHub board ranking / migration.
+# Tests lib/drover-setup.py — onboard's Checks step, the upgrade path, config
+# migration, onboard's config writer, board names, branch detection, and the GitHub board
+# ranking / migration.
 # Offline: `gh` is a stateful stub on PATH (board state in a JSON file, every call
-# logged), install.sh comes from this checkout, helper skills are skipped.
+# logged), skills link from this checkout into a scratch HOME, helper skills are skipped.
 #
 #   bash tests/test-setup.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PACK="$PWD"
-SETUP="$PACK/scripts/drover-setup.py"
+SETUP="$PACK/lib/drover-setup.py"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 fail() { echo "FAIL: $1" >&2; exit 1; }
@@ -16,65 +17,86 @@ export HOME="$WORK/home"; mkdir -p "$HOME"
 export DROVER_PACK="$PACK"
 q() { jq -e "$@" >/dev/null; }
 
-# 1 — a bare folder: check is red and lists what is missing; fix installs every
-#     must-have with no question, runs git init, and the re-check is green.
+# 1 — a bare folder: check is red and lists what is missing; fix links the skills into the
+#     user skill folder, wires the guard hooks into the untracked settings.local.json, runs
+#     git init, and the re-check is green. Nothing is copied into the project.
 T="$WORK/bare"; mkdir -p "$T"
 OUT=$(python3 "$SETUP" check --root "$T" || true)
 echo "$OUT" | q '.green == false and (.missing | index("skill drover")) and .git == false' \
   || fail "bare folder should be red with drover missing: $OUT"
 OUT=$(python3 "$SETUP" fix --root "$T" --no-helpers || true)
-echo "$OUT" | q '.fixed | index("drover skills, scripts and board engine installed")' || fail "fix should install: $OUT"
+echo "$OUT" | q '.fixed | any(test("^drover skills linked into"))' || fail "fix should link the skills: $OUT"
+echo "$OUT" | q '.fixed | any(test("safety guards switched on"))' || fail "fix should wire the guards: $OUT"
 echo "$OUT" | q '.fixed | index("git repo created (git init)")' || fail "fix should git init: $OUT"
 echo "$OUT" | q '.missing == [] and .git == true and .upgraded == false' || fail "re-check after fix should have nothing missing: $OUT"
-[ -x "$T/.claude/bin/drover-setup.py" ] || fail "the setup script installs itself into .claude/bin"
+[ -L "$HOME/.claude/skills/drover" ] || fail "fix links the skills into ~/.claude/skills"
+q --arg p "$PACK/hooks/guard-secrets.py" '[.hooks[][].hooks[].command | select(contains($p))] | length == 1' "$T/.claude/settings.local.json" \
+  || fail "guard hooks run from the install folder: $(cat "$T/.claude/settings.local.json")"
+[ ! -e "$T/.claude/bin" ] && [ ! -e "$T/.claude/skills" ] && [ ! -e "$T/.agents" ] || fail "nothing is copied into the project"
 TXT=$(python3 "$SETUP" check --root "$T" --text || true)
-echo "$TXT" | grep -q "✓ drover skills, scripts and board engine present" || fail "text report should list what is present: $TXT"
+echo "$TXT" | grep -q "✓ drover skills linked and safety guards on" || fail "text report should list what is present: $TXT"
 
-# 1b — missing safety helpers must trigger a repair even on a current installation.
-for helper in drover-approval.py drover-github-read.py drover-project-verifier.py; do
-  rm "$T/.claude/bin/$helper"
-  OUT=$(python3 "$SETUP" check --root "$T" || true)
-  echo "$OUT" | q --arg helper "script $helper" '.missing | index($helper)' \
-    || fail "missing $helper must be reported: $OUT"
-  OUT=$(python3 "$SETUP" fix --root "$T" --no-helpers || true)
-  [ -x "$T/.claude/bin/$helper" ] || fail "repair must restore $helper"
-  echo "$OUT" | q '.missing == []' || fail "repair must leave no missing scripts: $OUT"
-done
+# 1b — a lost settings.local.json is reported and repaired.
+rm "$T/.claude/settings.local.json"
+OUT=$(python3 "$SETUP" check --root "$T" || true)
+echo "$OUT" | q '.missing | any(test("^.claude/settings.local.json: [0-9]+ guard entries"))' || fail "unwired guards must be reported: $OUT"
+OUT=$(python3 "$SETUP" fix --root "$T" --no-helpers || true)
+echo "$OUT" | q '.missing == []' || fail "repair must leave nothing missing: $OUT"
 
-# 2 — upgrade: an older drover (VERSION 1.8.2, removed skill folders, a qa-only
-#     config with Skipped, old collect keys, telegram) is detected and upgraded with
-#     no question, backed up first, and listed as "Upgraded for you".
-T="$WORK/old"; mkdir -p "$T/.claude/skills/drover" "$T/.claude/drover/configs"
+# 2 — upgrade: an older drover copied into the project (VERSION 1.8.2, removed skill folders,
+#     scripts in .claude/bin, a guard entry in the tracked settings.json, a qa-only config with
+#     Skipped, old collect keys, telegram, under .claude/drover/configs/ with an active pointer)
+#     is detected and upgraded with no question, backed up first, the config moved to
+#     .drover/config.json.
+T="$WORK/old"; mkdir -p "$T/.claude/skills/drover" "$T/.claude/drover/configs" "$T/.claude/bin" "$T/.claude/hooks"
 git -C "$T" init -q
 echo "1.8.2" > "$T/.claude/skills/drover/VERSION"
 for d in super-refine cleanup-wt arch-loop; do mkdir -p "$T/.claude/skills/$d"; echo x > "$T/.claude/skills/$d/SKILL.md"; done
+echo old > "$T/.claude/bin/drover-run.sh"; echo mine > "$T/.claude/bin/mine.sh"; echo old > "$T/.claude/hooks/guard-secrets.py"
+cat > "$T/.claude/settings.json" <<'JSON'
+{"model":"x","hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[
+ {"type":"command","command":"python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-secrets.py"},
+ {"type":"command","command":"my-own-hook"}]}]}}
+JSON
+echo books > "$T/.claude/drover/active"
 cat > "$T/.claude/drover/configs/books.json" <<'JSON'
 {"version":1,"variant":"qa-only","project":{"owner":"eric","number":2},
  "columns":["Ready","QA","Review","Done","Blocked","Skipped"],
  "repo":{"path":".","remote":"https://github.com/eric/books.git"},
  "collect":{"window_days":14,"errors":"auto","feedback_paths":["docs/feedback"],"lookback_runs":10},
- "refine":{"rounds":10,"qa_hook_rounds":3},"human_approves_merge":true,
+ "refine":{"rounds":10,"qa_hook_rounds":3},"human_approves_merge":true,"worker_backend":"workflow",
+ "max_workers":0,"labels":["qa","bug","feature"],"truth_gate":"non-trivial",
  "notifications":{"channel":"telegram","chat_id":"auto","bot_identity":"eric"}}
 JSON
 OUT=$(python3 "$SETUP" check --root "$T" || true)
 echo "$OUT" | q '.upgrade == true and .from == "1.8.2" and .old_dirs == ["super-refine","cleanup-wt","arch-loop"]' \
   || fail "older install should be detected: $OUT"
+echo "$OUT" | q '.old_copies | index(".claude/bin/drover-run.sh")' || fail "copied scripts should be listed: $OUT"
 OUT=$(python3 "$SETUP" fix --root "$T" --no-helpers || true)
 echo "$OUT" | q '.upgraded == true and .from == "1.8.2"' || fail "fix should report the upgrade: $OUT"
-echo "$OUT" | q '.fixed | any(test("^skills updated; added .*drover-collect"))' || fail "upgrade should name the added skills: $OUT"
+echo "$OUT" | q '.fixed[0] == "skills updated"' || fail "upgrade should lead with the skills line: $OUT"
 echo "$OUT" | q '.fixed | index("removed old folders: super-refine, cleanup-wt, arch-loop")' || fail "old folders line missing: $OUT"
-echo "$OUT" | q '.fixed | any(test("^config moved to the new keys"))' || fail "config line missing: $OUT"
-for d in super-refine cleanup-wt arch-loop; do [ ! -e "$T/.claude/skills/$d" ] || fail "$d should be removed"; done
+echo "$OUT" | q '.fixed | any(test("^config moved to .drover/config.json"))' || fail "config line missing: $OUT"
+echo "$OUT" | q '.fixed | any(test("^removed 1 old hook entry"))' || fail "old hook entry line missing: $OUT"
+for d in super-refine cleanup-wt arch-loop drover; do [ ! -e "$T/.claude/skills/$d" ] || fail "$d should be removed"; done
+[ ! -e "$T/.claude/bin/drover-run.sh" ] && [ ! -e "$T/.claude/hooks/guard-secrets.py" ] || fail "copied drover files should be removed"
+[ "$(cat "$T/.claude/bin/mine.sh")" = mine ] || fail "a user's own bin file must stay"
+q '.model == "x" and ([.hooks[][].hooks[].command] == ["my-own-hook"])' "$T/.claude/settings.json" \
+  || fail "only drover's old hook entry goes from settings.json: $(cat "$T/.claude/settings.json")"
 B=$(echo "$OUT" | jq -r .backup)
 [ -f "$T/$B/.claude/skills/arch-loop/SKILL.md" ] && [ -f "$T/$B/.claude/drover/configs/books.json" ] \
-  || fail "old folders and config must be backed up first (backup: $B)"
-C="$T/.claude/drover/configs/books.json"
+  && [ -f "$T/$B/.claude/bin/drover-run.sh" ] || fail "old folders, copies and config must be backed up first (backup: $B)"
+[ ! -e "$T/.claude/drover/configs/books.json" ] && [ ! -e "$T/.claude/drover/active" ] || fail "the old config and pointer go"
+C="$T/.drover/config.json"
 q '(has("variant") | not) and ._qa_all == true' "$C" || fail "variant must go, qa-only remembered for the board: $(cat "$C")"
 q '.columns == ["Backlog","Ready","Building","QA","Review","Blocked","Done"]' "$C" || fail "columns must be the v3 seven"
 q '.collect.sources == ["sentry","github","prs","architecture"] and (.collect | has("lookback_runs") | not)' "$C" || fail "collect keys not migrated"
 q '.merge_policy.default == "human" and .notifications.channel == "session" and (.refine | has("qa_hook_rounds") | not)' "$C" \
   || fail "merge rule / notifications / refine not migrated: $(cat "$C")"
-q '.host == "claude"' "$C" || fail "fix must always write the top-level host (from --host): $(cat "$C")"
+q '.harness == "claude" and (has("worker_backend") or has("max_workers") or has("truth_gate") | not)' "$C" \
+  || fail "fix writes harness and drops the removed keys: $(cat "$C")"
+q '(.labels | type) == "object" and .roles.qa.skills != null' "$C" || fail "the starting skill routing is added: $(cat "$C")"
+python3 "$PACK/lib/drover-config.py" validate "$C" || fail "a migrated config must pass the schema"
 [ ! -e "$T/.claude/drover/upgrade.json" ] || fail "upgrade.json should be cleared once the upgrade is done"
 TXT=$(python3 "$SETUP" check --root "$T" --text || true)
 echo "$TXT" | grep -q "Upgraded for you" && fail "a finished upgrade must not be reported again"
@@ -302,47 +324,74 @@ cmp -s "$GH_STATE" "$WORK/before.json" || fail "dry-run changed board state: $(c
 [ ! -e "$WORK/dry/.claude" ] || fail "dry-run must not write a backup file"
 echo "$OUT" | q '.status_backup == null and .restored == 0 and .added_columns != []' || fail "dry-run report wrong: $OUT"
 
-# 13 — config `host`: check accepts claude / codex / opencode, flags anything else, and
-#      fix never overwrites a host that is already set.
-H="$WORK/bare/.claude/drover/configs"; mkdir -p "$H"
-for h in claude codex opencode; do
-  printf '{"host":"%s"}' "$h" > "$H/b.json"
-  OUT=$(python3 "$SETUP" check --root "$WORK/bare" || true)
-  echo "$OUT" | q '.host_errors == {}' || fail "host $h must be accepted: $OUT"
-done
-printf '{"host":"gemini"}' > "$H/b.json"
+# 13 — config `harness`: check accepts a harness with a harnesses/<name>.json entry (v1:
+#      claude), flags anything else, and fix never overwrites a harness that is already set.
+H="$WORK/bare/.drover"; mkdir -p "$H"
+printf '{"harness":"claude"}' > "$H/config.json"
 OUT=$(python3 "$SETUP" check --root "$WORK/bare" || true)
-echo "$OUT" | q '.green == false and (.host_errors | to_entries | .[0].value | test("gemini"))' \
-  || fail "host gemini must be flagged: $OUT"
-TXT=$(python3 "$SETUP" check --root "$WORK/bare" --text || true)
-echo "$TXT" | grep -q "✗ .*b.json.*gemini" || fail "text report must name the bad host: $TXT"
-python3 "$SETUP" fix --root "$WORK/bare" --no-helpers >/dev/null || true
-q '.host == "gemini"' "$H/b.json" || fail "fix must not guess over a set host: $(cat "$H/b.json")"
-# A non-Claude host keeps merge_policy.default unset (merges by hand, #47); claude gets "auto".
-for h in codex opencode; do
-  printf '{"host":"%s"}' "$h" > "$H/b.json"
-  python3 "$SETUP" fix --root "$WORK/bare" --no-helpers >/dev/null || true
-  q '.columns != null and (.merge_policy.default // null) == null' "$H/b.json" || fail "fix must migrate but not turn auto-merge on for host $h: $(cat "$H/b.json")"
+echo "$OUT" | q '.host_errors == {}' || fail "harness claude must be accepted: $OUT"
+for h in gemini codex; do
+  printf '{"harness":"%s"}' "$h" > "$H/config.json"
+  OUT=$(python3 "$SETUP" check --root "$WORK/bare" || true)
+  echo "$OUT" | q --arg h "$h" '.green == false and (.host_errors | to_entries | .[0].value | test($h))' \
+    || fail "harness $h has no entry and must be flagged: $OUT"
 done
-rm "$H/b.json"; echo '{}' > "$H/b.json"
-python3 "$SETUP" fix --root "$WORK/bare" --no-helpers --host codex >&2 || true
-q '.host == "codex" and (.merge_policy.default // null) == null' "$H/b.json" \
-  || fail "fix filling host codex must not turn auto-merge on: $(cat "$H/b.json")"
-printf '{"host":"claude"}' > "$H/b.json"
+TXT=$(python3 "$SETUP" check --root "$WORK/bare" --text || true)
+echo "$TXT" | grep -q "✗ .*config.json.*codex" || fail "text report must name the bad harness: $TXT"
 python3 "$SETUP" fix --root "$WORK/bare" --no-helpers >/dev/null || true
-q '.merge_policy.default == "auto"' "$H/b.json" || fail "host claude keeps the auto migration: $(cat "$H/b.json")"
-rm "$H/b.json"
+q '.harness == "codex"' "$H/config.json" || fail "fix must not guess over a set harness: $(cat "$H/config.json")"
+# A non-Claude harness keeps merge_policy.default unset (merges by hand, #47); claude gets "auto".
+printf '{"host":"codex"}' > "$H/config.json"
+python3 "$SETUP" fix --root "$WORK/bare" --no-helpers >/dev/null || true
+q '.harness == "codex" and (has("host") | not) and .columns != null and (.merge_policy.default // null) == null' "$H/config.json" \
+  || fail "fix renames host to harness and does not turn auto-merge on for codex: $(cat "$H/config.json")"
+echo '{}' > "$H/config.json"
+python3 "$SETUP" fix --root "$WORK/bare" --no-helpers --host codex >&2 || true
+q '.harness == "codex" and (.merge_policy.default // null) == null' "$H/config.json" \
+  || fail "fix filling harness codex must not turn auto-merge on: $(cat "$H/config.json")"
+printf '{"harness":"claude"}' > "$H/config.json"
+python3 "$SETUP" fix --root "$WORK/bare" --no-helpers >/dev/null || true
+q '.merge_policy.default == "auto"' "$H/config.json" || fail "harness claude keeps the auto migration: $(cat "$H/config.json")"
+rm "$H/config.json"
 
 # 14 — two backup-needing fixes back to back (same minute) each keep their own backup and
 #      both migrate; the per-minute stamp used to crash the second with EEXIST.
-R="$WORK/twice"; C="$R/.claude/drover/configs"; mkdir -p "$C"; git -C "$R" init -q
+R="$WORK/twice"; C="$R/.drover"; mkdir -p "$C"; git -C "$R" init -q
 for i in 1 2; do
-  printf '{"host":"codex"}' > "$C/b.json"
+  printf '{"harness":"codex"}' > "$C/config.json"
   OUT=$(python3 "$SETUP" fix --root "$R" --no-helpers || true)
   echo "$OUT" | q '.error == null' || fail "fix #$i in the same minute must not fail: $OUT"
-  q '.columns != null' "$C/b.json" || fail "fix #$i must migrate the config: $(cat "$C/b.json")"
+  q '.columns != null' "$C/config.json" || fail "fix #$i must migrate the config: $(cat "$C/config.json")"
 done
 N=$(find "$R/.claude/drover/backup" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
 [ "$N" = 2 ] || fail "two fixes must keep two distinct backups, got $N"
 
-echo "PASS: test-setup.sh (14 scenarios)"
+# 15 — onboard on a fresh repo adds exactly one tracked file (.drover/config.json, SC-4):
+#      the run folders and the untracked settings file go to .git/info/exclude, the hooks
+#      to .claude/settings.local.json; the config passes the schema and carries the
+#      starting routing, the detected commit style and the evidence location.
+O="$WORK/onboard"; mkdir -p "$O"; git -C "$O" init -q -b main
+for m in "feat: one" "fix(ui): two" "chore: three"; do git -C "$O" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "$m"; done
+RC=0; (cd "$O" && python3 "$SETUP" onboard --verify "npm test" </dev/null >/dev/null 2>&1) || RC=$?
+[ "$RC" -eq 2 ] && [ ! -e "$O/.drover" ] || fail "onboard without a board must write nothing (rc $RC)"
+OUT=$(cd "$O" && python3 "$SETUP" onboard --owner me --number 3 --verify "npm test" --evidence pr:docs/evidence </dev/null)
+[ "$(git -C "$O" status --porcelain --untracked-files=all)" = "?? .drover/config.json" ] \
+  || fail "onboard must add only .drover/config.json: $(git -C "$O" status --porcelain --untracked-files=all)"
+for l in .drover/runs/ .drover/worktrees/ ".claude/settings.local.json*"; do
+  grep -qxF "$l" "$O/.git/info/exclude" || fail "$l should be in .git/info/exclude"
+done
+C="$O/.drover/config.json"
+python3 "$PACK/lib/drover-config.py" validate "$C" || fail "onboard writes a valid config"
+q '.project == {"owner":"me","number":3} and .harness == "claude" and .base_branch == "main" and .verify_commands == ["npm test"]' "$C" \
+  || fail "onboard config core keys: $(cat "$C")"
+q '.commit_style == "conventional" and .evidence == {"mode":"pr","path":"docs/evidence"}' "$C" || fail "style / evidence: $(cat "$C")"
+q '.labels.bug.build == ["mattpocock-skills:diagnosing-bugs","mattpocock-skills:tdd"] and (.roles.qa.skills | index("pr-security-review"))' "$C" \
+  || fail "onboard writes the starting routing: $(cat "$C")"
+q '[.hooks[][].hooks[].command] | length > 0' "$O/.claude/settings.local.json" || fail "hooks go into settings.local.json"
+(cd "$O" && python3 "$SETUP" onboard --evidence branch </dev/null >/dev/null) || fail "a re-run keeps the board"
+q '.project.number == 3 and .evidence == {"mode":"branch","branch":"drover-evidence"}' "$C" || fail "re-run keeps keys, flags override: $(cat "$C")"
+[ "$(grep -c '^.drover/runs/$' "$O/.git/info/exclude")" = 1 ] || fail "exclude lines are added once"
+RC=0; (cd "$O" && python3 "$SETUP" onboard --merge sometimes </dev/null >/dev/null 2>&1) || RC=$?
+[ "$RC" -eq 2 ] && q '.merge_policy.default == "auto"' "$C" || fail "a schema failure must write nothing (rc $RC)"
+
+echo "PASS: test-setup.sh (15 scenarios)"

@@ -1,29 +1,46 @@
 #!/usr/bin/env python3
-"""drover-setup.py — the deterministic half of `/drover onboard`.
+"""drover-setup.py — the deterministic half of `/drover onboard` (`drover setup ...`).
 
-Onboard asks the questions; this script finds things out and fixes the must-haves,
-so step 1 (Checks) can say "Fixed for you" without asking anything.
+Onboard asks the questions; this script finds things out, fixes the must-haves and writes
+the config, so the Checks step can say "Fixed for you" without asking anything.
 
-    drover-setup.py check   [--root DIR] [--pack DIR]            what is missing / old (read-only)
-    drover-setup.py fix     [--root DIR] [--pack DIR] [--no-helpers] [--dry-run]
+    drover onboard [--from STAGED.json] [--owner O --number N] [--title T] [--base B] [--verify CMD]...
+                   [--evidence branch[:NAME]|pr:PATH] [--bot LOGIN] [--merge auto|human]
+                   [--harness claude] [--protect-main] [--no-hooks]
+                                                                       write .drover/config.json, the git
+                                                                       excludes and the harness hooks
+    drover setup check   [--root DIR] [--pack DIR]            what is missing / old (read-only)
+    drover setup fix     [--root DIR] [--pack DIR] [--no-helpers] [--dry-run]
                                                                        apply every must-have, then re-check
-    drover-setup.py migrate-config <config.json> [--dry-run]     old config keys → v3 keys
-    drover-setup.py names   [--root DIR]                          two board-name suggestions
-    drover-setup.py branch  [--root DIR]                          branches, deploy source, recommendation
-    drover-setup.py board-rank    --owner O                       the user's boards, best column match first
-    drover-setup.py board-migrate (--config C | --owner O --number N --repo R) [--qa-all] [--prune-empty] [--root DIR] [--dry-run]
+    drover setup migrate-config <config.json> [--dry-run]     old config keys → current keys
+    drover setup names   [--root DIR]                          two board-name suggestions
+    drover setup branch  [--root DIR]                          branches, deploy source, recommendation
+    drover setup board-rank    --owner O                       the user's boards, best column match first
+    drover setup board-migrate (--config C | --owner O --number N --repo R) [--qa-all] [--prune-empty] [--root DIR] [--dry-run]
                                                                        columns + labels + Skipped → Done
 
 Every command prints one JSON object. `--text` on check/fix prints the short ✓ lists the
 onboard screen shows instead.
 
+`onboard` is the only writer of `.drover/config.json`, the one tracked file drover adds to a
+project (FR-CFG-1). It keeps every key already set (`--from` adds the wizard's staged keys;
+an older `.claude/drover/configs/` config is the starting point when there is none), fills
+the starting skill routing
+(lib/drover-routing.json), the detected `commit_style`, the evidence location (asked on a
+terminal, else `--evidence`, else the drover-evidence branch), validates the result against
+config-schema.json and writes nothing when it fails. It then adds `.drover/runs/`,
+`.drover/worktrees/`, `.claude/settings.local.json*` and `.claude/drover/` to
+.git/info/exclude and merges the harness's guard hooks into its untracked settings file.
+
 What `fix` does, with NO question (all of it backed up first to
 .claude/drover/backup/<ts>/):
-  - installs or refreshes skills, .claude/bin scripts, workflows, guard hooks and their
-    settings.json entries (runs the pack's install.sh) when any is missing or older
-  - removes the folders of skills that no longer exist: super-refine, cleanup-wt, arch-loop
-  - migrates every .claude/drover/configs/*.json to the v3 keys (migrate-config), and
-    writes a missing top-level `host` from --host (check flags a host outside claude/codex/opencode)
+  - links drover's skills into the harness's user skill folder (`drover skills install`) and
+    wires the guard hooks into .claude/settings.local.json when any is missing
+  - removes what an older drover copied into the project (.claude/ and .agents/ skills, bin,
+    workflows, hooks), its hook entries in .claude/settings.json, and the folders of skills
+    that no longer exist: super-refine, cleanup-wt, arch-loop
+  - moves an older .claude/drover/configs/<slug>.json (the active or sole one) to
+    .drover/config.json and migrates it to the current keys (migrate-config)
   - `git init` when the folder is not a repo
   - adds Matt Pocock's helper skills with npx when Node is present and they are missing
 It never installs a system tool or signs in: those come back in `needs` with the exact
@@ -48,6 +65,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import io
 import datetime as dt
 import glob
 import json
@@ -59,7 +77,6 @@ import subprocess
 import sys
 
 COLUMNS = ["Backlog", "Ready", "Building", "QA", "Review", "Blocked", "Done"]
-HOSTS = ("claude", "codex", "opencode")  # config `host`; drover-host.sh accepts the same
 LABELS = {
     "qa": ("0e8a16", "Test what exists; skips Building (drover)"),
     "bug": ("d73a4a", "Something is broken; built, tested, reviewed (drover)"),
@@ -73,11 +90,7 @@ OLD_LABELS = {
 }
 SKILLS = ["drover", "drover-build", "drover-qa", "drover-review", "drover-collect", "visual", "git-sync", "ui-refine-loop", "pr-security-review"]
 OLD_SKILL_DIRS = ["super-refine", "cleanup-wt", "arch-loop"]
-BIN = ["drover-project-verifier.py", "drover-skills-ready.py", "drover-host.sh", "drover-codex-wave.sh", "drover-lane.sh", "drover-codex-lane.sh", "drover-verification-ready.py", "drover-github-read.py", "drover-collect-state.py", "drover-run.sh", "drover-gh-guard.sh", "drover-card.sh", "drover-status.py", "drover-wave-plan.sh",
-       "drover-deps.sh", "drover-preflight.sh", "drover-merge-gate.sh",
-       "drover-merge-policy.py", "drover-approval.py", "drover-env-check.sh",
-       "drover-settings.py", "drover-setup.py", "drover-usage.sh", "drover-pr-body.sh",
-       "drover-review-file-refactor.sh", "drover-qa-file-bug.sh", "drover-stop.sh", "drover-reasons.json", "drover-commit-style.py"]
+ROUTING = os.path.join(os.path.dirname(os.path.abspath(__file__)), "drover-routing.json")
 WORKFLOWS = ["drover-wave.js", "ui-refine-loop.js"]
 HELPERS_CMD = "npx -y skills@latest add mattpocock/skills --skill '*' -a claude-code -y"
 # Cloudflare's standalone whole-repo audit. Optional: installed by default, never
@@ -161,26 +174,31 @@ def write_json(path, data):
 
 
 def find_pack(explicit=None):
-    """The pack checkout whose install.sh can (re)install pieces. None when not found."""
-    cands = [explicit, os.environ.get("DROVER_PACK"),
-             os.path.dirname(os.path.dirname(os.path.abspath(__file__)))]
-    home = os.path.expanduser("~/.claude/plugins")
-    if os.path.isdir(home):
-        cands += sorted(os.path.dirname(p) for p in glob.glob(os.path.join(home, "**", "install.sh"), recursive=True)
-                        if "drover" in p and "node_modules" not in p)
-    for c in cands:
-        if c and os.path.isfile(os.path.join(c, "install.sh")) and os.path.isdir(os.path.join(c, "skills", "drover")):
+    """The drover install folder (bin/drover, skills/, hooks/). None when not found."""
+    for c in [explicit, os.environ.get("DROVER_PACK"), os.path.dirname(os.path.dirname(os.path.abspath(__file__)))]:
+        if c and os.path.isfile(os.path.join(c, "bin", "drover")) and os.path.isdir(os.path.join(c, "skills", "drover")):
             return os.path.abspath(c)
     return None
 
 
-def helper_readiness(root, host="claude", home=None, catalog=None):
+def drover_config():
+    """lib/drover-config.py: schema validation, harness entries, skill links."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("drover_config", os.path.join(os.path.dirname(os.path.abspath(__file__)), "drover-config.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def helper_readiness(root, host="claude", home=None, catalog=None, config=None):
     command = [sys.executable, os.path.join(os.path.dirname(__file__), "drover-skills-ready.py"),
                "--root", root, "--host", host, "--profile", "setup"]
     if home:
         command += ["--home", home]
     if catalog:
         command += ["--catalog", catalog]
+    if config:
+        command += ["--config", config]
     process = run(command)
     try:
         result = json.loads(process.stdout)
@@ -189,30 +207,59 @@ def helper_readiness(root, host="claude", home=None, catalog=None):
     return result
 
 
-def security_audit_present(root, readiness):
-    """Cloudflare's security-audit counts as installed when skills-lock.json lists it or the
-    resolver found its SKILL.md (it is an optional QA entry in the registry)."""
+def security_audit_present(root, home=None):
+    """Cloudflare's security-audit (optional, run on demand) counts as installed when
+    skills-lock.json lists it or a skill folder holds it."""
     if "cloudflare/security-audit-skill" in read(os.path.join(root, "skills-lock.json")):
         return True
-    return any(e.get("name") == "security-audit" and e.get("status") == "resolved"
-               for e in (readiness or {}).get("entries", []))
+    return any(os.path.isfile(os.path.join(d, ".claude", "skills", "security-audit", "SKILL.md"))
+               for d in (root, home or os.path.expanduser("~")))
 
 
 def is_git_repo(root):
     return have("git") and run(["git", "rev-parse", "--is-inside-work-tree"], cwd=root).returncode == 0
 
 
-def snippet_commands(pack):
-    snip = load_json(os.path.join(pack, "hooks", "settings-snippet.json")) if pack else None
-    if not snip:
-        return []
-    return [h["command"] for entries in snip["hooks"].values() for e in entries for h in e.get("hooks", [])]
+def snippet_commands(pack, snippets=("hooks/settings-snippet.json",)):
+    """The hook commands the harness entry installs, with {drover_home} filled in."""
+    cmds = []
+    for rel in snippets if pack else []:
+        snip = load_json(os.path.join(pack, rel)) or {"hooks": {}}
+        cmds += [h["command"].replace("{drover_home}", pack) for entries in snip["hooks"].values()
+                 for e in entries for h in e.get("hooks", [])]
+    return cmds
 
 
-def settings_commands(root):
-    s = load_json(os.path.join(root, ".claude", "settings.json")) or {}
+def settings_commands(path):
+    s = load_json(path) or {}
     return {h.get("command") for entries in (s.get("hooks") or {}).values() for e in entries
             for h in e.get("hooks", [])}
+
+
+# Hook commands an older drover wrote into the tracked settings.json; they point at
+# .claude/hooks/ copies that drover no longer makes, so fix removes them.
+OLD_HOOK = re.compile(r"\.claude/hooks/(guard-[a-z-]+|cleanup-wt)\.py")
+
+
+def old_copies(root):
+    """drover files an older install copied into the project (now run from the install folder)."""
+    claude, agents = os.path.join(root, ".claude"), os.path.join(root, ".agents")
+    found = [os.path.join(d, "skills", s) for d in (claude, agents) for s in SKILLS]
+    found += glob.glob(os.path.join(claude, "bin", "drover-*")) + glob.glob(os.path.join(agents, "bin", "drover-*"))
+    found += [os.path.join(d, "workflows", w) for d in (claude, agents) for w in WORKFLOWS]
+    found += [p for d in (claude, agents) for p in glob.glob(os.path.join(d, "hooks", "*.py"))
+              if re.fullmatch(r"(guard-[a-z-]+|cleanup-wt)\.py", os.path.basename(p))]
+    return sorted(p for p in found if os.path.lexists(p))
+
+
+def legacy_config(root):
+    """The config an older drover kept in .claude/drover/configs/: the active one, else the sole one."""
+    base = os.path.join(root, ".claude", "drover")
+    configs = sorted(glob.glob(os.path.join(base, "configs", "*.json")))
+    slug = read(os.path.join(base, "active"))
+    if slug and os.path.join(base, "configs", slug + ".json") in configs:
+        return os.path.join(base, "configs", slug + ".json"), configs
+    return (configs[0] if len(configs) == 1 else None), configs
 
 
 # ── config migration ───────────────────────────────────────────────────────────
@@ -229,10 +276,13 @@ def machine_tz():
     return "UTC"
 
 
+REMOVED_KEYS = ("worker_backend", "codex", "usage_fallback", "truth_gate", "truth_threshold", "calibration")
+
+
 def migrate_config(cfg, host=None):
     """Return (new config, [human-readable change lines]). Pure; never drops a project setting
-    that still means something. `host` (the actual worker host) fills a missing top-level
-    `host` key; a set one is never replaced."""
+    that still means something. `host` (the actual worker harness) fills a missing `harness`
+    key; a set one is never replaced. specs/config.md "Keys" lists the renames and removals."""
     c = json.loads(json.dumps(cfg))
     changes = []
     variant = c.pop("variant", None)
@@ -266,8 +316,15 @@ def migrate_config(cfg, host=None):
     if isinstance(ref, dict) and "qa_hook_rounds" in ref:
         ref.pop("qa_hook_rounds")
         changes.append("refine.qa_hook_rounds removed (the board no longer runs ui-refine-loop)")
-    # A codex/opencode host leaves the default unset: it merges by hand (#47).
-    if "merge_policy" not in c and (c.get("human_approves_merge") or (c.get("host") or host) in (None, "claude")):
+    if "host" in c:
+        old = c.pop("host")
+        c.setdefault("harness", old)
+        changes.append(f"host \"{old}\" renamed harness")
+    if host and "harness" not in c:
+        c["harness"] = host
+        changes.append(f"harness \"{host}\" added")
+    # A non-Claude harness leaves the default unset: it merges by hand (#47).
+    if "merge_policy" not in c and (c.get("human_approves_merge") or c.get("harness") in (None, "claude")):
         c["merge_policy"] = {"default": "human" if c.get("human_approves_merge") else "auto"}
         changes.append(f"merge rule: merge_policy.default \"{c['merge_policy']['default']}\" (from human_approves_merge)")
     if "migrations" not in c:
@@ -278,15 +335,40 @@ def migrate_config(cfg, host=None):
     if isinstance(n, dict) and n.get("channel") not in (None, "session"):
         changes.append(f"notifications: \"{n.get('channel')}\" → session (drover sends no messages)")
         n["channel"], n["chat_id"] = "session", None
+    if "bot_identity" in c:
+        c.setdefault("notifications", {}).setdefault("bot_identity", c["bot_identity"])
+        del c["bot_identity"]
+        changes.append("bot_identity moved to notifications.bot_identity")
     if not c.get("timezone"):
         c["timezone"] = machine_tz()
         changes.append(f"timezone {c['timezone']} added")
-    if not c.get("worker_backend"):
-        c["worker_backend"] = "workflow"
-        changes.append("worker_backend \"workflow\" added")
-    if host and "host" not in c:
-        c["host"] = host
-        changes.append(f"host \"{host}\" added")
+    gone = [k for k in REMOVED_KEYS if k in c]
+    for k in gone:
+        del c[k]
+    if gone:
+        changes.append("removed keys: " + ", ".join(gone))
+    if "max_workers" in c:
+        cap = c.pop("max_workers")
+        changes.append("max_workers moved to roles.<role>.max_workers (default 1)")
+        if isinstance(cap, int) and cap > 3:
+            for role in ("build", "qa", "review"):
+                c.setdefault("roles", {}).setdefault(role, {}).setdefault("max_workers", max(1, cap // 3))
+    if isinstance(c.get("labels"), list):
+        del c["labels"]
+        changes.append("labels list replaced by the skill routing map")
+    if isinstance(c.get("paths"), dict) and "runs_dir" in c["paths"]:
+        del c["paths"]["runs_dir"]
+        changes.append("paths.runs_dir removed (fixed run folder)")
+    routing = load_json(ROUTING) or {}
+    for key in ("roles", "labels"):
+        if key not in c:
+            c[key] = routing.get(key, {})
+            changes.append(f"{key}: starting skill routing added")
+        elif key == "roles":
+            for role, entry in routing.get("roles", {}).items():
+                if "skills" not in c["roles"].setdefault(role, {}):
+                    c["roles"][role]["skills"] = entry["skills"]
+                    changes.append(f"roles.{role}.skills: starting skill routing added")
     return c, changes
 
 
@@ -296,44 +378,63 @@ def installed_version(root):
     return read(os.path.join(root, ".claude", "skills", "drover", "VERSION")) or None
 
 
+def user_skill_dir(host, home=None):
+    folder = drover_config().harness(host)["user_skill_dir"]
+    return os.path.join(home, folder[2:]) if home and folder.startswith("~/") else os.path.expanduser(folder)
+
+
+def config_problems(root, cfg_path, host):
+    """Migration changes, verification and schema problems of the project config."""
+    changes, verification, host_errors = {}, {}, {}
+    if not os.path.isfile(cfg_path):
+        return changes, verification, host_errors
+    rel = os.path.relpath(cfg_path, root)
+    cfg = load_json(cfg_path)
+    if not isinstance(cfg, dict):
+        host_errors[rel] = "not a JSON object"
+        return changes, verification, host_errors
+    ready = subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), "drover-verification-ready.py"),
+                            "--config", cfg_path], capture_output=True, text=True)
+    if ready.returncode:
+        verification[rel] = ready.stderr.strip()
+    name = cfg.get("harness", cfg.get("host"))
+    if name is not None and not os.path.isfile(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "harnesses", f"{name}.json")):
+        host_errors[rel] = f"harness \"{name}\" has no harnesses/{name}.json entry (v1 ships claude)"
+    _, ch = migrate_config(cfg, host)
+    if ch:
+        changes[rel] = ch
+    return changes, verification, host_errors
+
+
 def check(root, pack, host="claude", home=None, catalog=None):
     claude = os.path.join(root, ".claude")
+    cfg_path = os.path.join(root, ".drover", "config.json")
     pack_version = read(os.path.join(pack, "VERSION")) if pack else None
     have_v = installed_version(root)
     upgrade_rec = load_json(os.path.join(claude, "drover", "upgrade.json")) or {}
-    missing = []
-    missing += [f"skill {s}" for s in SKILLS if not os.path.isfile(os.path.join(claude, "skills", s, "SKILL.md"))]
-    missing += [f"script {b}" for b in BIN if not os.path.isfile(os.path.join(claude, "bin", b))]
-    missing += [f"workflow {w}" for w in WORKFLOWS if not os.path.isfile(os.path.join(claude, "workflows", w))]
-    hook_files = sorted(os.path.basename(p) for p in glob.glob(os.path.join(pack, "hooks", "*.py"))) if pack else []
-    missing += [f"hook {h}" for h in hook_files if not os.path.isfile(os.path.join(claude, "hooks", h))]
-    wired = settings_commands(root)
-    unwired = [c for c in snippet_commands(pack) if c not in wired]
+    skills_dir = user_skill_dir(host if host != "codex" else "claude", home)
+    missing = [f"skill {s}" for s in SKILLS if not os.path.isfile(os.path.join(skills_dir, s, "SKILL.md"))]
+    entry = drover_config().harness(host if host != "codex" else "claude")
+    wired = settings_commands(os.path.join(root, entry["hooks"]["file"]))
+    unwired = [c for c in snippet_commands(pack, entry["hooks"]["snippets"]) if c not in wired]
     if unwired:
-        missing.append(f"settings.json: {len(unwired)} guard entr{'y' if len(unwired) == 1 else 'ies'}")
+        missing.append(f"{entry['hooks']['file']}: {len(unwired)} guard entr{'y' if len(unwired) == 1 else 'ies'}")
     old_dirs = [d for d in OLD_SKILL_DIRS if os.path.isdir(os.path.join(claude, "skills", d))]
-    configs = {}
-    verification = {}
-    host_errors = {}
-    for p in sorted(glob.glob(os.path.join(claude, "drover", "configs", "*.json"))):
-        cfg = load_json(p)
-        ready = subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__),
-                                "drover-verification-ready.py"), "--config", p],
-                               capture_output=True, text=True)
-        if ready.returncode:
-            verification[os.path.relpath(p, root)] = ready.stderr.strip()
-        if isinstance(cfg, dict):
-            if "host" in cfg and cfg["host"] not in HOSTS:
-                host_errors[os.path.relpath(p, root)] = (
-                    f"host \"{cfg['host']}\" must be one of {', '.join(HOSTS)}")
-            _, ch = migrate_config(cfg, host)
-            if ch:
-                configs[os.path.relpath(p, root)] = ch
-    older = bool(upgrade_rec.get("from")) or bool(old_dirs) or any(
+    copies = old_copies(root)
+    old_hooks = [c for c in settings_commands(os.path.join(claude, "settings.json")) if c and OLD_HOOK.search(c)]
+    legacy, legacy_all = legacy_config(root)
+    configs, verification, host_errors = config_problems(root, cfg_path, host)
+    if not os.path.isfile(cfg_path) and legacy_all:
+        rel = os.path.relpath(legacy or os.path.dirname(legacy_all[0]), root)
+        if legacy:
+            configs[rel] = ["config moves to .drover/config.json"] + migrate_config(load_json(legacy) or {}, host)[1]
+        else:
+            host_errors[rel] = "several configs and no active pointer: move the one you use to .drover/config.json"
+    older = bool(upgrade_rec.get("from")) or bool(old_dirs) or bool(copies) or bool(legacy_all) or any(
         "variant" in " ".join(ch) or "Skipped" in " ".join(ch) or "collect:" in " ".join(ch) for ch in configs.values())
     if have_v and pack_version and vtuple(have_v) < vtuple(pack_version):
         older = True
-    from_v = upgrade_rec.get("from") or (have_v if have_v and pack_version and vtuple(have_v) < vtuple(pack_version) else None)
+    from_v = upgrade_rec.get("from") or have_v
     fam = os_family()
     needs = []
     for t in ("git", "gh", "jq", "node"):
@@ -343,28 +444,28 @@ def check(root, pack, host="claude", home=None, catalog=None):
             if t == "node":
                 cmd += " && " + HELPERS_CMD + " && " + SECURITY_AUDIT_CMD
             needs.append({"kind": "tool", "name": t, "why": why, "command": cmd})
-    readiness = helper_readiness(root, host, home, catalog)
+    readiness = helper_readiness(root, host, home, catalog, cfg_path if os.path.isfile(cfg_path) else None)
     helpers = readiness["ready"]
-    security_audit = security_audit_present(root, readiness)
+    security_audit = security_audit_present(root, home)
     git = is_git_repo(root)
     ok = []
     if not missing:
-        ok.append("drover skills, scripts and board engine present")
-        if hook_files:
-            ok.append(f"{len(hook_files)} safety guards on")
+        ok.append("drover skills linked and safety guards on")
     if git:
         ok.append("git repo found")
     if helpers:
         ok.append("required worker skills resolved for " + host)
     if security_audit:
         ok.append("security-audit skill installed (optional, run on demand)")
-    red = bool(missing or old_dirs or configs or verification or host_errors or not git or needs or not helpers)
+    red = bool(missing or old_dirs or copies or old_hooks or configs or verification or host_errors
+               or not git or needs or not helpers)
     return {
         "root": root, "pack": pack, "pack_version": pack_version, "installed_version": have_v,
         "upgrade": older, "from": from_v or ("older" if older else None),
         "added_skills": upgrade_rec.get("added_skills", []),
-        "missing": missing, "old_dirs": old_dirs, "configs": configs, "verification": verification,
-        "host_errors": host_errors, "git": git,
+        "missing": missing, "old_dirs": old_dirs, "old_copies": [os.path.relpath(p, root) for p in copies],
+        "old_hooks": old_hooks, "configs": configs, "verification": verification,
+        "host_errors": host_errors, "git": git, "skills_dir": skills_dir,
         "helper_skills": helpers, "security_audit": security_audit, "helper_readiness": readiness, "needs": needs, "os": fam, "ok": ok, "green": not red,
     }
 
@@ -377,46 +478,90 @@ def backup(root, paths, stamp):
         dest = f"{base}-{n}"
     os.makedirs(dest)
     for p in paths:
-        if not os.path.exists(p):
+        if not os.path.lexists(p):
             continue
         rel = os.path.relpath(p, root)
         target = os.path.join(dest, rel)
         os.makedirs(os.path.dirname(target), exist_ok=True)
-        (shutil.copytree if os.path.isdir(p) else shutil.copy2)(p, target)
+        if os.path.islink(p):
+            os.symlink(os.readlink(p), target)
+        else:
+            (shutil.copytree if os.path.isdir(p) else shutil.copy2)(p, target)
     return os.path.relpath(dest, root) + "/"
+
+
+def remove(path):
+    if os.path.isdir(path) and not os.path.islink(path):
+        shutil.rmtree(path, ignore_errors=True)
+    elif os.path.lexists(path):
+        os.remove(path)
+
+
+def install_hooks(root, pack, host, protect=False):
+    """Wire the harness entry's guard hooks into its untracked settings file (FR-HRN-1)."""
+    entry = drover_config().harness(host)["hooks"]
+    snippets = [os.path.join(pack, s) for s in entry["snippets"]]
+    if protect and entry.get("protect_main"):
+        snippets.append(os.path.join(pack, entry["protect_main"]))
+    r = run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "drover-settings.py"),
+             "hooks", os.path.join(root, entry["file"]), *snippets])
+    if r.returncode:
+        raise RuntimeError((r.stderr or r.stdout).strip() or f"{entry['file']}: hook merge failed")
+    return entry["file"]
+
+
+def drop_old_hooks(root):
+    """Remove an older drover's .claude/hooks/ commands from the tracked settings.json."""
+    path = os.path.join(root, ".claude", "settings.json")
+    s = load_json(path)
+    if not isinstance(s, dict):
+        return 0
+    n = 0
+    for event, entries in list((s.get("hooks") or {}).items()):
+        for e in entries:
+            keep = [h for h in e.get("hooks", []) if not OLD_HOOK.search(h.get("command") or "")]
+            n += len(e.get("hooks", [])) - len(keep)
+            e["hooks"] = keep
+        s["hooks"][event] = [e for e in entries if e.get("hooks")]
+        if not s["hooks"][event]:
+            del s["hooks"][event]
+    if n:
+        write_json(path, s)
+    return n
 
 
 def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=None):
     before = check(root, pack, host, home, catalog)
     fixed, notes = [], []
     claude = os.path.join(root, ".claude")
+    cfg_path = os.path.join(root, ".drover", "config.json")
+    legacy, legacy_all = legacy_config(root)
     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-    to_backup = [os.path.join(claude, "settings.json"), os.path.join(claude, "drover", "configs")]
+    to_backup = [os.path.join(claude, "settings.json"), os.path.join(claude, "settings.local.json"), cfg_path,
+                 os.path.join(claude, "drover", "configs"), os.path.join(claude, "drover", "active")]
     to_backup += [os.path.join(claude, "skills", d) for d in before["old_dirs"]]
+    to_backup += [os.path.join(root, p) for p in before["old_copies"]]
     bdir = None
-    if not dry and (before["missing"] or before["old_dirs"] or before["configs"] or before["upgrade"]):
+    if not dry and (before["missing"] or before["old_dirs"] or before["old_copies"] or before["old_hooks"]
+                    or before["configs"] or before["upgrade"]):
         bdir = backup(root, to_backup, stamp)
 
     if before["missing"]:
         if not pack:
             return {**before, "fixed": [], "error": "pack-not-found"}
-        if not dry:
-            r = run(["bash", os.path.join(pack, "install.sh"), root],
-                    input="", cwd=root)
-            if r.returncode != 0:
-                return {**before, "fixed": fixed, "error": "install.sh failed: " + (r.stderr or r.stdout)[-300:]}
-            rec = load_json(os.path.join(claude, "drover", "upgrade.json")) or {}
-            before["added_skills"] = rec.get("added_skills", before["added_skills"])
-        if before["upgrade"]:
-            fixed.append("scripts, board engine and safety guards updated")
-        else:
-            fixed.append("drover skills, scripts and board engine installed")
-            if any(m.startswith("hook") or m.startswith("settings") for m in before["missing"]):
-                n = len(glob.glob(os.path.join(pack, "hooks", "*.py")))
-                fixed.append(f"{n} safety guards switched on")
-                fixed.append("settings.json entries added (backup kept)")
-    elif before["upgrade"]:
-        fixed.append("scripts, board engine and safety guards updated")
+        if any(m.startswith("skill ") for m in before["missing"]):
+            if not dry:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    drover_config().skills_install(before["skills_dir"], host if host != "codex" else "claude")
+            fixed.append(f"drover skills linked into {before['skills_dir']}")
+        if any(not m.startswith("skill ") for m in before["missing"]):
+            if not dry:
+                try:
+                    f = install_hooks(root, pack, host if host != "codex" else "claude")
+                except RuntimeError as e:
+                    return {**before, "fixed": fixed, "error": str(e)}
+            n = len(snippet_commands(pack))
+            fixed.append(f"{n} safety guards switched on ({drover_config().harness('claude')['hooks']['file']})")
     if before["upgrade"]:
         added = before["added_skills"]
         fixed.insert(0, "skills updated" + (f"; added {', '.join(added)}" if added else ""))
@@ -426,16 +571,31 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
             for d in before["old_dirs"]:
                 shutil.rmtree(os.path.join(claude, "skills", d), ignore_errors=True)
         fixed.append("removed old folders: " + ", ".join(before["old_dirs"]))
-
-    for rel, ch in before["configs"].items():
-        p = os.path.join(root, rel)
-        new, _ = migrate_config(load_json(p), host)
+    if before["old_copies"]:
         if not dry:
-            write_json(p, new)
-        if before["upgrade"]:
-            fixed.append(f"config moved to the new keys ({len(ch)} change{'s' if len(ch) != 1 else ''})")
-        else:
-            fixed.append(f"config repaired: {rel}")
+            for p in before["old_copies"]:
+                remove(os.path.join(root, p))
+        fixed.append(f"removed {len(before['old_copies'])} files an older drover copied into the project")
+    if before["old_hooks"]:
+        n = drop_old_hooks(root) if not dry else len(before["old_hooks"])
+        fixed.append(f"removed {n} old hook entr{'y' if n == 1 else 'ies'} from .claude/settings.json")
+
+    if not os.path.isfile(cfg_path) and legacy:
+        new, ch = migrate_config(load_json(legacy) or {}, host)
+        if not dry:
+            os.makedirs(os.path.dirname(cfg_path), exist_ok=True)
+            write_json(cfg_path, new)
+            for p in legacy_all:
+                os.remove(p)
+            remove(os.path.join(claude, "drover", "active"))
+        fixed.append("config moved to .drover/config.json (from " + os.path.relpath(legacy, root) + ")")
+        notes += ch
+    elif os.path.isfile(cfg_path) and before["configs"]:
+        new, ch = migrate_config(load_json(cfg_path), host)
+        if not dry:
+            write_json(cfg_path, new)
+        fixed.append(f"config moved to the new keys ({len(ch)} change{'s' if len(ch) != 1 else ''})"
+                     if before["upgrade"] else "config repaired: .drover/config.json")
         notes += ch
 
     if not before["git"] and have("git"):
@@ -445,8 +605,8 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
 
     if helpers and not before["helper_skills"] and have("npx"):
         if not dry:
-            r = run(["bash", "-c", HELPERS_CMD], cwd=root, input="")
-            confirmed = helper_readiness(root, host, home, catalog)
+            run(["bash", "-c", HELPERS_CMD], cwd=root, input="")
+            confirmed = helper_readiness(root, host, home, catalog, cfg_path if os.path.isfile(cfg_path) else None)
             if confirmed["ready"]:
                 fixed.append("worker skills re-resolved after helper installation")
             else:
@@ -458,7 +618,7 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
     if helpers and not before["security_audit"] and have("npx"):
         if not dry:
             run(["bash", "-c", SECURITY_AUDIT_CMD], cwd=root, input="")
-            if security_audit_present(root, helper_readiness(root, host, home, catalog)):
+            if security_audit_present(root, home):
                 fixed.append("security-audit skill installed (Cloudflare, optional)")
             else:
                 notes.append("security-audit install attempted and not found; optional, retry: " + SECURITY_AUDIT_CMD)
@@ -472,6 +632,107 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
     after = check(root, pack, host, home, catalog) if not dry else before
     return {**after, "upgraded": before["upgrade"], "from": before["from"], "fixed": fixed,
             "notes": notes, "backup": bdir}
+
+
+# ── onboard: write .drover/config.json ─────────────────────────────────────────
+
+EXCLUDES = (".drover/runs/", ".drover/worktrees/", ".claude/settings.local.json*", ".claude/drover/")
+
+
+def git_exclude(root, lines=EXCLUDES):
+    """Add run folders and the untracked settings file to .git/info/exclude (FR-CFG-1), once each."""
+    common = run(["git", "rev-parse", "--git-common-dir"], cwd=root).stdout.strip()
+    path = os.path.join(root, common, "info", "exclude")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    have_lines = read(path).splitlines()
+    new = [l for l in lines if l not in have_lines]
+    if new:
+        with open(path, "a") as f:
+            f.write(("" if not have_lines or read(path).endswith("\n") else "\n") + "\n".join(new) + "\n")
+    return new
+
+
+def parse_evidence(value):
+    """`branch`, `branch:<name>` or `pr:<path>` (FR-EVD-1)."""
+    mode, _, rest = (value or "").partition(":")
+    if mode == "branch":
+        return {"mode": "branch", "branch": rest or "drover-evidence"}
+    if mode == "pr" and rest:
+        return {"mode": "pr", "path": rest}
+    raise ValueError("--evidence must be branch, branch:<name> or pr:<path>")
+
+
+def ask_evidence():
+    print("Where should QA evidence (screenshots, logs) go?\n"
+          "  1  an orphan branch, drover-evidence (Recommended: the PR diff stays clean)\n"
+          "  2  the PR branch, under a folder you name", file=sys.stderr)
+    choice = input("evidence [1]: ").strip() or "1"
+    if choice in ("1", "branch"):
+        name = input("branch [drover-evidence]: ").strip()
+        return {"mode": "branch", "branch": name or "drover-evidence"}
+    path = input("folder on the PR branch [docs/drover/evidence]: ").strip()
+    return {"mode": "pr", "path": path or "docs/drover/evidence"}
+
+
+def onboard(root, rest, pack):
+    """Write .drover/config.json (the only tracked file drover adds), the git excludes and the
+    harness hooks. Re-running keeps every key already set; flags override. Nothing is written
+    when the result fails the schema."""
+    if not is_git_repo(root):
+        raise ValueError(f"{root} is not a git repository: run git init first")
+    cfg_path = os.path.join(root, ".drover", "config.json")
+    if os.path.isfile(cfg_path):
+        base = load_json(cfg_path)
+        if not isinstance(base, dict):
+            raise ValueError(f"{cfg_path} is not a JSON object; fix or remove it, then re-run")
+    else:
+        legacy, _ = legacy_config(root)
+        base = load_json(legacy) if legacy else {}
+    if flag(rest, "--from"):  # the wizard's staged answers: their top-level keys win
+        staged = load_json(flag(rest, "--from"))
+        if not isinstance(staged, dict):
+            raise ValueError(f"--from {flag(rest, '--from')} is not a JSON object")
+        base = {**(base or {}), **staged}
+    cfg, _ = migrate_config(base or {}, flag(rest, "--harness", "claude"))
+    owner, number = flag(rest, "--owner"), flag(rest, "--number")
+    if owner or number:
+        cfg["project"] = {**(cfg.get("project") or {}), **({"owner": owner} if owner else {}),
+                          **({"number": int(number)} if number else {})}
+    if flag(rest, "--title"):
+        cfg.setdefault("project", {})["title"] = flag(rest, "--title")
+    if not (cfg.get("project") or {}).get("owner") or not (cfg.get("project") or {}).get("number"):
+        raise ValueError("the board is unknown: pass --owner <github-owner> --number <project-number>")
+    cfg["base_branch"] = flag(rest, "--base") or cfg.get("base_branch") or branch(root).get("default") or "main"
+    verify = [rest[i + 1] for i, a in enumerate(rest[:-1]) if a == "--verify"]
+    if verify:
+        cfg["verify_commands"] = verify
+    cfg.setdefault("verify_commands", [])
+    if flag(rest, "--bot"):
+        cfg.setdefault("notifications", {})["bot_identity"] = flag(rest, "--bot")
+    if flag(rest, "--merge"):
+        cfg.setdefault("merge_policy", {})["default"] = flag(rest, "--merge")
+    if "commit_style" not in cfg or "--base" in rest:
+        r = run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "drover-commit-style.py"),
+                 "--root", root, "--base", cfg["base_branch"]])
+        cfg["commit_style"] = (json.loads(r.stdout or "{}") if r.returncode == 0 else {}).get("commit_style", "conventional")
+    if flag(rest, "--evidence"):
+        cfg["evidence"] = parse_evidence(flag(rest, "--evidence"))
+    elif "evidence" not in cfg:
+        cfg["evidence"] = ask_evidence() if sys.stdin.isatty() else {"mode": "branch", "branch": "drover-evidence"}
+    problems = drover_config().errors(cfg, load_json(drover_config().SCHEMA))
+    if problems:
+        raise ValueError("config not written, it fails the schema: " + "; ".join(problems))
+    first = ("project", "harness", "base_branch", "verify_commands", "commit_style", "evidence", "roles", "labels")
+    cfg = {**{k: cfg[k] for k in first if k in cfg}, **cfg}
+    os.makedirs(os.path.dirname(cfg_path), exist_ok=True)
+    write_json(cfg_path, cfg)
+    excluded = git_exclude(root)
+    hooks = None if "--no-hooks" in rest else install_hooks(root, pack, cfg.get("harness", "claude"), "--protect-main" in rest)
+    ready = run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "drover-verification-ready.py"),
+                 "--config", cfg_path])
+    return {"config": os.path.relpath(cfg_path, root), "excluded": excluded, "hooks": hooks,
+            "evidence": cfg["evidence"], "commit_style": cfg["commit_style"],
+            "verify_ready": ready.returncode == 0, "verify_error": ready.stderr.strip() or None}
 
 
 def text_report(res):
@@ -488,10 +749,12 @@ def text_report(res):
         lines.append("  ✓ re-checked: all green")
     elif "fixed" not in res:
         red = res.get("missing", [])[:3] + [f"old folder {d}" for d in res.get("old_dirs", [])] + \
+            ([f"{len(res['old_copies'])} files an older drover copied into the project"] if res.get("old_copies") else []) + \
+            ([".claude/settings.json has old drover hook entries"] if res.get("old_hooks") else []) + \
             [f"config {c} uses old keys" for c in res.get("configs", {})] + ([] if res.get("git") else ["not a git repo"])
         lines += [f"  ✗ {r}" for r in red]
         if red:
-            lines.append("  → fix: drover-setup.py fix")
+            lines.append("  → fix: drover setup fix")
     for entry in res.get("helper_readiness", {}).get("entries", []):
         if entry["status"] == "missing":
             lines.append(f"  ✗ missing {entry['name']} for {res['helper_readiness']['host']}; install it in that host and restart")
@@ -1014,6 +1277,11 @@ def main(argv):
                 print(text_report(res))
                 return 0 if res["green"] else 1
             return out(res, 0 if res["green"] else 1)
+        if cmd == "onboard":
+            pack = find_pack(flag(rest, "--pack"))
+            if not pack:
+                return out({"error": "pack-not-found"}, 66)
+            return out(onboard(root, rest, pack))
         if cmd == "migrate-config":
             path = rest[0] if rest and not rest[0].startswith("-") else None
             if not path:
@@ -1037,7 +1305,7 @@ def main(argv):
             cfg_path = flag(rest, "--config")
             if cfg_path and "--root" not in rest:
                 config_dir = os.path.dirname(os.path.abspath(cfg_path))
-                suffix = os.path.join('.claude', 'drover', 'configs')
+                suffix = '.drover'
                 root = config_dir[:-len(suffix)].rstrip(os.sep) if config_dir.endswith(os.sep + suffix) else config_dir
             cfg = load_json(cfg_path) if cfg_path else {}
             cfg = cfg if isinstance(cfg, dict) else {}

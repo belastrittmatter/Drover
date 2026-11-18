@@ -353,8 +353,9 @@ if gh pr merge "$PR" ${REPO:+--repo "$REPO"} --squash --delete-branch \
   # Post-merge tidy-up: drop worktrees and local branches the merge just made
   # redundant. Optional (only when the cleanup-wt hook is installed), local-only, and it
   # can never fail the merge that already happened.
-  if [ -f "$REPO_PATH/.claude/hooks/cleanup-wt.py" ]; then
-    ( cd "$REPO_PATH" && python3 .claude/hooks/cleanup-wt.py --post-merge --base "$BASE" </dev/null ) >&2 || true
+  CLEANUP_WT="${DROVER_CLEANUP_WT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/cleanup-wt.py}"
+  if [ -f "$CLEANUP_WT" ]; then
+    ( cd "$REPO_PATH" && python3 "$CLEANUP_WT" --post-merge --base "$BASE" </dev/null ) >&2 || true
   fi
   exit 0
 fi

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # drover-run.sh — headless autonomous runner.
-# Spawned as `nohup scripts/drover-run.sh <config-slug> &`.
+# Spawned as `nohup drover run &` from the repo root (config: .drover/config.json).
 # Pure shell while-loop. Dispatches `claude -p` workers per lane.
 # Holds NO Claude session state — re-reads GitHub on every tick.
 #
@@ -44,25 +44,27 @@ gh_write_once() {
 # ───────────────────────────── args + paths ─────────────────────────────
 # SB_LIB_ONLY=1 sources this file for its helpers only (gate tests). Config discovery,
 # preconditions and the run loop are all skipped; the caller supplies whatever vars it needs.
-CONFIG_SLUG="${1:-}"
+DROVER_LIB="$(dirname "$SB_GITHUB_READ")"
+DROVER_HOME="${DROVER_HOME:-$(dirname "$DROVER_LIB")}"
 if [ "${SB_LIB_ONLY:-0}" = "1" ]; then
   CONFIG_SLUG="${CONFIG_SLUG:-lib}"
   CONFIG_PATH="${CONFIG_PATH:-/dev/null}"
-elif [ -z "$CONFIG_SLUG" ]; then
-  if [ -f .claude/drover/active ]; then
-    CONFIG_SLUG=$(cat .claude/drover/active)
-  else
-    echo "usage: $0 <config-slug>  (or set .claude/drover/active)" >&2
-    exit 64
-  fi
+elif [ $# -gt 0 ]; then
+  echo "usage: drover run  (one config per repo: .drover/config.json)" >&2
+  exit 64
 fi
 
 if [ "${SB_LIB_ONLY:-0}" != "1" ]; then
-CONFIG_PATH=".claude/drover/configs/${CONFIG_SLUG}.json"
+# One config per repo; the run slug in manifest and log names is the repo name (FR-CFG-1).
+CONFIG_PATH=$(python3 "$DROVER_LIB/drover-config.py" path)
 if [ ! -f "$CONFIG_PATH" ]; then
-  echo "config not found: $CONFIG_PATH" >&2
-  exit 66
+  echo "no config: $CONFIG_PATH (run drover onboard)" >&2
+  exit 64
 fi
+CONFIG_SLUG=$(python3 "$DROVER_LIB/drover-config.py" slug)
+# The worker harness (FR-HRN-1). A missing harnesses/<name>.json halts here, before any claim.
+HARNESS=$(jq -r '.harness // "claude"' "$CONFIG_PATH")
+python3 "$DROVER_LIB/drover-config.py" harness "$HARNESS" >/dev/null || exit $?
 
 # ───────────────────────────── config read ─────────────────────────────
 # `variant` was removed in v3.0.0: one board shape, labels route cards (a Ready card
@@ -80,22 +82,13 @@ HUMAN_APPROVES=$(jq -r '.human_approves_merge // false' "$CONFIG_PATH")
 REBUILD_CAP=$(jq -r '.rebuild_cap // 2' "$CONFIG_PATH")
 BLOCK_ALERT_PCT=$(jq -r '.block_rate_alert_pct // 30' "$CONFIG_PATH")
 TICK_SECONDS=$(jq -r '.tick_seconds // 120' "$CONFIG_PATH")
-MAX_WORKERS=$(jq -r '.max_workers // 3' "$CONFIG_PATH")
+# One worker per role unless roles.<role>.max_workers says more; per-role slots come in stage 6.
+MAX_WORKERS=$(jq -r '[.roles.build.max_workers // 1, .roles.qa.max_workers // 1, .roles.review.max_workers // 1] | add' "$CONFIG_PATH")
 BOT_LOGIN=$(jq -r '.notifications.bot_identity // .bot_identity // ""' "$CONFIG_PATH")
-WORKER_BACKEND=$(jq -r '.worker_backend // "workflow"' "$CONFIG_PATH")
 # Runaway controls (issue #8). NO_PROGRESS_CYCLES counts dispatch cycles with no
 # card reaching Done, regardless of lane occupancy. MAX_DISPATCHES=0 disables the ceiling.
 NO_PROGRESS_CYCLES=$(jq -r '.no_progress_cycles // 6' "$CONFIG_PATH")
 MAX_DISPATCHES=$(jq -r '.max_dispatches // 0' "$CONFIG_PATH")
-
-# Workflow is the default backend (v1.6.0). This legacy dispatcher only runs
-# when the config opts in explicitly — never by accident or stale habit.
-if [ "$WORKER_BACKEND" != "claude-p" ]; then
-  echo "board '${CONFIG_SLUG}' uses the workflow backend (worker_backend=${WORKER_BACKEND})." >&2
-  echo "    Run it in-session: /drover run ${CONFIG_SLUG}  (see references/run-workflow.md)" >&2
-  echo "    To use this legacy dispatcher, set \"worker_backend\": \"claude-p\" in the config." >&2
-  exit 78
-fi
 
 python3 "$(dirname "$SB_GITHUB_READ")/drover-verification-ready.py" --config "$CONFIG_PATH"
 
@@ -325,7 +318,10 @@ dispatch_lane() {
   card=$(echo "$PROJECT_ITEMS_JSON" | jq -c --argjson n "$issue" --arg lane "$lane" '
     [.items[] | select(.content.number == $n) | {number:$n, status:(.status // "Ready"), labels:(.labels // .content.labels // []), lane:$lane}]')
   [ "$(printf '%s' "$card" | jq length)" -eq 1 ] || { log "skills-readiness: selected issue #${issue} missing from board cache"; exit 64; }
-  skills_report=$(printf '%s' "$card" | python3 "$(dirname "$SB_GITHUB_READ")/drover-skills-ready.py"     --root "$PWD" --host claude --cards - --hydrate) || skills_rc=$?
+  # FR-CFG-3/4: the role, label and issue `Skills:` routing from the config, each checked in
+  # the harness's skill folders. A missing skill halts here, before the claim.
+  skills_report=$(printf '%s' "$card" | python3 "$DROVER_LIB/drover-skills-ready.py" \
+    --root "$PWD" --host "${HARNESS:-claude}" --cards - --hydrate) || skills_rc=$?
   if [ "$skills_rc" -ne 0 ]; then
     log "skills-readiness: halt before claim lane=${lane} issue=#${issue}; ${skills_report}"
     exit "$skills_rc"
@@ -334,14 +330,16 @@ dispatch_lane() {
     return 0
   fi
   case "$lane" in
-    build)  prompt="Run drover-build on issue #${issue} for drover run. Read .claude/skills/drover/references/run.md → Builder lifecycle. Config: ${CONFIG_PATH}." ;;
-    qa)     prompt="Run drover-qa on issue #${issue} for drover run. Read .claude/skills/drover/references/run.md → Tester lifecycle. Config: ${CONFIG_PATH}." ;;
-    review) prompt="Run drover-review on issue #${issue} for drover run. Read .claude/skills/drover/references/run.md → Reviewer lifecycle. Config: ${CONFIG_PATH}." ;;
+    build)  prompt="Run drover-build on issue #${issue} for drover run. Read ${DROVER_HOME}/skills/drover/references/run.md → Builder lifecycle. Config: ${CONFIG_PATH}." ;;
+    qa)     prompt="Run drover-qa on issue #${issue} for drover run. Read ${DROVER_HOME}/skills/drover/references/run.md → Tester lifecycle. Config: ${CONFIG_PATH}." ;;
+    review) prompt="Run drover-review on issue #${issue} for drover run. Read ${DROVER_HOME}/skills/drover/references/run.md → Reviewer lifecycle. Config: ${CONFIG_PATH}." ;;
     *) log "unknown lane: $lane"; return 1 ;;
   esac
   # FR-CNV-2: the repo's commit style and three real subjects ride in every lane prompt.
-  prompt="$prompt $(python3 "$(dirname "$SB_GITHUB_READ")/drover-commit-style.py" --root "$PWD" --config "$CONFIG_PATH" --prompt 2>/dev/null || true)"
-  prompt="First operation: run .claude/bin/drover-skills-ready.py --root '$PWD' --host claude --cards - --lane '$lane' --hydrate with $card as stdin. Halt on exit 10 before worktree creation or lifecycle writes; preserve claims and approval evidence. Load resolved paths and only declared fallbacks; recheck conditionals with --require before activation. $prompt"
+  prompt="$prompt $(python3 "$DROVER_LIB/drover-commit-style.py" --root "$PWD" --config "$CONFIG_PATH" --prompt 2>/dev/null || true)"
+  # The skills checked above, by path: the worker loads them and runs no readiness command itself.
+  prompt="Skills for this card (load each SKILL.md before you start): $(printf '%s' "$skills_report" | jq -r --arg lane "$lane" '
+    [.entries[] | select(.lane == $lane and .status == "resolved") | "\(.name)=\(.resolved_path)"] | join(", ")'). $prompt"
   # Worker output goes to a per-worker log, not /dev/null (issue #13). Redirect at the
   # `claude` invocation itself — no wrapping subshell, no `exec` — so the wire to the
   # file survives and `$!` names the worker process rather than a bash stub.
@@ -350,8 +348,14 @@ dispatch_lane() {
     printf '=== dispatch lane=%s issue=#%s at %s ===\n' "$lane" "$issue" "$(date -u +%FT%TZ)"
     printf 'prompt: %s\n\n' "$prompt"
   } >> "$worker_log"
+  # The harness's worker command with the role's model and the headless permissions
+  # (FR-HRN-4): a worker never waits on an approval prompt.
+  local -a worker=()
+  while IFS= read -r -d '' arg; do worker+=("$arg"); done \
+    < <(python3 "$DROVER_LIB/drover-config.py" worker-argv "$lane" "$prompt")
+  [ "${#worker[@]}" -gt 1 ] || { log "worker command: no argv from harness ${HARNESS:-claude}"; exit 66; }
   gh_checkpoint
-  nohup claude -p "$prompt" >> "$worker_log" 2>&1 &
+  nohup "${worker[@]}" >> "$worker_log" 2>&1 &
   pid=$!
   DISPATCH_COUNT=$((DISPATCH_COUNT + 1))
   DISPATCH_LOG="${DISPATCH_LOG}${issue}
@@ -574,7 +578,7 @@ REAP_COUNT=0
 LANDED_COUNT=0
 DISPATCH_LOG=""
 
-# Sourced by the gate tests (`SB_LIB_ONLY=1 . scripts/drover-run.sh`) to exercise
+# Sourced by the gate tests (`SB_LIB_ONLY=1 . lib/drover-run.sh`) to exercise
 # the helpers above without starting a run. Executing the script normally is unaffected.
 if [ "${SB_LIB_ONLY:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
@@ -602,7 +606,7 @@ ORPHANS=${ORPHANS:-0}
 if [ "$ORPHANS" -gt 0 ]; then
   log "refusing to start: ${ORPHANS} drover claude workers already running."
   log "    Stop them first: pkill -f 'claude -p .*drover run'"
-  log "    Then re-run: $0 $CONFIG_SLUG"
+  log "    Then re-run: drover run"
   exit 73
 fi
 
@@ -653,7 +657,7 @@ while true; do
   # same moment as this dispatcher is never detected by either side.
   if [ -f "$WAVE_LOCK" ]; then
     log "workflow-backend wave appeared mid-run ($WAVE_LOCK) — halting for mutual exclusion."
-    log "    Resume after the wave: $0 $CONFIG_SLUG"
+    log "    Resume after the wave: drover run"
     exit 74
   fi
 

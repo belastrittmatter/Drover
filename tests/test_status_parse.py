@@ -4,7 +4,7 @@ Pure stdlib. No pytest dependency, no `gh` auth, no network — runs anywhere
 Python 3.10+ runs (matches the CI matrix in `.github/workflows/cross-platform.yml`).
 
 Why these tests exist: the renderer's regexes are the contract between this
-script and `scripts/drover-run.sh`. When the dispatcher's log format
+script and `lib/drover-run.sh`. When the dispatcher's log format
 diverges from the parser's expectations, the Workers / Recent / Health
 sections silently empty out — which is exactly what happened before these
 tests existed (cf. the `attempt=` / `reaped worktree` calibration bugs).
@@ -24,7 +24,7 @@ from pathlib import Path
 
 # The script has a hyphen in its filename, so import via spec_from_file_location.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_SCRIPT = _REPO_ROOT / "scripts" / "drover-status.py"
+_SCRIPT = _REPO_ROOT / "lib" / "drover-status.py"
 _spec = importlib.util.spec_from_file_location("drover_status", _SCRIPT)
 assert _spec is not None and _spec.loader is not None
 sbs = importlib.util.module_from_spec(_spec)
@@ -218,26 +218,6 @@ def test_field_status_picks_status_select() -> None:
 
 
 # ───────────────────────────── I7: slug sanitization ─────────────────────────────
-
-
-def test_valid_slug_accepts_normal_slugs() -> None:
-    assert sbs.valid_slug("my-project")
-    assert sbs.valid_slug("my-app-drover")
-    assert sbs.valid_slug("Project_1.0")
-    assert sbs.valid_slug("a")
-
-
-def test_valid_slug_rejects_path_traversal() -> None:
-    assert not sbs.valid_slug("../etc/passwd")
-    assert not sbs.valid_slug("..")
-    assert not sbs.valid_slug("foo/bar")
-    assert not sbs.valid_slug("foo\\bar")  # Windows path separator
-    assert not sbs.valid_slug("")
-    assert not sbs.valid_slug("foo bar")  # spaces
-    assert not sbs.valid_slug("foo\x00bar")  # NUL byte
-
-
-# ───────────────────────────── I8: title control-char strip ─────────────────────────────
 
 
 def test_sanitize_title_strips_c0_and_del() -> None:

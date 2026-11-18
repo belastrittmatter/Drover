@@ -2,10 +2,10 @@
 """PreToolUse(Bash) guard: no direct or force pushes to a protected base branch.
 
 Opt-in. `drover onboard` asks once ("Block direct/force pushes to main?") and
-`install.sh --protect-main` wires it. Lanes push feature branches and merge through
+`drover onboard --protect-main` wires it. Lanes push feature branches and merge through
 `drover-merge-gate.sh` (`gh pr merge`), so nothing in the loop needs to push a base.
 
-Protected: main, master, every `base_branch` in .claude/drover/configs/*.json, and
+Protected: main, master, the `base_branch` in .drover/config.json, and
 any name in SB_PROTECTED_BRANCHES (comma-separated). A `git push` is denied when it would
 update or delete one of them: an explicit refspec (`feat:main`, `+main`, `HEAD:refs/heads/main`,
 `--delete main`), `--all` / `--mirror`, or a bare `git push` / `git push origin HEAD` while the
@@ -15,7 +15,6 @@ the reason; force pushes to feature branches stay allowed (the rebase pass needs
 SB_ALLOW_PROTECTED_PUSH=1 in Claude Code's environment turns it off for a session.
 Its own errors never block a tool call: anything unexpected exits 0 with no output.
 """
-import glob
 import json
 import os
 import re
@@ -132,7 +131,7 @@ def current_branch(d):
 
 def protected_branches(project_dir):
     names = {"main", "master"}
-    for p in glob.glob(os.path.join(project_dir, ".claude", "drover", "configs", "*.json")):
+    for p in [os.path.join(project_dir, ".drover", "config.json")]:
         try:
             base = json.load(open(p)).get("base_branch")
             if isinstance(base, str) and base:
