@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 """Resolve the actual host-visible worker chain. Read-only; exits 10 if incomplete.
 
+A worker's skills are the union of `roles.<role>.skills`, `labels.<label>.<role>` for each
+card label and the issue's `Skills:` line (FR-CFG-3), read from --config (default: the
+repo's .drover/config.json, or DROVER_CONFIG). A config without `roles` or `labels` gets that half from
+lib/drover-routing.json, the routing onboard writes. Each skill must exist in the
+harness's skill folders (harnesses/<host>.json `skill_dirs`) or the check halts (FR-CFG-4).
+
 --cards accepts an array file or stdin (-). --hydrate fills absent issue bodies via
 our guarded GitHub reader before resolution. --profile setup checks the pack and
-unconditional helper union. --home and --catalog isolate authoritative inventories.
+every routed skill. --home and --catalog isolate authoritative inventories.
 No directory, lockfile, or plugin cache is evidence of an available skill.
 """
 from __future__ import annotations
 import argparse
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -17,29 +24,52 @@ import subprocess
 import sys
 
 POLICY = 'skills/drover-build/references/decision-policy.md'
-REGISTRY = {
-    'build_rows': [(['bug'], ['mattpocock-skills:diagnosing-bugs', 'mattpocock-skills:tdd']),
-                   (['feature'], ['mattpocock-skills:implement', 'mattpocock-skills:tdd', 'mattpocock-skills:codebase-design']),
-                   (['ux'], ['mattpocock-skills:implement', 'mattpocock-skills:tdd']),
-                   (['refactor', 'tech-debt'], ['mattpocock-skills:codebase-design', 'mattpocock-skills:tdd']),
-                   (['tests'], ['mattpocock-skills:tdd']), (['docs'], [])],
-    'default': ['mattpocock-skills:tdd'],
-    'boundaries': {
-        'build': ['ponytail:ponytail', 'verification-before-completion', 'mattpocock-skills:code-review'],
-        'qa': ['mattpocock-skills:tdd', 'mattpocock-skills:diagnosing-bugs', 'verification-before-completion',
-               'testing-strategy', 'mattpocock-skills:code-review', 'pr-security-review'],
-        'review': ['mattpocock-skills:code-review', 'mattpocock-skills:codebase-design']},
-    'conditional': {
-        'build': ['vitest', 'playwright-best-practices', 'testing-strategy',
-                  'mattpocock-skills:resolving-merge-conflicts', 'mattpocock-skills:domain-modeling'],
-        'qa': ['mattpocock-skills:ask-matt', 'vitest', 'playwright-best-practices'], 'review': []},
-    'optional': {'build': [], 'qa': ['security-audit'], 'review': ['ponytail:ponytail-review']},
-    'aliases': {'mattpocock-skills': ['diagnosing-bugs', 'tdd', 'implement', 'codebase-design', 'code-review',
-                                   'resolving-merge-conflicts', 'domain-modeling', 'ask-matt', 'to-spec', 'to-tickets', 'implement-spec', 'improve-codebase-architecture'],
-                'ponytail': ['ponytail', 'ponytail-review']},
-    'fallbacks': {'ponytail:ponytail': {'id': 'simplest-solution-first', 'source': POLICY + '#simplest-solution-first'},
-                  'ponytail:ponytail-review': {'id': 'over-engineering-ladder', 'source': 'skills/drover-review/SKILL.md#over-engineering'}},
-}
+ROUTING = Path(__file__).with_name('drover-routing.json')
+# Name resolution, not routing: short names of known packs, and the in-pack rules a
+# missing helper may fall back to.
+ALIASES = {'mattpocock-skills': ['diagnosing-bugs', 'tdd', 'implement', 'codebase-design', 'code-review',
+                                 'resolving-merge-conflicts', 'domain-modeling', 'ask-matt', 'to-spec', 'to-tickets', 'implement-spec', 'improve-codebase-architecture'],
+           'ponytail': ['ponytail', 'ponytail-review']}
+FALLBACKS = {'ponytail:ponytail': {'id': 'simplest-solution-first', 'source': POLICY + '#simplest-solution-first'},
+             'ponytail:ponytail-review': {'id': 'over-engineering-ladder', 'source': 'skills/drover-review/SKILL.md#over-engineering'}}
+
+
+def routing(root, config=None):
+    """roles/labels routing: the config's keys, the starting routing for any it lacks."""
+    data = json.loads(ROUTING.read_text())
+    path = Path(config) if config else drover_config().config_path(root)
+    if config or path.is_file():
+        cfg = json.loads(path.read_text())
+        if not isinstance(cfg, dict):
+            raise ValueError('config must be an object')
+        for key in ('roles', 'labels'):
+            if key in cfg:
+                data[key] = cfg[key]
+    if not isinstance(data.get('roles'), dict) or not isinstance(data.get('labels'), dict):
+        raise ValueError('config roles and labels must be objects')
+    return data
+
+
+def role_skills(route, lane):
+    return list(((route['roles'].get(lane) or {}).get('skills')) or [])
+
+
+def label_skills(route, label, lane):
+    return list(((route['labels'].get(label) or {}).get(lane)) or [])
+
+
+def drover_config():
+    spec = importlib.util.spec_from_file_location('drover_config', Path(__file__).with_name('drover-config.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def harness_dirs(host):
+    """The harness entry's skill folders. A missing entry halts with exit 66 (FR-HRN-2)."""
+    return drover_config().harness(host).get('skill_dirs', [])
+
+
 CORE = ['drover', 'drover-build', 'drover-qa', 'drover-review', 'drover-collect', 'visual', 'git-sync', 'ui-refine-loop', 'pr-security-review']
 LANES = ['build', 'qa', 'review']
 NAME = re.compile(r'[a-zA-Z0-9][a-zA-Z0-9._-]*(?::[a-zA-Z0-9][a-zA-Z0-9._-]*)?\Z')
@@ -119,48 +149,39 @@ def remaining(card, lane=None):
 
 def canonical(name):
     if ':' not in name:
-        for namespace, names in REGISTRY['aliases'].items():
+        for namespace, names in ALIASES.items():
             if name in names:
                 return namespace + ':' + name
     return name
 
 
-def requirements(card, lane=None, require=()):
+def requirements(card, route, lane=None, require=()):
     explicit = override(card['body'])
     selected = remaining(card, lane)
+    labels = labels_of(card)
     for current in selected:
         source = 'boundary: skills/drover-' + current + '/SKILL.md'
         rows = [('drover', 'required', source), ('drover-' + current, 'required', source)]
-        if current == 'build':
-            if explicit is not None:
-                row, origin = explicit, 'override: Skills: + ' + POLICY
-            else:
-                labels = labels_of(card)
-                row = next((names for tags, names in REGISTRY['build_rows'] if set(tags).intersection(labels)), None)
-                if row is None:
-                    # Untyped Ready cards will be classified bug/feature after this gate.
-                    row = list(dict.fromkeys(sum((names for tags, names in REGISTRY['build_rows'][:2]), []))) if card['status'] == 'Ready' else REGISTRY['default']
-                origin = 'label: ' + POLICY
-            rows += [(name, 'required', origin) for name in row]
-        elif explicit is not None and 'build' not in selected:
+        tags = labels
+        if current == 'build' and card['status'] == 'Ready' and not any(tag in route['labels'] for tag in labels):
+            # A Ready card with no routed label is classified bug/feature after this gate.
+            tags = labels + ['bug', 'feature']
+        for tag in dict.fromkeys(tags):
+            rows += [(name, 'required', 'config: labels.' + tag + '.' + current) for name in label_skills(route, tag, current)]
+        # The issue's Skills: line goes to the builder, or to the first lane of a card that skips Build.
+        if explicit is not None and (current == 'build' or 'build' not in selected):
             rows += [(name, 'required', 'override: Skills: + ' + POLICY) for name in explicit]
-        rows += [(name, 'required', source) for name in REGISTRY['boundaries'][current]]
-        rows += [(name, 'conditional', source) for name in REGISTRY['conditional'][current]]
-        rows += [(name, 'optional', source) for name in REGISTRY['optional'][current]]
+        rows += [(name, 'required', 'config: roles.' + current + '.skills') for name in role_skills(route, current)]
         rows += [(worker_name(name), 'required', 'activation: --require + ' + source) for name in require]
         grouped = {}
         for name, requirement, origin in rows:
-            name = canonical(name)
+            name = canonical(worker_name(name))
             if current == 'review' and name == 'mattpocock-skills:improve-codebase-architecture':
                 raise ValueError('prohibited Review worker skill: ' + name)
             if name not in grouped:
                 grouped[name] = [requirement, origin]
-            else:
-                old = grouped[name]
-                if requirement == 'required':
-                    old[0] = requirement
-                if origin not in old[1]:
-                    old[1] += '; ' + origin
+            elif origin not in grouped[name][1]:
+                grouped[name][1] += '; ' + origin
         for name, (requirement, origin) in grouped.items():
             yield current, name, requirement, origin
 
@@ -261,9 +282,11 @@ class Inventory:
         self.metadata_surfaces = []
         self.disabled = set()
         self.catalog_only = False
-        if host == 'claude':
-            self.roots = [self.root / '.claude/skills', self.home / '.claude/skills']
-            self.claude_plugins()
+        if host != 'codex':
+            for folder in harness_dirs(host):
+                self.roots.append(self.home / folder[2:] if folder.startswith('~/') else self.root / folder)
+            if host == 'claude':
+                self.claude_plugins()
         else:
             # Codex discovery stops at this independent repository's root.
             process = subprocess.run(['git', '-C', str(self.root), 'rev-parse', '--show-toplevel'],
@@ -370,7 +393,7 @@ class Inventory:
 
     def resolve(self, name):
         namespace, separator, suffix = name.partition(':')
-        known = separator and suffix in REGISTRY['aliases'].get(namespace, [])
+        known = separator and suffix in ALIASES.get(namespace, [])
         candidates = [directory / (suffix if known else name) / 'SKILL.md' for directory in self.roots] if not separator or known else []
         # Local roots and project plugin records win over enabled user installs.
         if candidates:
@@ -388,10 +411,11 @@ class Inventory:
         return None, None
 
 
-def report(root, host, cards=None, profile=None, lane=None, require=(), home=None, catalog=None):
+def report(root, host, cards=None, profile=None, lane=None, require=(), home=None, catalog=None, config=None):
     if not profile and cards == []:
         return dict(ready=True, host=host, entries=[], searched_surfaces=[], remediation='')
     inventory = Inventory(root, host, home, catalog)
+    route = routing(root, config)
     entries = []
     if profile:
         cards = [{'number': None, 'status': 'Ready', 'labels': ['feature'], 'body': ''}]
@@ -399,18 +423,19 @@ def report(root, host, cards=None, profile=None, lane=None, require=(), home=Non
         if (not isinstance(card, dict) or (card.get('number') is not None and (type(card['number']) is not int or card['number'] < 1))
                 or ('number' in card and card['number'] is None and not profile) or 'number' not in card or 'body' not in card):
             raise ValueError('each card needs number, status and literal body')
-        chain = list(requirements(card, lane, require))
+        chain = list(requirements(card, route, lane, require))
         if profile:
             chain += [('setup', name, 'required', 'boundary: setup nine-skill installation') for name in CORE]
-            for _, names in REGISTRY['build_rows']:
-                chain += [('build', name, 'required', 'label: ' + POLICY) for name in names]
+            for lane_name in LANES:
+                chain += [(lane_name, canonical(name), 'required', 'config: labels.' + tag + '.' + lane_name)
+                          for tag in route['labels'] for name in label_skills(route, tag, lane_name)]
         seen = set()
         for current, name, requirement, source in chain:
             if (current, name) in seen:
                 continue
             seen.add((current, name))
-            path, visible = inventory.resolve(name) if requirement != 'conditional' else (None, None)
-            fallback = REGISTRY['fallbacks'].get(name) if not path and requirement != 'conditional' else None
+            path, visible = inventory.resolve(name)
+            fallback = FALLBACKS.get(name) if not path else None
             status = 'resolved' if path else 'fallback' if fallback else 'skipped' if requirement != 'required' else 'missing'
             entries.append(dict(card=card['number'], lane=current, name=name, requirement=requirement, source=source,
                                 status=status, resolved_path=path, visible_path=visible, fallback=fallback))
@@ -454,7 +479,8 @@ class UsageParser(argparse.ArgumentParser):
 def main(argv=None):
     parser = UsageParser(description=__doc__)
     parser.add_argument('--root', required=True)
-    parser.add_argument('--host', required=True, choices=['claude', 'codex'])
+    parser.add_argument('--host', required=True, help='harness name (harnesses/<name>.json) or codex')
+    parser.add_argument('--config', help='drover config; default <root>/.drover/config.json')
     selection = parser.add_mutually_exclusive_group(required=True)
     selection.add_argument('--cards')
     selection.add_argument('--profile', choices=['setup'])
@@ -474,11 +500,12 @@ def main(argv=None):
             raise ValueError('cards must be an array')
         if args.hydrate and cards is not None:
             hydrate(cards, args.root)
-        result = report(args.root, args.host, cards, args.profile, args.lane, args.require, args.home, args.catalog)
+        result = report(args.root, args.host, cards, args.profile, args.lane, args.require, args.home, args.catalog, args.config)
         print(json.dumps(result))
         for entry in result['entries']:
             if entry['status'] == 'missing':
-                print('skills-readiness: missing ' + entry['name'] + ' for ' + args.host + '; ' + result['remediation'], file=sys.stderr)
+                print('skills-readiness: missing ' + entry['name'] + ' for ' + args.host + '; searched: ' +
+                      ', '.join(result['searched_surfaces']) + '. ' + result['remediation'], file=sys.stderr)
         return 0 if result['ready'] else 10
     except (OSError, ValueError, TypeError, KeyError) as error:
         print('skills-readiness: ' + str(error), file=sys.stderr)

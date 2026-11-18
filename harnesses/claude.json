@@ -1,0 +1,30 @@
+{
+  "name": "claude",
+  "worker_command": ["claude", "-p"],
+  "model_flag": "--model",
+  "skill_dirs": [".claude/skills", "~/.claude/skills"],
+  "user_skill_dir": "~/.claude/skills",
+  "hooks": {
+    "method": "settings-json",
+    "file": ".claude/settings.local.json",
+    "snippets": ["hooks/settings-snippet.json"],
+    "protect_main": "hooks/settings-protect-main.json"
+  },
+  "usage_probe": "drover usage check",
+  "permissions": {
+    "mode_flag": "--permission-mode",
+    "mode": "acceptEdits",
+    "allow_flag": "--allowedTools",
+    "deny_flag": "--disallowedTools",
+    "add_dir_flag": "--add-dir",
+    "add_dirs": ["{drover_home}"],
+    "tools": ["Read", "Edit", "MultiEdit", "Write", "Glob", "Grep", "LS", "NotebookEdit",
+              "TodoWrite", "Task", "Skill", "WebFetch", "WebSearch"],
+    "commands": ["drover", "gh", "git", "jq", "python3", "python", "node", "npm", "npx", "pnpm", "yarn", "bun",
+                 "bash", "sh", "cd", "pwd", "ls", "cat", "head", "tail", "wc", "sort", "uniq", "cut", "tr",
+                 "grep", "rg", "sed", "awk", "find", "diff", "echo", "printf", "test", "[", "true", "false",
+                 "mkdir", "mktemp", "touch", "cp", "mv", "rm", "ln", "chmod", "date", "sleep", "env",
+                 "basename", "dirname", "realpath", "tee", "xargs", "which", "command", "curl", "openssl"],
+    "deny": ["Bash(gh pr merge:*)"]
+  }
+}

@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+"""Every command a headless worker is told to run is covered by its harness permissions
+(specs/config.md FR-HRN-4, docs/audit.md section 11).
+
+Stage 0 failed because the first command of every worker needed approval and the old
+allowlist test never read the runner's worker prompt. This test reads the prompt the
+runner builds (lib/drover-run.sh dispatch_lane), every file that prompt points a worker
+at, and every role rules file (the drover-build, drover-qa and drover-review skills with
+their references, plus the shared references they follow). From each fenced shell block
+and each inline code span it takes the commands (split on pipes, `&&`, `||`, `;` and
+`$(`), and checks the first word of each against harnesses/claude.json.
+
+A first word counts as a command when it is a path to a script or one of the CLI names
+in KNOWN below; prose fragments in backticks (`move <issue>`) are neither. Placeholders
+(`<test command>`, `$VAR`) are the project's own commands: the runner adds the first word
+of each `verify_commands` entry to the worker's rules (lib/drover-config.py allowed()).
+"""
+import json
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+HARNESS = json.loads((ROOT / "harnesses/claude.json").read_text())
+PERMS = HARNESS["permissions"]
+ALLOWED = set(PERMS["commands"])
+DENIED = [re.match(r"Bash\((.*?)(?::\*)?\)$", d).group(1) for d in PERMS["deny"]]
+RUNNER = ROOT / "lib/drover-run.sh"
+# run.md sections for the orchestrator and the runner itself, not for a worker.
+RUNNER_SECTIONS = re.compile(r"^##+ (Orchestrator delegation|Intro shown|Preconditions|Lanes and label routing|"
+                             r"Dispatch allocation|Per-tick logic|Done conditions|Run manifest|Notification cadence|"
+                             r"Anti-zombie addendum)")
+ROLE_FILES = sorted(
+    [ROOT / f"skills/drover-{r}/SKILL.md" for r in ("build", "qa", "review")]
+    + [p for r in ("build", "qa", "review") for p in (ROOT / f"skills/drover-{r}/references").glob("*.md")]
+    + [ROOT / "skills/pr-security-review/SKILL.md"]
+    + [ROOT / f"skills/drover/references/{n}.md" for n in
+       ("writing-standard", "rate-limit-etiquette", "block-template", "pr-author-notes")])
+# CLI names a rules file may tell a worker to run. Anything here that the harness does not
+# allow fails the test; add the command to harnesses/claude.json or change the rules.
+# Harness CLIs (claude, codex, hc) are left out: rules name them, the runner starts them.
+KNOWN = {
+    "drover", "gh", "git", "jq", "python3", "python", "node", "npm", "npx", "pnpm", "yarn", "bun", "deno",
+    "bash", "sh", "zsh", "source", "eval", "exec", "export", "set", "unset", "cd", "pwd", "ls", "cat",
+    "head", "tail", "wc", "sort", "uniq", "cut", "tr", "grep", "rg", "sed", "awk", "find", "diff", "echo",
+    "printf", "test", "[", "true", "false", "mkdir", "mktemp", "touch", "cp", "mv", "rm", "ln", "chmod",
+    "date", "sleep", "env", "basename", "dirname", "realpath", "tee", "xargs", "which", "command", "curl",
+    "wget", "make", "cargo", "go", "pytest", "vitest", "playwright", "docker", "supabase", "psql", "sqlite3",
+    "open", "xdg-open", "brew", "apt-get", "pip", "pip3",
+    "uv", "tsc", "eslint", "prettier", "kill", "pkill", "pgrep", "ps", "nohup", "timeout", "lsof", "ssh",
+    "scp", "rsync", "tar", "unzip", "zip", "base64", "shasum", "sha256sum", "openssl", "nc", "lsof",
+}
+SCRIPT = re.compile(r"^(?:\./|~/|/|\.\./|[\w.-]+/)[\w./-]*\.(?:sh|py|js|mjs)$")
+FENCE = re.compile(r"^\s*(```|~~~)\s*([\w-]*)")
+SHELL_LANGS = {"", "bash", "sh", "shell", "console", "zsh"}
+NEGATION = re.compile(r"\b(never|not|don't|do not|no longer|instead of|forbidden|refuse)\b", re.I)
+
+
+def segments(command):
+    """First words of each simple command in a shell line."""
+    out = []
+    for part in re.split(r"\$\(|`|&&|\|\||[;|(){}]", command):
+        words = part.strip().split()
+        while words and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[0]):  # VAR=value prefix
+            words = words[1:]
+        while words and words[0] in ("!", "then", "do", "else", "if", "while", "until", "time"):
+            words = words[1:]
+        if words:
+            out.append((words[0], " ".join(words)))
+    return out
+
+
+def commands(path):
+    """(line number, first word, command text) for each command the file instructs."""
+    found, fence, lang = [], None, ""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    joined, skip = "", False
+    for n, line in enumerate(lines, 1):
+        if re.match(r"##+ ", line) and path.name == "run.md":
+            skip = bool(RUNNER_SECTIONS.match(line))
+        if skip:
+            continue
+        m = FENCE.match(line)
+        if m:
+            fence, lang = (None, "") if fence else (m.group(1), m.group(2).lower())
+            continue
+        # Fenced prose (tables, trees, templates with `code` in them) is read like a line of text.
+        prose = not fence or "`" in line or line.lstrip().startswith("|") or re.search("[←├└│]", line)
+        if fence and lang in SHELL_LANGS and not prose:
+            text = (joined + " " + line.strip()) if joined else line.strip()
+            if text.endswith("\\"):
+                joined = text[:-1]
+                continue
+            joined = ""
+            if text.startswith("#") or NEGATION.search(text):
+                continue
+            for first, cmd in segments(re.sub(r"\s+#.*$", "", text)):
+                found.append((n, first, cmd))
+        elif prose and not NEGATION.search(line):
+            # An inline span is a command when it has arguments; one word is a name.
+            for span in re.findall(r"`([^`]+)`", line):
+                if len(span.split()) > 1 and re.match(r"[\w$./~]", span):
+                    found += [(n, first, cmd) for first, cmd in segments(span)]
+    return [(n, f, c) for n, f, c in found if f in KNOWN or SCRIPT.match(f)]
+
+
+def worker_prompt():
+    """The prompt text dispatch_lane builds, and the files it tells the worker to read."""
+    src = RUNNER.read_text()
+    body = src[src.index("dispatch_lane() {"):src.index("\nissue_status() {")]
+    prompts = re.findall(r'\)\s+prompt="(Run drover-[^"]*)"\s*;;', body)
+    reads = sorted({m for p in prompts for m in re.findall(r"Read \$\{DROVER_HOME\}/(\S+?) ", p)})
+    return body, prompts, [ROOT / r for r in reads]
+
+
+failures = []
+
+
+def check(cond, msg):
+    if not cond:
+        failures.append(msg)
+
+
+def covered(first, cmd):
+    if any(cmd == d or cmd.startswith(d + " ") for d in DENIED):
+        return False
+    return first in ALLOWED
+
+
+# 0 — the extractor finds what stage 0 tripped on: a script run by path, and a command the
+#     harness does not allow, in a fence or an inline span; prose and names are left alone.
+import tempfile
+with tempfile.TemporaryDirectory() as tmp:
+    sample = Path(tmp) / "run.md"
+    sample.write_text("Run `kill -9 1234` now. The `vitest` runner.\nNever run `gh pr merge 3`.\n"
+                      "```bash\nprintf '%s' \"$card\" | .claude/bin/drover-skills-ready.py --root .\n```\n")
+    got = [(f, covered(f, c)) for _, f, c in commands(sample)]
+    check(got == [("kill", False), ("printf", True), (".claude/bin/drover-skills-ready.py", False)],
+          f"extractor self-check: {got}")
+
+# 1 — the worker prompt itself asks for no command, and points only at files that exist.
+body, prompts, reads = worker_prompt()
+check(len(prompts) == 3, f"expected the three lane prompts in dispatch_lane, found {len(prompts)}")
+check(reads and all(p.is_file() for p in reads), f"prompt reads must exist: {reads}")
+check("First operation" not in body and ".claude/bin" not in body,
+      "the worker prompt must not tell the worker to run a command before it starts (stage 0)")
+check("worker-argv" in body, "dispatch_lane must start workers through the harness worker-argv")
+
+# 2 — every command in the files the prompt names and in the role rules is covered.
+scanned = sorted(set(reads + ROLE_FILES))
+seen = {}
+for path in scanned:
+    for n, first, cmd in commands(path):
+        seen.setdefault(first, 0)
+        seen[first] += 1
+        if SCRIPT.match(first):
+            failures.append(f"{path.relative_to(ROOT)}:{n}: runs a script by path ({first}); "
+                            f"call it through an allowed command (drover <name>, python3, bash)")
+        elif not covered(first, cmd):
+            failures.append(f"{path.relative_to(ROOT)}:{n}: `{cmd[:80]}` is not covered by harnesses/claude.json")
+check(len(scanned) >= 10 and seen.get("drover", 0) > 5 and seen.get("gh", 0) > 5,
+      f"the scan should find the role commands (files {len(scanned)}, commands {seen})")
+
+# 3 — the tools the role rules depend on are allowed.
+for tool in ("Read", "Edit", "Write", "Task", "Skill"):
+    check(tool in PERMS["tools"], f"harness permissions should allow the {tool} tool")
+check(any("{drover_home}" in d for d in PERMS["add_dirs"]), "workers need the drover install folder (skills, run.md)")
+
+if failures:
+    print("\n".join("FAIL: " + f for f in failures), file=sys.stderr)
+    sys.exit(1)
+print(f"PASS: test_harness_permissions.py ({len(scanned)} files, "
+      f"{sum(seen.values())} commands, {len(seen)} distinct: {', '.join(sorted(seen))})")
