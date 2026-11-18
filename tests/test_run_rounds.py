@@ -1,216 +1,25 @@
 #!/usr/bin/env python3
-"""Whole runner rounds (lib/drover-run.sh) with fakes on PATH for gh, claude
-and pgrep (NFR-7). The board is a JSON file the fake gh serves; nothing reaches GitHub,
-and no real worker or dispatcher on this machine is ever matched or signalled."""
+"""Whole runner rounds (lib/drover-run.sh) with fakes on PATH for gh, claude and pgrep
+(tests/runner_fixture.py, NFR-7). Nothing reaches GitHub, and no real worker or dispatcher
+on this machine is ever matched or signalled."""
 import json
 import os
 from pathlib import Path
 import signal
 import subprocess
 import sys
-import tempfile
 import time
 import unittest
 
-KIT = Path(__file__).resolve().parents[1]
-IDLE_ROUND_CALLS = 3  # measured at d0b7d5a; see docs/baseline.md
-# The skills the readiness check needs for every lane (see test_skill_dispatch.py).
-NAMES = ['drover', 'drover-build', 'drover-qa', 'drover-review', 'drover-collect', 'visual', 'git-sync',
-         'ui-refine-loop', 'pr-security-review', 'tdd', 'implement', 'codebase-design', 'code-review',
-         'diagnosing-bugs', 'verification-before-completion', 'testing-strategy']
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from runner_fixture import KIT, RunnerCase, alive  # noqa: E402
 
-FAKE_GH = r'''
-import glob, json, os, re, subprocess, sys, time
-args = sys.argv[1:]
-manifest = ''.join(open(p).read() for p in glob.glob('.drover/runs/*.md'))
-phase = 'round' if 'initial Ready count' in manifest else 'startup'
-with open(os.environ['CALL_LOG'], 'a') as f:
-    f.write(json.dumps({'phase': phase, 'args': args}) + '\n')
-board = json.load(open(os.environ['BOARD']))
-cols = ['Backlog', 'Ready', 'Building', 'QA', 'Review', 'Blocked', 'Done']
-def card(n):
-    return next((c for c in board if c['number'] == n), {})
-if args[:2] == ['api', 'rate_limit']:
-    print('{"resources":{"graphql":{"remaining":5000,"reset":0},"core":{"remaining":5000,"reset":0}}}')
-elif args[:2] == ['api', 'graphql'] and '--paginate' in args:
-    nodes = [{'id': 'item%d' % c['number'], 'fieldValueByName': {'name': c['status']},
-              'content': {'__typename': 'Issue', 'number': c['number'], 'title': 'fixture',
-                          'url': 'https://github.com/o/r/issues/%d' % c['number'],
-                          'repository': {'nameWithOwner': 'o/r'},
-                          'labels': {'nodes': [{'name': l} for l in c.get('labels', [])]}}} for c in board]
-    print(json.dumps([{'data': {'repositoryOwner': {'projectV2': {'items': {
-        'totalCount': len(nodes), 'nodes': nodes, 'pageInfo': {'hasNextPage': False, 'endCursor': None}}}}}}]))
-elif args[:2] == ['api', 'graphql']:
-    print('{"data":{"rateLimit":{"limit":5000,"remaining":5000,"used":0,"resetAt":"2030-01-01T00:00:00Z"}}}')
-elif args[:2] == ['issue', 'view']:
-    c = card(int(args[2]))
-    fields = args[args.index('--json') + 1] if '--json' in args else ''
-    if fields == 'state':
-        print(c.get('state', 'OPEN'))
-    elif fields == 'stateReason,comments':  # run the runner's own --jq over gh's shape
-        issue = {'stateReason': c.get('reason', 'COMPLETED'), 'comments': [{'body': b} for b in c.get('comments', [])]}
-        sys.stdout.write(subprocess.run(['jq', '-c', args[args.index('--jq') + 1]], input=json.dumps(issue),
-                                        capture_output=True, text=True, check=True).stdout)
-    elif fields == 'labels':
-        print(json.dumps({'labels': [{'name': l} for l in c.get('labels', [])]}))
-    else:
-        print(json.dumps({'number': int(args[2]), 'title': 'fixture', 'body': ''}))
-elif args[:2] == ['project', 'field-list']:
-    print(json.dumps({'fields': [{'id': 'F', 'name': 'Status',
-                                  'options': [{'id': 'opt_' + s, 'name': s} for s in cols]}]}))
-elif args[:2] == ['project', 'view']:
-    print('{"id":"P"}')
-elif args[:2] == ['pr', 'list'] and 'merged' in args:
-    base = args[args.index('--base') + 1]
-    print(json.dumps([{'headRefName': c['merged']} for c in board
-                      if c.get('merged') and c.get('merged_base', 'main') == base]))
-elif args[0] == 'api' and re.fullmatch(r'repos/\{owner\}/\{repo\}/issues/\d+/comments', args[1]):
-    now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-    print(json.dumps([[{'id': i + 1, 'body': b, 'user': {'login': 'bot'}, 'created_at': now, 'updated_at': now}
-                       for i, b in enumerate(card(int(args[1].split('/')[4])).get('reports', []))]]))
-elif args[:2] == ['pr', 'list']:
-    m = re.search(r'issue-(\d+)-', ' '.join(args))
-    print(os.environ.get('PR_FOR_' + m.group(1), '') if m else '')
-elif args[:2] == ['project', 'item-edit']:  # the board remembers column moves
-    item, option = args[args.index('--id') + 1], args[args.index('--single-select-option-id') + 1]
-    for c in board:
-        if 'item%d' % c['number'] == item:
-            c['status'] = option[len('opt_'):]
-    json.dump(board, open(os.environ['BOARD'], 'w'))
-elif args[:2] in (['issue', 'edit'], ['issue', 'comment'], ['pr', 'comment']):
-    pass
-else:
-    sys.exit('unexpected gh call: %r' % args)
-'''
-
-# A live worker: records its pid, then runs until signalled (60 s cap).
-# FAKE_CLAUDE=exit makes it a worker that ends at once without touching the board;
-# FAKE_CLAUDE=handoff moves its card to Blocked, then keeps running; FAKE_CLAUDE=strand
-# moves its card to Building, then ends.
-FAKE_CLAUDE = r'''
-import json, os, signal, sys, time
-from pathlib import Path
-d = Path(os.environ['WORKER_DIR']); d.mkdir(exist_ok=True)
-(d / ('argv-%d' % os.getpid())).write_text('\0'.join(sys.argv[1:]))
-(d / ('env-%d' % os.getpid())).write_text('DROVER_ROLE=%s DROVER_ISSUE=%s' % (os.environ.get('DROVER_ROLE'), os.environ.get('DROVER_ISSUE')))
-(d / ('stdin-%d' % os.getpid())).write_text(str(os.path.samestat(os.fstat(0), os.stat(os.devnull))))
-(d / str(os.getpid())).write_text(' '.join(sys.argv[1:]))
-if os.environ.get('FAKE_CLAUDE') == 'exit':
-    sys.exit(0)
-if os.environ.get('FAKE_CLAUDE') in ('handoff', 'strand'):
-    board = json.load(open(os.environ['BOARD']))
-    for c in board:
-        if c['number'] == int(os.environ['DROVER_ISSUE']):
-            c['status'] = 'Blocked' if os.environ['FAKE_CLAUDE'] == 'handoff' else 'Building'
-    json.dump(board, open(os.environ['BOARD'], 'w'))
-    if os.environ['FAKE_CLAUDE'] == 'strand':
-        sys.exit(0)
-signal.signal(signal.SIGTERM, lambda *a: sys.exit(0))
-end = time.time() + 60
-while time.time() < end:
-    time.sleep(.05)
-'''
+# 3 measured at d0b7d5a (docs/baseline.md), plus the dependency-graph read a board with a
+# Blocked card now costs (FR-BRD-5). NFR-6 caps an idle round at 5.
+IDLE_ROUND_CALLS = 4
 
 
-def alive(pid):
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    state = subprocess.run(['ps', '-p', str(pid), '-o', 'stat='], capture_output=True, text=True).stdout.strip()
-    return bool(state) and not state.startswith('Z')
-
-
-class RunnerRounds(unittest.TestCase):
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        self.base = Path(self.temp.name).resolve()
-        self.root, self.home, self.bin = [self.base / n for n in ['repo', 'home', 'bin']]
-        for p in [self.root, self.home, self.bin]:
-            p.mkdir()
-        self.calls_path = self.base / 'calls.jsonl'
-        self.board_path = self.base / 'board.json'
-        self.workers = self.base / 'workers'
-        self.env = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.environ['PATH'],
-                        DROVER_SKILLS_HOME=str(self.home), SB_GITHUB_RETRY_DELAY='0',
-                        SB_GITHUB_HALT_FILE=str(self.base / 'halt.json'), CALL_LOG=str(self.calls_path),
-                        BOARD=str(self.board_path), WORKER_DIR=str(self.workers),
-                        GIT_AUTHOR_NAME='f', GIT_AUTHOR_EMAIL='f@example.com',
-                        GIT_COMMITTER_NAME='f', GIT_COMMITTER_EMAIL='f@example.com')
-        # No drover code may search the process table: a pgrep call fails the test.
-        pgrep = "import os, sys; open(os.environ['PGREP_CALLED'], 'w').write(' '.join(sys.argv)); sys.exit(1)"
-        self.env['PGREP_CALLED'] = str(self.base / 'pgrep-called')
-        self.addCleanup(lambda: self.assertFalse((self.base / 'pgrep-called').exists(), 'pgrep was called'))
-        for name, source in [('gh', FAKE_GH), ('claude', FAKE_CLAUDE), ('pgrep', pgrep)]:
-            path = self.bin / name
-            path.write_text('#!/usr/bin/env python3\n' + source)
-            path.chmod(0o755)
-        self.git('init', '-q', '-b', 'main')
-        self.git('commit', '-q', '--allow-empty', '-m', 'base')
-        for name in NAMES:
-            skill = self.root / '.claude/skills' / name / 'SKILL.md'
-            skill.parent.mkdir(parents=True, exist_ok=True)
-            skill.write_text('fixture skill instructions')
-        self.state = self.root / '.claude/drover'
-        (self.root / '.drover').mkdir()
-        self.addCleanup(self.stop_workers)
-
-    def git(self, *args, cwd=None):
-        return subprocess.run(['git', *args], cwd=cwd or self.root, env=self.env, check=True,
-                              capture_output=True, text=True).stdout
-
-    def board(self, *cards):
-        self.board_path.write_text(json.dumps(list(cards)))
-
-    def run_board(self, cycles, rc=0, **extra):
-        # no_progress_cycles=N stops the run after N rounds with no new Done card.
-        (self.root / '.drover/config.json').write_text(json.dumps(dict(
-            project=dict(owner='o', number=1), base_branch='main', notifications=dict(bot_identity='bot'),
-            verify_commands=['true'], human_approves_merge=True, tick_seconds=0, no_progress_cycles=cycles,
-            **extra)))
-        result = subprocess.run(['bash', str(KIT / 'lib/drover-run.sh')], cwd=self.root,
-                                env=self.env, text=True, capture_output=True, timeout=60)
-        self.assertEqual(result.returncode, rc, result.stdout + result.stderr)
-        return result.stdout
-
-    def stop(self):
-        result = subprocess.run(['bash', str(KIT / 'lib/drover-stop.sh')], cwd=self.root,
-                                env=self.env, text=True, capture_output=True, timeout=30)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        return result.stdout
-
-    def calls(self, phase=None):
-        if not self.calls_path.exists():
-            return []
-        rows = [json.loads(line) for line in self.calls_path.read_text().splitlines()]
-        return [r['args'] for r in rows if phase in (None, r['phase'])]
-
-    def worker_pids(self, expect=0):
-        deadline = time.monotonic() + 5  # a dispatched fake worker may still be starting
-        while expect and len(self.worker_pids()) < expect and time.monotonic() < deadline:
-            time.sleep(.02)
-        return self._pids()
-
-    def _pids(self):
-        return sorted(int(p.name) for p in self.workers.iterdir() if p.name.isdigit()) if self.workers.exists() else []
-
-    def lock(self, issue):
-        path = self.state / 'inflight' / str(issue)
-        return path.read_text() if path.exists() else None
-
-    def wait_dead(self, pid):
-        deadline = time.monotonic() + 5
-        while alive(pid) and time.monotonic() < deadline:
-            time.sleep(.02)
-        self.assertFalse(alive(pid), 'fixture worker %d did not exit' % pid)
-
-    def stop_workers(self):
-        for pid in self.worker_pids():
-            if alive(pid):
-                os.kill(pid, signal.SIGTERM)
-                self.wait_dead(pid)
-
+class RunnerRounds(RunnerCase):
     # FR-WRK-1: a worker's lock is removed only when the worker is not alive.
     def test_live_worker_lock_survives_a_round(self):
         self.board({'number': 7, 'status': 'Ready'})
@@ -230,16 +39,6 @@ class RunnerRounds(unittest.TestCase):
         self.run_board(cycles=1)
         self.assertIsNone(self.lock(7))
         self.assertIn(['issue', 'edit', '7', '--remove-assignee', 'bot'], self.calls())
-
-    def manifest(self):
-        return next((self.root / '.drover/runs').glob('*-repo.md')).read_text()
-
-    def moves(self, column):
-        return [c[c.index('--id') + 1] for c in self.calls()
-                if c[:2] == ['project', 'item-edit'] and c[-1] == 'opt_' + column]
-
-    def done_moves(self):
-        return self.moves('Done')
 
     # FR-BRD-3: the runner never moves an open card to Done; the merge gate
     # (test-merge-gate.sh) is what proves a merge before the reviewer moves it.
@@ -417,7 +216,7 @@ class RunnerRounds(unittest.TestCase):
         calls = self.calls()
         self.assertIn(['project', 'item-edit', '--id', 'item12', '--project-id', 'P', '--field-id', 'F',
                        '--single-select-option-id', 'opt_Ready'], calls)
-        [note] = [c for c in calls if c[:3] == ['issue', 'comment', '12']]
+        [note] = [c for c in calls if c[:3] == ['issue', 'comment', '12'] and 'stranded' in c[-1]]
         self.assertIn('branch %s kept' % branch, note[note.index('--body') + 1])
         self.assertTrue(self.git('ls-remote', '--heads', 'origin', branch).strip(), 'branch was dropped')
         self.assertFalse([c for c in calls if c[:2] in (['pr', 'create'], ['pr', 'close'])])
