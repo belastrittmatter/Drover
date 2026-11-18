@@ -586,9 +586,9 @@ EOF
 
 check_legacy_worktrees() {
   # Never strand a previous run's edits by silently switching its folder.
-  # Pre-rename card worktrees only: .claude/worktrees/ also holds unrelated agent worktrees.
+  # Card worktrees only: .claude/worktrees/ also holds unrelated agent worktrees.
   local wt
-  for wt in .claude/worktrees/issue-*; do
+  for wt in .worktrees/issue-* .claude/worktrees/issue-*; do
     [ -e "$wt" ] || continue
     log "legacy worktree $wt exists — stop its worker and inspect/preserve its edits"
     log "    Move it with git worktree move to .drover/worktrees/ before resuming."
