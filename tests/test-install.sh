@@ -65,4 +65,10 @@ echo '{"project":{"owner":"o","number":3},"worker_backend":"claude-p"}' > "$P/.d
 ERR=$(cd "$P" && "$HOME/.local/bin/drover" config validate 2>&1) && fail "a removed key must fail validation"
 echo "$ERR" | grep -q "worker_backend: unknown key" || fail "a removed key should be named: $ERR"
 
-echo "PASS: test-install.sh (link, no project writes, kept files, skills links, validation)"
+# 6 — `drover gh-guard` calls of one worker share one budget (keyed on role and issue).
+B="$T/budget"; mkdir -p "$B"
+for n in 5 2; do TMPDIR="$B" DROVER_ROLE=build DROVER_ISSUE=7 "$HOME/.local/bin/drover" gh-guard spend "$n"; done
+[ "$(TMPDIR="$B" DROVER_ROLE=build DROVER_ISSUE=7 "$HOME/.local/bin/drover" gh-guard budget)" = 143 ] || fail "separate calls must share the budget"
+[ "$(TMPDIR="$B" DROVER_ROLE=qa DROVER_ISSUE=7 "$HOME/.local/bin/drover" gh-guard budget)" = 150 ] || fail "another worker has its own budget"
+
+echo "PASS: test-install.sh (link, no project writes, kept files, skills links, validation, gh-guard budget)"

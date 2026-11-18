@@ -134,7 +134,7 @@ Run the same preconditions as `run.md` §Preconditions, minus PID checks:
 
 Repeat until a done condition or halt gate fires:
 
-1. **Rate guard** — `sb_gh_guard_check 200` (drover-gh-guard.sh; `gh api rate_limit` misreports GraphQL); if GraphQL remaining < 200, wait for
+1. **Rate guard** — `drover gh-guard check 200` (lib/drover-gh-guard.sh; `gh api rate_limit` misreports GraphQL); if GraphQL remaining < 200, wait for
    reset (same thresholds as run.md). A failing `gh` call outranks the reading:
    right after a reset the REST reading has shown 4999 while calls still failed.
    With GraphQL dry, the orchestrator's own writes go over REST, a separate

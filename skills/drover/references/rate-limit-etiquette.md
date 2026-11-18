@@ -97,7 +97,7 @@ Use `drover gh-guard summary` to grab the snapshot. This gives the run manifest 
 
 ## 7. Per-worker hard cap
 
-`sb_gh_budget_spend` decrements a per-worker call counter. Default 150. If exhausted, the helper returns non-zero — the worker should write a halt comment ("worker-budget exhausted, releasing claim") and exit gracefully. The orphan-scan and reaper will recover the lock; the dispatcher re-tries on next tick when quota has recovered.
+`drover gh-guard spend [n]` decrements a per-worker call counter (`drover gh-guard budget` prints it), shared by every call of one worker (keyed on DROVER_ROLE and DROVER_ISSUE). Default 150. If exhausted, the helper returns non-zero — the worker should write a halt comment ("worker-budget exhausted, releasing claim") and exit gracefully. The orphan-scan and reaper will recover the lock; the dispatcher re-tries on next tick when quota has recovered.
 
 ---
 
