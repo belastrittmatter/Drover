@@ -384,15 +384,18 @@ def user_skill_dir(host, home=None):
 
 
 def config_problems(root, cfg_path, host):
-    """Migration changes, verification and schema problems of the project config."""
-    changes, verification, host_errors = {}, {}, {}
+    """Migration changes, verification, harness and schema problems of the project config."""
+    changes, verification, host_errors, schema = {}, {}, {}, {}
     if not os.path.isfile(cfg_path):
-        return changes, verification, host_errors
+        return changes, verification, host_errors, schema
     rel = os.path.relpath(cfg_path, root)
     cfg = load_json(cfg_path)
     if not isinstance(cfg, dict):
         host_errors[rel] = "not a JSON object"
-        return changes, verification, host_errors
+        return changes, verification, host_errors, schema
+    problems = schema_errors(cfg)
+    if problems:
+        schema[rel] = problems
     ready = subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), "drover-verification-ready.py"),
                             "--config", cfg_path], capture_output=True, text=True)
     if ready.returncode:
@@ -403,7 +406,13 @@ def config_problems(root, cfg_path, host):
     _, ch = migrate_config(cfg, host)
     if ch:
         changes[rel] = ch
-    return changes, verification, host_errors
+    return changes, verification, host_errors, schema
+
+
+def schema_errors(cfg):
+    """'field: message' for each way cfg fails config-schema.json."""
+    dc = drover_config()
+    return dc.errors(cfg, load_json(str(dc.SCHEMA)))
 
 
 def check(root, pack, host="claude", home=None, catalog=None):
@@ -423,7 +432,7 @@ def check(root, pack, host="claude", home=None, catalog=None):
     copies = old_copies(root)
     old_hooks = [c for c in settings_commands(os.path.join(claude, "settings.json")) if c and OLD_HOOK.search(c)]
     legacy, legacy_all = legacy_config(root)
-    configs, verification, host_errors = config_problems(root, cfg_path, host)
+    configs, verification, host_errors, schema = config_problems(root, cfg_path, host)
     if not os.path.isfile(cfg_path) and legacy_all:
         rel = os.path.relpath(legacy or os.path.dirname(legacy_all[0]), root)
         if legacy:
@@ -457,7 +466,7 @@ def check(root, pack, host="claude", home=None, catalog=None):
         ok.append("required worker skills resolved for " + host)
     if security_audit:
         ok.append("security-audit skill installed (optional, run on demand)")
-    red = bool(missing or old_dirs or copies or old_hooks or configs or verification or host_errors
+    red = bool(missing or old_dirs or copies or old_hooks or configs or verification or host_errors or schema
                or not git or needs or not helpers)
     return {
         "root": root, "pack": pack, "pack_version": pack_version, "installed_version": have_v,
@@ -465,7 +474,7 @@ def check(root, pack, host="claude", home=None, catalog=None):
         "added_skills": upgrade_rec.get("added_skills", []),
         "missing": missing, "old_dirs": old_dirs, "old_copies": [os.path.relpath(p, root) for p in copies],
         "old_hooks": old_hooks, "configs": configs, "verification": verification,
-        "host_errors": host_errors, "git": git, "skills_dir": skills_dir,
+        "host_errors": host_errors, "schema_errors": schema, "git": git, "skills_dir": skills_dir,
         "helper_skills": helpers, "security_audit": security_audit, "helper_readiness": readiness, "needs": needs, "os": fam, "ok": ok, "green": not red,
     }
 
@@ -536,6 +545,15 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
     claude = os.path.join(root, ".claude")
     cfg_path = os.path.join(root, ".drover", "config.json")
     legacy, legacy_all = legacy_config(root)
+    # The config fix is checked first: a migrated config that fails the schema stops fix
+    # before anything is removed, naming the field, and every legacy file stays.
+    source = legacy if not os.path.isfile(cfg_path) and legacy else cfg_path if os.path.isfile(cfg_path) else None
+    if source and isinstance(load_json(source), dict):
+        problems = schema_errors(migrate_config(load_json(source), host)[0])
+        if problems:
+            return {**before, "fixed": [], "notes": [], "backup": None,
+                    "error": f"config not migrated, {os.path.relpath(source, root)} would fail the schema: "
+                             + "; ".join(problems) + ". Fix it by hand; nothing was changed."}
     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
     to_backup = [os.path.join(claude, "settings.json"), os.path.join(claude, "settings.local.json"), cfg_path,
                  os.path.join(claude, "drover", "configs"), os.path.join(claude, "drover", "active")]
@@ -762,6 +780,10 @@ def text_report(res):
         lines.append("  ✗ " + res["helper_readiness"]["error"])
     for path, error in {**res.get("verification", {}), **res.get("host_errors", {})}.items():
         lines.append(f"  ✗ {path}: {error}")
+    for path, errors in res.get("schema_errors", {}).items():
+        lines += [f"  ✗ {path}: {e}" for e in errors]
+    if res.get("error"):
+        lines.append(f"  ✗ {res['error']}")
     for n in res.get("needs", []):
         lines.append(f"  Needs your machine: {n['name']} isn't installed. It's needed for {n['why']}.")
         lines.append(f"    {n['command']}")

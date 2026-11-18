@@ -327,11 +327,11 @@ echo "$OUT" | q '.status_backup == null and .restored == 0 and .added_columns !=
 # 13 — config `harness`: check accepts a harness with a harnesses/<name>.json entry (v1:
 #      claude), flags anything else, and fix never overwrites a harness that is already set.
 H="$WORK/bare/.drover"; mkdir -p "$H"
-printf '{"harness":"claude"}' > "$H/config.json"
+printf '{"project":{"owner":"o","number":1},"harness":"claude"}' > "$H/config.json"
 OUT=$(python3 "$SETUP" check --root "$WORK/bare" || true)
 echo "$OUT" | q '.host_errors == {}' || fail "harness claude must be accepted: $OUT"
 for h in gemini codex; do
-  printf '{"harness":"%s"}' "$h" > "$H/config.json"
+  printf '{"project":{"owner":"o","number":1},"harness":"%s"}' "$h" > "$H/config.json"
   OUT=$(python3 "$SETUP" check --root "$WORK/bare" || true)
   echo "$OUT" | q --arg h "$h" '.green == false and (.host_errors | to_entries | .[0].value | test($h))' \
     || fail "harness $h has no entry and must be flagged: $OUT"
@@ -341,15 +341,15 @@ echo "$TXT" | grep -q "✗ .*config.json.*codex" || fail "text report must name 
 python3 "$SETUP" fix --root "$WORK/bare" --no-helpers >/dev/null || true
 q '.harness == "codex"' "$H/config.json" || fail "fix must not guess over a set harness: $(cat "$H/config.json")"
 # A non-Claude harness keeps merge_policy.default unset (merges by hand, #47); claude gets "auto".
-printf '{"host":"codex"}' > "$H/config.json"
+printf '{"project":{"owner":"o","number":1},"host":"codex"}' > "$H/config.json"
 python3 "$SETUP" fix --root "$WORK/bare" --no-helpers >/dev/null || true
 q '.harness == "codex" and (has("host") | not) and .columns != null and (.merge_policy.default // null) == null' "$H/config.json" \
   || fail "fix renames host to harness and does not turn auto-merge on for codex: $(cat "$H/config.json")"
-echo '{}' > "$H/config.json"
+echo '{"project":{"owner":"o","number":1}}' > "$H/config.json"
 python3 "$SETUP" fix --root "$WORK/bare" --no-helpers --host codex >&2 || true
 q '.harness == "codex" and (.merge_policy.default // null) == null' "$H/config.json" \
   || fail "fix filling harness codex must not turn auto-merge on: $(cat "$H/config.json")"
-printf '{"harness":"claude"}' > "$H/config.json"
+printf '{"project":{"owner":"o","number":1},"harness":"claude"}' > "$H/config.json"
 python3 "$SETUP" fix --root "$WORK/bare" --no-helpers >/dev/null || true
 q '.merge_policy.default == "auto"' "$H/config.json" || fail "harness claude keeps the auto migration: $(cat "$H/config.json")"
 rm "$H/config.json"
@@ -358,7 +358,7 @@ rm "$H/config.json"
 #      both migrate; the per-minute stamp used to crash the second with EEXIST.
 R="$WORK/twice"; C="$R/.drover"; mkdir -p "$C"; git -C "$R" init -q
 for i in 1 2; do
-  printf '{"harness":"codex"}' > "$C/config.json"
+  printf '{"project":{"owner":"o","number":1},"harness":"codex"}' > "$C/config.json"
   OUT=$(python3 "$SETUP" fix --root "$R" --no-helpers || true)
   echo "$OUT" | q '.error == null' || fail "fix #$i in the same minute must not fail: $OUT"
   q '.columns != null' "$C/config.json" || fail "fix #$i must migrate the config: $(cat "$C/config.json")"
@@ -394,4 +394,21 @@ q '.project.number == 3 and .evidence == {"mode":"branch","branch":"drover-evide
 RC=0; (cd "$O" && python3 "$SETUP" onboard --merge sometimes </dev/null >/dev/null 2>&1) || RC=$?
 [ "$RC" -eq 2 ] && q '.merge_policy.default == "auto"' "$C" || fail "a schema failure must write nothing (rc $RC)"
 
-echo "PASS: test-setup.sh (15 scenarios)"
+# 16 — a legacy config that would fail the schema after migration stops fix before anything is
+#      removed: the field is named and every legacy file stays. check reports schema errors.
+L="$WORK/badlegacy"; mkdir -p "$L/.claude/drover/configs" "$L/.claude/bin"; git -C "$L" init -q
+echo old > "$L/.claude/bin/drover-run.sh"
+echo '{"project":{"owner":"o","number":"seven"},"bogus":1}' > "$L/.claude/drover/configs/app.json"
+OUT=$(python3 "$SETUP" fix --root "$L" --no-helpers || true)
+echo "$OUT" | q '.error | test("project.number: expected integer") and test("bogus: unknown key")' \
+  || fail "fix must name the failing fields: $OUT"
+[ -f "$L/.claude/drover/configs/app.json" ] && [ ! -e "$L/.drover/config.json" ] && [ -f "$L/.claude/bin/drover-run.sh" ] \
+  || fail "a failed migration keeps every legacy file and writes nothing"
+mkdir -p "$L/.drover"; echo '{"project":{"owner":"o","number":1},"harness":"claude","bogus":1}' > "$L/.drover/config.json"
+OUT=$(python3 "$SETUP" check --root "$L" || true)
+echo "$OUT" | q '.green == false and (.schema_errors[".drover/config.json"] | index("bogus: unknown key"))' \
+  || fail "check must report schema errors: $OUT"
+TXT=$(python3 "$SETUP" check --root "$L" --text || true)
+echo "$TXT" | grep -q "✗ .drover/config.json: bogus: unknown key" || fail "text report names the schema error"
+
+echo "PASS: test-setup.sh (16 scenarios)"
