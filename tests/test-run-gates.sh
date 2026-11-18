@@ -24,6 +24,8 @@ cat > "$STUB_DIR/gh" <<'STUB'
 printf '%s\n' "$*" >> "$GH_LOG"
 case "$1 ${2:-}" in
   "issue view")
+    # The closed-card check (FR-BRD-3): closed as not planned, with a comment → Done.
+    case "$*" in *stateReason*) echo '{"reason":"NOT_PLANNED","comments":1}'; exit 0 ;; esac
     for n in $CLOSED_ISSUES; do
       [ "$n" = "$3" ] && { echo "CLOSED"; exit 0; }
     done

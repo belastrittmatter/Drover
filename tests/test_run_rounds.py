@@ -22,7 +22,7 @@ NAMES = ['drover', 'drover-build', 'drover-qa', 'drover-review', 'drover-collect
 FAKE_GH = r'''
 import glob, json, os, re, sys
 args = sys.argv[1:]
-manifest = ''.join(open(p).read() for p in glob.glob('docs/drover/runs/*.md'))
+manifest = ''.join(open(p).read() for p in glob.glob('.drover/runs/*.md'))
 phase = 'round' if 'initial Ready count' in manifest else 'startup'
 with open(os.environ['CALL_LOG'], 'a') as f:
     f.write(json.dumps({'phase': phase, 'args': args}) + '\n')
@@ -47,6 +47,8 @@ elif args[:2] == ['issue', 'view']:
     fields = args[args.index('--json') + 1] if '--json' in args else ''
     if fields == 'state':
         print(c.get('state', 'OPEN'))
+    elif fields == 'stateReason,comments':  # the runner's --jq shape
+        print(json.dumps({'reason': c.get('reason', 'COMPLETED'), 'comments': c.get('comments', 0)}))
     elif fields == 'labels':
         print(json.dumps({'labels': [{'name': l} for l in c.get('labels', [])]}))
     else:
@@ -56,6 +58,8 @@ elif args[:2] == ['project', 'field-list']:
                                   'options': [{'id': 'opt_' + s, 'name': s} for s in cols]}]}))
 elif args[:2] == ['project', 'view']:
     print('{"id":"P"}')
+elif args[:2] == ['pr', 'list'] and 'merged' in args:
+    print(json.dumps([{'headRefName': c['merged']} for c in board if c.get('merged')]))
 elif args[:2] == ['pr', 'list']:
     m = re.search(r'issue-(\d+)-', ' '.join(args))
     print(os.environ.get('PR_FOR_' + m.group(1), '') if m else '')
@@ -72,16 +76,24 @@ else:
 '''
 
 # A live worker: records its pid, then runs until signalled (60 s cap).
-# FAKE_CLAUDE=exit makes it a worker that ends at once without touching the board.
+# FAKE_CLAUDE=exit makes it a worker that ends at once without touching the board;
+# FAKE_CLAUDE=handoff moves its card to Blocked, then keeps running.
 FAKE_CLAUDE = r'''
-import os, signal, sys, time
+import json, os, signal, sys, time
 from pathlib import Path
 d = Path(os.environ['WORKER_DIR']); d.mkdir(exist_ok=True)
-(d / str(os.getpid())).write_text(' '.join(sys.argv[1:]))
 (d / ('argv-%d' % os.getpid())).write_text('\0'.join(sys.argv[1:]))
 (d / ('env-%d' % os.getpid())).write_text('DROVER_ROLE=%s DROVER_ISSUE=%s' % (os.environ.get('DROVER_ROLE'), os.environ.get('DROVER_ISSUE')))
+(d / ('stdin-%d' % os.getpid())).write_text(str(os.path.samestat(os.fstat(0), os.stat(os.devnull))))
+(d / str(os.getpid())).write_text(' '.join(sys.argv[1:]))
 if os.environ.get('FAKE_CLAUDE') == 'exit':
     sys.exit(0)
+if os.environ.get('FAKE_CLAUDE') == 'handoff':
+    board = json.load(open(os.environ['BOARD']))
+    for c in board:
+        if c['number'] == int(os.environ['DROVER_ISSUE']):
+            c['status'] = 'Blocked'
+    json.dump(board, open(os.environ['BOARD'], 'w'))
 signal.signal(signal.SIGTERM, lambda *a: sys.exit(0))
 end = time.time() + 60
 while time.time() < end:
@@ -136,11 +148,12 @@ class RunnerRounds(unittest.TestCase):
     def board(self, *cards):
         self.board_path.write_text(json.dumps(list(cards)))
 
-    def run_board(self, cycles):
+    def run_board(self, cycles, **extra):
         # no_progress_cycles=N stops the run after N rounds with no new Done card.
         (self.root / '.drover/config.json').write_text(json.dumps(dict(
             project=dict(owner='o', number=1), base_branch='main', notifications=dict(bot_identity='bot'),
-            verify_commands=['true'], human_approves_merge=True, tick_seconds=0, no_progress_cycles=cycles)))
+            verify_commands=['true'], human_approves_merge=True, tick_seconds=0, no_progress_cycles=cycles,
+            **extra)))
         result = subprocess.run(['bash', str(KIT / 'lib/drover-run.sh')], cwd=self.root,
                                 env=self.env, text=True, capture_output=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -189,8 +202,8 @@ class RunnerRounds(unittest.TestCase):
         self.run_board(cycles=2)  # round 1 dispatches, round 2 sees the lock
         [pid] = self.worker_pids(expect=1)
         self.assertTrue(alive(pid), 'the fake worker should still be running')
-        self.assertIn('PID=%d\n' % pid, self.lock(7) or '', 'live worker lost its lock')
-        manifest = next((self.root / 'docs/drover/runs').glob('*-repo.md')).read_text()
+        self.assertIn('HANDLE=process:%d\n' % pid, self.lock(7) or '', 'live worker lost its lock')
+        manifest = self.manifest()
         self.assertNotIn('reaped stale lock', manifest)
         self.assertEqual(manifest.count('dispatch lane=build issue=#7'), 1, manifest)
         self.assertNotIn(['issue', 'edit', '7', '--remove-assignee', 'bot'], self.calls())
@@ -203,21 +216,78 @@ class RunnerRounds(unittest.TestCase):
         self.assertIsNone(self.lock(7))
         self.assertIn(['issue', 'edit', '7', '--remove-assignee', 'bot'], self.calls())
 
-    def done_moves(self):
+    def manifest(self):
+        return next((self.root / '.drover/runs').glob('*-repo.md')).read_text()
+
+    def moves(self, column):
         return [c[c.index('--id') + 1] for c in self.calls()
-                if c[:2] == ['project', 'item-edit'] and c[-1] == 'opt_Done']
+                if c[:2] == ['project', 'item-edit'] and c[-1] == 'opt_' + column]
+
+    def done_moves(self):
+        return self.moves('Done')
 
     # FR-BRD-3: the runner never moves an open card to Done; the merge gate
     # (test-merge-gate.sh) is what proves a merge before the reviewer moves it.
+    # A closed card reaches Done only with a merged issue-<N>-* PR into the base, or a
+    # not-planned close with a comment; any other close goes to Blocked [needs-you].
     def test_done_only_after_merge(self):
         self.env['FAKE_CLAUDE'] = 'exit'  # the reviewer ends without merging
         self.board({'number': 6, 'status': 'Review', 'state': 'CLOSED'},
+                   {'number': 9, 'status': 'Review', 'state': 'CLOSED', 'merged': 'issue-9-fix'},
+                   {'number': 10, 'status': 'Review', 'state': 'CLOSED', 'reason': 'NOT_PLANNED', 'comments': 1},
+                   {'number': 11, 'status': 'QA', 'state': 'CLOSED', 'reason': 'NOT_PLANNED'},
                    {'number': 5, 'status': 'Review'})
         self.run_board(cycles=2)
         self.assertNotIn('item5', self.done_moves(), 'an unmerged open card reached Done')
-        self.assertIn('item6', self.done_moves(), 'a closed issue is reconciled to Done')
+        self.assertEqual(sorted(self.done_moves()), ['item10', 'item9'])
+        self.assertEqual(sorted(self.moves('Blocked')), ['item11', 'item6'])
+        notes = {c[2]: c[c.index('--body') + 1] for c in self.calls() if c[:2] == ['issue', 'comment']}
+        self.assertEqual(sorted(notes), ['11', '6'])
+        self.assertTrue(notes['6'].startswith('[orchestrator] [blocker] blocked [needs-you] '), notes['6'])
+        self.assertIn('\nblocked-by:  -', notes['6'])
         self.assertTrue(self.worker_pids(expect=1), 'the open card got a reviewer')
         self.assertTrue(all('issue #5 ' in (self.workers / str(p)).read_text() for p in self.worker_pids()))
+
+    # FR-RUN-2: roles.<role>.max_workers workers of one role run side by side, no more.
+    def test_two_builders_run_in_parallel(self):
+        self.board({'number': 7, 'status': 'Ready'}, {'number': 8, 'status': 'Ready'},
+                   {'number': 9, 'status': 'Ready'})
+        self.run_board(cycles=1, roles=dict(build=dict(max_workers=2)))
+        pids = self.worker_pids(expect=2)
+        self.assertEqual(len(pids), 2, pids)
+        self.assertTrue(all(alive(p) for p in pids), 'both builders should run at once')
+        issues = sorted((self.workers / ('env-%d' % p)).read_text() for p in pids)
+        self.assertEqual(issues, ['DROVER_ROLE=build DROVER_ISSUE=7', 'DROVER_ROLE=build DROVER_ISSUE=8'])
+        for issue in (7, 8):
+            self.assertRegex(self.lock(issue) or '', r'^HANDLE=process:\d+\nLANE=build\nSTARTED=\S+\nCOLUMN=Ready\n$')
+        self.assertIsNone(self.lock(9), 'a third builder started past max_workers 2')
+        self.assertIn('max_workers=4 (build=2 qa=1 review=1)', self.manifest())
+
+    # FR-RUN-13: two failed dispatches in a row on one card halt the run with the log tail.
+    def test_two_failed_dispatches_halt(self):
+        self.env['FAKE_CLAUDE'] = 'exit'  # ends without moving its card or reporting
+        self.board({'number': 5, 'status': 'Review'})
+        out = self.run_board(cycles=30)
+        manifest = self.manifest()
+        self.assertEqual(manifest.count('dispatch lane=review issue=#5 pid='), 2, manifest)
+        self.assertIn('failed dispatch lane=review issue=#5', manifest)
+        self.assertIn('halt — failed dispatch: #5 failed 2 dispatches in a row', out)
+        self.assertIn('| === dispatch lane=review issue=#5 at ', out)  # the log tail
+        self.assertNotIn('RUNAWAY', manifest)
+
+    # FR-WRK-10: a worker whose card left its lane runs one more tick, then is stopped.
+    def test_worker_gets_one_tick_after_its_card_leaves(self):
+        self.env['FAKE_CLAUDE'] = 'handoff'  # moves its card to Blocked and keeps running
+        self.board({'number': 7, 'status': 'Ready'})
+        out = self.run_board(cycles=30)
+        [pid] = self.worker_pids(expect=1)
+        self.wait_dead(pid)
+        lines = self.manifest().splitlines()
+        marked = next(i for i, l in enumerate(lines) if 'one more tick to finish its handoff' in l)
+        stopped = next(i for i, l in enumerate(lines) if 'zombie build worker on #7 (pid=%d)' % pid in l)
+        self.assertEqual(sum('] tick — Ready=' in l for l in lines[marked:stopped]), 1, '\n'.join(lines))
+        self.assertIsNone(self.lock(7))
+        self.assertIn('exiting cleanly', out)
 
     def started_build(self, issue, pr):
         # A card mid-build: issue branch pushed, its worktree, an open PR, a live worker.
@@ -276,7 +346,7 @@ class RunnerRounds(unittest.TestCase):
     # FR-HRN-4: the worker starts with the harness's permissions and the checked skills.
     def test_worker_starts_with_harness_permissions(self):
         self.board({'number': 8, 'status': 'Ready', 'labels': ['bug']})
-        self.run_board(cycles=1)
+        self.run_board(cycles=1, permissions=dict(allow_commands=['rtk']))
         [pid] = self.worker_pids(expect=1)
         argv = (self.workers / str(pid)).read_text()
         harness = json.loads((KIT / 'harnesses/claude.json').read_text())['permissions']
@@ -290,13 +360,26 @@ class RunnerRounds(unittest.TestCase):
         allow = args[args.index(harness['allow_flag']) + 1].split(',')
         deny = args[args.index(harness['deny_flag']) + 1].split(',')
         self.assertIn('Read(%s)' % home, allow)  # the install folder is readable ...
-        for tool in ('Edit', 'Write', 'MultiEdit', 'NotebookEdit'):
-            self.assertIn('%s(%s)' % (tool, home), deny)  # ... and never edited
+        self.assertIn('Edit(%s)' % home, deny)  # ... and never edited (Edit covers every file tool)
+        for tool in ('Write', 'MultiEdit', 'NotebookEdit'):  # Claude rejects path rules on these
+            self.assertNotIn('%s(%s)' % (tool, home), deny)
+        self.assertIn('Bash(rtk:*)', allow)  # permissions.allow_commands
+        self.assertEqual((self.workers / ('stdin-%d' % pid)).read_text(), 'True', 'worker stdin is not /dev/null')
         self.assertIn('Bash(gh pr merge:*)', deny)
         self.assertEqual((self.workers / ('env-%d' % pid)).read_text(), 'DROVER_ROLE=build DROVER_ISSUE=8')
         self.assertIn('Skills for this card', argv)
         self.assertIn('mattpocock-skills:diagnosing-bugs=' + str(self.root / '.claude/skills/diagnosing-bugs/SKILL.md'), argv)
         self.assertNotIn('drover-skills-ready', argv)  # no readiness command left for the worker
+
+    # permissions.allow_commands is schema-checked: one command word each.
+    def test_allow_commands_rejects_more_than_a_word(self):
+        cfg = self.base / 'cfg.json'
+        cfg.write_text(json.dumps({'project': {'owner': 'o', 'number': 1},
+                                   'permissions': {'allow_commands': ['rtk', 'rm -rf']}}))
+        r = subprocess.run(['python3', str(KIT / 'lib/drover-config.py'), 'validate', str(cfg)],
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 65, r.stderr)
+        self.assertIn('permissions.allow_commands[1]', r.stderr)
 
     # NFR-6 measurement: GitHub calls in one round with nothing to do. Prints the
     # call list; asserts only the count measured at the fork point (docs/baseline.md).

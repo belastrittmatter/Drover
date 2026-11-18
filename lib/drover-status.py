@@ -504,7 +504,7 @@ def main() -> int:
     cfg = json.loads(config_path.read_text())
     project_owner: str = cfg["project"]["owner"]
     project_number: int = int(cfg["project"]["number"])
-    runs_dir = "docs/drover/runs"
+    runs_dir = ".drover/runs"  # metrics.md FR-MET-3
     run_date = datetime.date.today().isoformat()
     manifest_path = Path(runs_dir) / f"{run_date}-{config_slug}.md"
 

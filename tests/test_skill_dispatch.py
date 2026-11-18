@@ -215,7 +215,8 @@ dispatch_lane build 1
                 unrelated.terminate()
             unrelated.wait(timeout=3)
         self.addCleanup(reap_unrelated)
-        (self.state / 'inflight/99').write_text(f'PID={unrelated.pid}\nLANE=review\n')
+        (self.state / 'inflight/99').unlink()  # written by the owned worker once the run is under way
+        self.env['UNRELATED_PID'] = str(unrelated.pid)
         (self.root / '.drover').mkdir(exist_ok=True)
         (self.root / '.drover/config.json').write_text(json.dumps(dict(project=dict(owner='fixture',number=1),
             base_branch='main',notifications=dict(bot_identity='bot'),
@@ -226,6 +227,8 @@ dispatch_lane build 1
 from pathlib import Path
 root=Path(os.environ['ROOT_FIXTURE'])
 (root/'owned.pid').write_text(str(os.getpid()))
+# A lock this runner did not start appears mid-run; the halt must leave it alone (FR-WRK-8).
+(root/'.claude/drover/inflight/99').write_text('PID=%s\\nLANE=review\\n' % os.environ['UNRELATED_PID'])
 (root/'.claude/skills/diagnosing-bugs/SKILL.md').unlink()
 (root/'owned.started').write_text('started')
 def stop(*args):

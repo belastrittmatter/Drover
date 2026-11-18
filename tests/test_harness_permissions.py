@@ -180,7 +180,8 @@ check(len(prompts) == 3, f"expected the three lane prompts in dispatch_lane, fou
 check(reads and all(p.is_file() for p in reads), f"prompt reads must exist: {reads}")
 check("First operation" not in body and ".claude/bin" not in body,
       "the worker prompt must not tell the worker to run a command before it starts (stage 0)")
-check("worker-argv" in body, "dispatch_lane must start workers through the harness worker-argv")
+check("worker_start" in body and "worker-argv" in (ROOT / "lib/drover-worker.sh").read_text(),
+      "dispatch_lane must start workers through drover-worker.sh and the harness worker-argv")
 
 # 2 — every command in the files the prompt names and in the role rules is covered.
 scanned = sorted(set(reads + ROLE_FILES))

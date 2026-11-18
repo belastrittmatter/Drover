@@ -2,15 +2,16 @@
 # drover-stop.sh — graceful shutdown of an in-flight drover run.
 #
 # What it does:
-#   1. Find every in-flight worker (lock files under .claude/drover/inflight/).
-#      Stop any Codex wave and its lane process groups before comments/releases.
-#   2. For each one, post a "stopped mid-flight" comment on the issue AND its PR
+#   1. Find every in-flight worker (lock files under .claude/drover/inflight/) and this
+#      repo's runner (.claude/drover/runner.lock). Only these are touched (FR-WRK-8):
+#      no process search, so another repo's runner and workers are never signalled.
+#      Stop the runner first, then any Codex wave and its lane process groups.
+#   2. For each worker, post a "stopped mid-flight" comment on the issue AND its PR
 #      (with last commit, lane, and resume hint) — so context survives the kill.
 #   3. Release the GitHub assignee mutex on each claimed issue.
-#   4. SIGTERM → 1s → SIGKILL the worker PIDs.
-#   5. Kill the legacy dispatcher loop (drover-run.sh).
-#   6. Remove in-flight locks. Leave worktrees in place (Builder can resume).
-#   7. Print summary + resume command.
+#   4. SIGTERM → 1s → SIGKILL each worker through lib/drover-worker.sh.
+#   5. Remove the locks of workers that are no longer alive. Leave worktrees in place.
+#   6. Print summary + resume command.
 #
 # What it does NOT do:
 #   - Wait for workers to reach a clean stopping point (claude -p has no SIGTERM
@@ -50,28 +51,16 @@ CONFIG_SLUG=$(python3 "$HERE/drover-config.py" slug)
 BOT_LOGIN=$(jq -r '.notifications.bot_identity // .bot_identity // ""' "$CONFIG_PATH")
 INFLIGHT_DIR=".claude/drover/inflight"
 RUN_DATE=$(date +%Y-%m-%d)
-RUN_MANIFEST="docs/drover/runs/${RUN_DATE}-${CONFIG_SLUG}.md"
+RUN_MANIFEST=".drover/runs/${RUN_DATE}-${CONFIG_SLUG}.md"
+RUNNER_LOCK=".claude/drover/runner.lock"
+# shellcheck source=drover-worker.sh
+. "$HERE/drover-worker.sh"
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # ───────────────────────────── helpers ─────────────────────────────
 log() {
   printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"
   [ -f "$RUN_MANIFEST" ] && printf '[%s] STOP %s\n' "$(date +%H:%M:%S)" "$*" >> "$RUN_MANIFEST" || true
-}
-
-# Source a lock file. Supports both v1.3.0+ (PID=/LANE=/STARTED= assignments)
-# and pre-v1.3.0 (single-line PID) formats.
-read_lock() {
-  local lock="$INFLIGHT_DIR/$1"
-  PID=""; LANE=""; STARTED=""
-  [ -f "$lock" ] || return 1
-  if grep -q '^PID=' "$lock" 2>/dev/null; then
-    # shellcheck disable=SC1090
-    . "$lock" 2>/dev/null || true
-  else
-    PID=$(cat "$lock" 2>/dev/null || echo "")
-  fi
-  return 0
 }
 
 # Look up the PR number for an issue's branch (if any). One gh call.
@@ -122,23 +111,14 @@ release_claim() {
   log "  released assignee + lane labels on #${issue}"
 }
 
-kill_pid() {
-  local pid="$1" name="${2:-process}" grace="${3:-1}" waited=0
-  if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
-    log "  ⊘ ${name} pid=${pid:-empty} already dead"
-    return 0
-  fi
-  kill -TERM "$pid" 2>/dev/null || true
-  while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt "$grace" ]; do
-    sleep 1
-    waited=$((waited + 1))
-  done
-  if kill -0 "$pid" 2>/dev/null; then
-    kill -KILL "$pid" 2>/dev/null || true
-    log "  ${name} pid=${pid} SIGKILLed (didn't respond to SIGTERM)"
-  else
-    log "  ${name} pid=${pid} SIGTERMed"
-  fi
+stop_handle() {
+  local handle="$1" name="${2:-process}" grace="${3:-1}" pid="${1#*:}"
+  worker_stop "$handle" "$grace"
+  case "$WORKER_STOPPED_BY" in
+    none) log "  ${name} pid=${pid:-empty} already dead" ;;
+    KILL) log "  ${name} pid=${pid} SIGKILLed (didn't respond to SIGTERM)" ;;
+    *)    log "  ${name} pid=${pid} SIGTERMed" ;;
+  esac
 }
 
 # ───────────────────────────── main ─────────────────────────────
@@ -154,13 +134,13 @@ if [ -d "$INFLIGHT_DIR" ]; then
     issue=$(basename "$lock")
     # Wave/merge control markers are not GitHub issue numbers.
     case "$issue" in ''|*[!0-9]*) continue ;; esac
-    read_lock "$issue"
-    WORKERS+=("${issue}|${LANE:-unknown}|${PID:-}")
+    worker_lock "$lock"
+    WORKERS+=("${issue}|${LANE:-unknown}|${HANDLE}")
   done
 fi
 
-DISPATCHER_PIDS=$(pgrep -f 'drover-run\.sh' 2>/dev/null || true)
-ORPHAN_WORKERS=$(pgrep -f 'claude -p .*drover' 2>/dev/null || true)
+DISPATCHER=""
+if worker_lock "$RUNNER_LOCK" && worker_alive "$HANDLE"; then DISPATCHER="$HANDLE"; fi
 CODEX_WAVE_MARKER=".claude/drover/codex-wave.pid"
 CODEX_WAVE_PID=""
 if [ -f "$CODEX_WAVE_MARKER" ]; then
@@ -169,7 +149,7 @@ if [ -f "$CODEX_WAVE_MARKER" ]; then
     log "invalid Codex wave PID marker; preserve claims and inspect $CODEX_WAVE_MARKER"
     exit 1 ;;
   esac
-  if kill -0 "$CODEX_WAVE_PID" 2>/dev/null; then
+  if worker_alive "process:$CODEX_WAVE_PID"; then
     # Refuse a reused PID, or an unavailable process identity, rather than
     # signal an unrelated process and release a still-running wave's claims.
     if ! ps -p "$CODEX_WAVE_PID" -o args= 2>/dev/null | grep -q 'drover-codex-wave'; then
@@ -179,63 +159,58 @@ if [ -f "$CODEX_WAVE_MARKER" ]; then
   fi
 fi
 
-if [ "${#WORKERS[@]}" -eq 0 ] && [ -z "$DISPATCHER_PIDS" ] && [ -z "$ORPHAN_WORKERS" ] && [ -z "$CODEX_WAVE_PID" ]; then
-  echo "  ✓ nothing to stop — no dispatcher, no in-flight workers, no orphans"
+if [ "${#WORKERS[@]}" -eq 0 ] && [ -z "$DISPATCHER" ] && [ -z "$CODEX_WAVE_PID" ]; then
+  echo "  ✓ nothing to stop — no dispatcher, no in-flight workers"
   echo "════════════════════════════════════════════════════════"
   exit 0
+fi
+
+# The runner first, so it cannot start a new worker while the others are wrapped up.
+if [ -n "$DISPATCHER" ]; then
+  log "stopping dispatcher loop"
+  stop_handle "$DISPATCHER" "dispatcher"
+  worker_alive "$DISPATCHER" || rm -f "$RUNNER_LOCK"
 fi
 
 # Stop new Codex dispatch first. Its TERM handler cancels lane process groups
 # and reaps them (up to five seconds), before any claim can be released.
 if [ -n "$CODEX_WAVE_PID" ]; then
   log "stopping Codex wave and its lane workers"
-  kill_pid "$CODEX_WAVE_PID" "codex-wave" 7
+  stop_handle "process:$CODEX_WAVE_PID" "codex-wave" 7
 fi
 
 # 2. Per-worker wrap-up: comment, release claim, kill.
 if [ "${#WORKERS[@]}" -gt 0 ]; then
   log "${#WORKERS[@]} in-flight worker(s) to wrap up"
   for entry in "${WORKERS[@]}"; do
-    IFS='|' read -r issue lane pid <<< "$entry"
+    IFS='|' read -r issue lane handle <<< "$entry"
     log ""
-    log "─── #${issue} (lane=${lane}, pid=${pid:-unknown}) ───"
-    post_stop_comment "$issue" "$lane" "$pid"
+    log "─── #${issue} (lane=${lane}, pid=${handle#*:}) ───"
+    post_stop_comment "$issue" "$lane" "${handle#*:}"
     release_claim "$issue"
-    kill_pid "$pid" "worker(${lane}/#${issue})"
+    stop_handle "$handle" "worker(${lane}/#${issue})"
   done
 fi
 
-# 3. Sweep any untracked claude -p drover workers.
-if [ -n "$ORPHAN_WORKERS" ]; then
-  log ""
-  log "sweeping untracked claude -p drover workers"
-  for pid in $ORPHAN_WORKERS; do
-    kill_pid "$pid" "orphan-worker"
-  done
-fi
-
-# 4. Kill the dispatcher loop.
-if [ -n "$DISPATCHER_PIDS" ]; then
-  log ""
-  log "stopping dispatcher loop"
-  for pid in $DISPATCHER_PIDS; do
-    kill_pid "$pid" "dispatcher"
-  done
-fi
-
-# 5. Clear in-flight locks (PIDs are dead now).
-if [ -d "$INFLIGHT_DIR" ] && [ -n "$(ls -A "$INFLIGHT_DIR" 2>/dev/null)" ]; then
+# 3. Clear the locks of stopped workers (FR-WRK-1: a live worker keeps its lock).
+if [ "${#WORKERS[@]}" -gt 0 ]; then
+  KEPT=0
   for entry in "${WORKERS[@]}"; do
-    IFS='|' read -r issue lane pid <<< "$entry"
-    rm -f "$INFLIGHT_DIR/$issue"
+    IFS='|' read -r issue lane handle <<< "$entry"
+    if worker_alive "$handle"; then
+      KEPT=$((KEPT + 1)); log "  kept the lock of #${issue}: its worker is still alive"
+    else
+      rm -f "$INFLIGHT_DIR/$issue"
+    fi
   done
   log ""
-  log "cleared $INFLIGHT_DIR"
+  log "cleared $INFLIGHT_DIR (${KEPT} lock(s) kept)"
 fi
 [ -z "$CODEX_WAVE_PID" ] || rm -f "$INFLIGHT_DIR/workflow-wave.lock" "$CODEX_WAVE_MARKER"
 
-# 6. Summary.
-DISP_COUNT=$(echo "$DISPATCHER_PIDS" | tr ' ' '\n' | grep -c . || true)
+# 4. Summary.
+DISP_COUNT=0
+[ -z "$DISPATCHER" ] || DISP_COUNT=1
 [ -z "$CODEX_WAVE_PID" ] || DISP_COUNT=$((DISP_COUNT + 1))
 echo ""
 echo "════════════════════════════════════════════════════════"

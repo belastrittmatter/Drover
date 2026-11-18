@@ -208,7 +208,7 @@ def run_card(card):
                                             '--tier', args.tier] + (['--complexity', complexity] if complexity else []),
                                            stdout=subprocess.PIPE, text=True, start_new_session=True)
                 active.add(process)
-                lock.write_text(f'PID={process.pid}\nLANE={lane}\nSTARTED={time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}\n')
+                lock.write_text(f'HANDLE=process:{process.pid}\nLANE={lane}\nSTARTED={time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}\n')
             except OSError as error:
                 if process is not None:
                     try:
@@ -252,7 +252,7 @@ def run_card(card):
             current.pop('lane', None)
         finally:
             try:
-                if not preserve_lock and lock.read_text().startswith(f'PID={process.pid}\n'):
+                if not preserve_lock and lock.read_text().startswith(f'HANDLE=process:{process.pid}\n'):
                     lock.unlink()
             except FileNotFoundError:
                 pass
