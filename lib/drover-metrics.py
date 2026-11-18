@@ -10,11 +10,16 @@
   drover metrics waiting ISSUE REASON             human.waiting
   drover metrics finish ISSUE STATUS [WHY]        attempt.finished; the next claim starts anew
   drover metrics board [DEPS_FILE] < ITEMS        column-driven events for every open attempt
+  drover metrics pr-urls                          print the linked PR url of each open attempt
+  drover metrics closed FILE                      finish (failed) attempts whose PR closed unmerged;
+                                                  FILE: `gh pr list --state closed --json url,mergedAt`
   drover metrics flush                            factorybench emit --flush
 
 Every command is a silent no-op unless `factorybench` is on PATH and FACTORYBENCH_URL is set
 (FR-MET-4). Open attempts live in .drover/runs/attempts.json (FR-MET-6). Events carry ids,
-labels, reasons and urls only: no prompts, code or diffs (FR-MET-10).
+labels, reasons and urls only: no prompts, code or diffs (FR-MET-10). Each `factorybench`
+call runs in the background with its event time set here, so a slow or hung FactoryBench
+never stalls the runner (it spools what it cannot send).
 """
 import hashlib
 import json
@@ -23,6 +28,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 import uuid
 
 HERE = Path(__file__).resolve().parent
@@ -48,21 +54,25 @@ def save(state):
     tmp.replace(STATE)
 
 
-def emit(kind, attempt, key, payload):
-    # `factorybench emit` always exits 0 and spools; a missing or hung binary never fails a run.
+def background(argv):
+    # Fire and forget: `factorybench` always exits 0 and spools; nothing here waits on it.
     try:
-        subprocess.run(["factorybench", "emit", kind, "--attempt", attempt, "--key", key,
-                        "--json", json.dumps(payload, sort_keys=True)],
-                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                       timeout=30, check=False)
+        subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
     except (OSError, subprocess.SubprocessError):
         pass
+
+
+def emit(kind, attempt, key, payload):
+    background(["factorybench", "emit", kind, "--attempt", attempt, "--key", key,
+                "--json", json.dumps(payload, sort_keys=True),
+                "--ts", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())])
 
 
 def config_version():
     def out(cmd, cwd=None):
         try:
-            return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=30,
+            return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=5,
                                   stdin=subprocess.DEVNULL).stdout.strip()
         except (OSError, subprocess.SubprocessError):
             return ""
@@ -106,7 +116,7 @@ def finish(state, issue, status, why=""):
 def main(argv):
     cmd, args = (argv[0] if argv else ""), argv[1:]
     if cmd not in ("enabled", "config-version", "claim", "env", "pr", "gate", "waiting", "finish",
-                   "board", "flush"):
+                   "board", "pr-urls", "closed", "flush"):
         print(__doc__, file=sys.stderr)
         return 64
     if not enabled():
@@ -117,11 +127,7 @@ def main(argv):
         print(config_version())
         return 0
     if cmd == "flush":
-        try:
-            subprocess.run(["factorybench", "emit", "--flush"], stdin=subprocess.DEVNULL,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120, check=False)
-        except (OSError, subprocess.SubprocessError):
-            pass
+        background(["factorybench", "emit", "--flush"])
         return 0
     state = load()
     if cmd == "claim":
@@ -163,6 +169,18 @@ def main(argv):
             rounds[name] = rounds.get(name, 0) + 1
             emit("gate", a["id"], "gate:%s:%d" % (name, rounds[name]),
                  {"name": name, "passed": passed == "true", "reason": why})
+    elif cmd == "pr-urls":
+        for a in state.values():
+            if a.get("pr"):
+                print(a["pr"])
+    elif cmd == "closed":
+        try:
+            closed = json.loads(Path(args[0]).read_text())
+        except (OSError, ValueError):
+            closed = []
+        unmerged = {p.get("url") for p in closed if isinstance(p, dict) and not p.get("mergedAt")}
+        for issue in [i for i, a in state.items() if a.get("pr") in unmerged]:
+            finish(state, issue, "failed", "PR closed unmerged")
     elif cmd == "waiting":
         waiting(state, args[0], args[1])
     elif cmd == "finish":
@@ -186,7 +204,7 @@ def main(argv):
                 waiting(state, issue, (deps.get(issue) or {}).get("reasonTag") or "blocked")
             elif col and state[issue].get("waiting") not in (None, "stopped"):
                 resumed(state, issue)  # a stopped card resumes at its next claim
-    if cmd in ("pr", "gate", "waiting", "finish", "board"):
+    if cmd in ("pr", "gate", "waiting", "finish", "board", "closed"):
         save(state)
     return 0
 
