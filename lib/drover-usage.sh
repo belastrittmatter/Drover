@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# drover-usage.sh — Claude plan-usage guard for the run loop.
+# drover-usage.sh — Claude plan-usage probe for the runner (FR-RUN-8).
 #
 # WHERE THE NUMBER COMES FROM
 #
@@ -27,8 +27,8 @@
 #
 # - The snapshot refreshes only while some interactive Claude Code session with
 #   the record line is rendering its status line (after each API response).
-#   Headless `claude -p` workers do not render one. The workflow backend's
-#   orchestrator IS an interactive session, so its own turns keep it fresh.
+#   Headless workers do not render one, so the runner's reading is only as fresh
+#   as the owner's last interactive session (harnesses/claude.json `usage_probe`).
 # - API-key and Bedrock/Vertex users get no `rate_limits` at all → `unknown`.
 # - Usage only grows inside a window until it resets. A stale reading at or
 #   over the threshold is therefore still a valid "pause" until its resets_at;
@@ -80,7 +80,7 @@ fi
 THRESHOLD="${THRESHOLD:-95}"
 
 if [ ! -f "$FILE" ]; then
-  echo '{"state":"unknown","window":null,"used":null,"resets_at":null,"age":null,"reason":"no usage snapshot — add the record line to your status-line script (run-workflow.md)"}'
+  echo '{"state":"unknown","window":null,"used":null,"resets_at":null,"age":null,"reason":"no usage snapshot — add the record line to your status-line script (run.md, Usage pause)"}'
   exit 3
 fi
 

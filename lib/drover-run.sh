@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # drover-run.sh — headless autonomous runner.
-# Spawned as `nohup drover run &` from the repo root (config: .drover/config.json).
-# Pure shell while-loop. Dispatches `claude -p` workers per lane.
+# Started as `drover run` (in the background by `/drover run`) from the repo root (config:
+# .drover/config.json). Pure shell while-loop. Dispatches the harness's headless workers per lane.
 # Holds NO Claude session state — re-reads GitHub on every tick.
 #
 # Anti-zombie controls (added 2026-05-22 after #381 worker-storm incident):
 #   1. Leftover-worker check on startup — refuses to start while a lock's worker is alive.
 #   2. Issue-level lock files in .claude/drover/inflight/<N> — survives runner restart.
 #      All worker start / liveness / signals go through lib/drover-worker.sh (FR-WRK-1).
-#   3. Atomic GitHub assignee claim BEFORE spawning worker (closes 10-30s claude -p cold-start race).
+#   3. Atomic GitHub assignee claim BEFORE spawning worker (closes the 10-30s worker cold-start race).
 #   4. Rate-limit guard — sleeps until reset when GraphQL remaining < 200.
 #   5. Per-tick project-items cache — one gh call per tick, not per column lookup.
 #   6. Tick interval bumped from 30s → 120s (GraphQL ProjectsV2 query is ~103 pts; 120s keeps usage <3.1k/hr vs 5k budget).
@@ -42,7 +42,7 @@
 #
 # Exit codes: 0 finished or a runaway/ceiling halt · 9/10 verification or skills readiness ·
 #   64 usage, no config or no GitHub repo · 65 old config · 66 no worker command · 73 leftover
-#   runner, worker or legacy worktree · 74 workflow wave in flight · 75 would auto-merge to production main ·
+#   runner, worker or legacy worktree · 75 would auto-merge to production main ·
 #   76 failed-dispatch halt (FR-RUN-13; other workers keep running) · 79 GitHub read halt ·
 #   143 stopped by TERM/INT.
 
@@ -357,8 +357,7 @@ issue_locked() {
 }
 
 issue_locks() {
-  # The issue numbers that hold an in-flight lock. Other files there (the workflow
-  # backend's workflow-wave.lock, merge.lock) are not ours.
+  # The issue numbers that hold an in-flight lock. Other files there (merge.lock) are not ours.
   local lock issue
   for lock in "$INFLIGHT_DIR"/*; do
     [ -f "$lock" ] || continue
@@ -618,8 +617,7 @@ reap_finished_locks() {
   # Sweep inflight/ for dead workers; remove locks AND sweep stale assignees so the
   # next dispatch can re-claim the card if the worker crashed without releasing.
   # The assignee remove is idempotent — no-op if the worker exited cleanly.
-  # Issue locks only (issue_locks): the workflow backend's workflow-wave.lock is not
-  # ours to reap — deleting it would dissolve the backend mutual exclusion mid-run.
+  # Issue locks only (issue_locks): merge.lock is the merge gate's.
   # $1 = "judge": queue each reaped worker of this run for judge_finished_workers.
   local issue pid
   for issue in $(issue_locks); do
@@ -1140,14 +1138,6 @@ STARTED=$(date -u +%FT%TZ)
 "
 RUNNER_LOCK_OWNED=1
 
-# Workflow-backend mutual exclusion (see references/run-workflow.md §Preconditions).
-WAVE_LOCK=".claude/drover/inflight/workflow-wave.lock"
-if [ -f "$WAVE_LOCK" ]; then
-  log "refusing to start: workflow-backend wave in flight ($WAVE_LOCK exists)."
-  log "    If no wave is actually running, remove the stale lock: rm $WAVE_LOCK"
-  exit 74
-fi
-
 # Production-merge guard.
 if [ "$BASE_BRANCH" = "main" ] && [ "$HUMAN_APPROVES" = "false" ]; then
   if rg -qU 'on:\s*\n?\s*push:\s*\n?\s*branches:[^a-z]*main' .github/workflows 2>/dev/null \
@@ -1203,14 +1193,6 @@ while true; do
   TICK=$((TICK + 1)); TICK_SEEN=" "
   python3 "$(dirname "$SB_GITHUB_READ")/drover-verification-ready.py" --config "$CONFIG_PATH"
   gh_checkpoint
-  # Workflow-backend mutual exclusion, re-checked every tick: the startup
-  # check alone leaves a TOCTOU window where a workflow run starting at the
-  # same moment as this dispatcher is never detected by either side.
-  if [ -f "$WAVE_LOCK" ]; then
-    log "workflow-backend wave appeared mid-run ($WAVE_LOCK) — halting for mutual exclusion."
-    log "    Resume after the wave: drover run"
-    exit 74
-  fi
 
   reap_finished_locks judge  # cheap local sweep; runs every tick
 

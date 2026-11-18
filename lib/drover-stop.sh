@@ -2,8 +2,8 @@
 # drover-stop.sh — graceful shutdown of an in-flight drover run.
 #
 # What it does:
-#   1. Stop this repo's runner (.claude/drover/runner.lock) first, then any Codex wave and
-#      its lane process groups, then find every in-flight worker (lock files under
+#   1. Stop this repo's runner (.claude/drover/runner.lock) first, then find every
+#      in-flight worker (lock files under
 #      .claude/drover/inflight/). Only these are touched (FR-WRK-8): no process search, so
 #      another repo's runner and workers are never signalled, and a pid whose start time no
 #      longer matches its handle (recycled) is never signalled either.
@@ -15,7 +15,7 @@
 #   6. Print summary + resume command.
 #
 # What it does NOT do:
-#   - Wait for workers to reach a clean stopping point (claude -p has no SIGTERM
+#   - Wait for workers to reach a clean stopping point (a headless worker has no SIGTERM
 #     handler that flushes a partial commit). Unsaved in-memory work can be lost;
 #     uncommitted files remain in the preserved worktree for inspection.
 #   - Touch worktrees. Leaving them lets the next worker pick up faster.
@@ -131,39 +131,12 @@ echo "════════════════════════�
 
 DISPATCHER=""
 if worker_lock "$RUNNER_LOCK" && worker_alive "$HANDLE"; then DISPATCHER="$HANDLE"; fi
-CODEX_WAVE_MARKER=".claude/drover/codex-wave.pid"
-CODEX_WAVE_PID=""
-CODEX_WAVE_HANDLE=""
-if [ -f "$CODEX_WAVE_MARKER" ]; then
-  CODEX_WAVE_PID=$(cat "$CODEX_WAVE_MARKER")
-  case "$CODEX_WAVE_PID" in ''|*[!0-9]*)
-    log "invalid Codex wave PID marker; preserve claims and inspect $CODEX_WAVE_MARKER"
-    exit 1 ;;
-  esac
-  if worker_alive "process:$CODEX_WAVE_PID"; then
-    # Refuse a reused PID, or an unavailable process identity, rather than
-    # signal an unrelated process and release a still-running wave's claims.
-    if ! ps -p "$CODEX_WAVE_PID" -o args= 2>/dev/null | grep -q 'drover-codex-wave'; then
-      log "cannot identify Codex wave PID $CODEX_WAVE_PID; preserve claims and inspect $CODEX_WAVE_MARKER"
-      exit 1
-    fi
-    CODEX_WAVE_HANDLE=$(process_handle "$CODEX_WAVE_PID")
-  fi
-fi
-
 # 1. The runner first, so it cannot start a new worker while the others are wrapped up;
 #    the worker inventory comes after, so a worker it started meanwhile is not missed.
 if [ -n "$DISPATCHER" ]; then
   log "stopping dispatcher loop"
   stop_handle "$DISPATCHER" "dispatcher"
   worker_alive "$DISPATCHER" || rm -f "$RUNNER_LOCK"
-fi
-
-# Stop new Codex dispatch next. Its TERM handler cancels lane process groups
-# and reaps them (up to five seconds), before any claim can be released.
-if [ -n "$CODEX_WAVE_HANDLE" ]; then
-  log "stopping Codex wave and its lane workers"
-  stop_handle "$CODEX_WAVE_HANDLE" "codex-wave" 7
 fi
 
 WORKERS=()
@@ -178,7 +151,7 @@ if [ -d "$INFLIGHT_DIR" ]; then
   done
 fi
 
-if [ "${#WORKERS[@]}" -eq 0 ] && [ -z "$DISPATCHER" ] && [ -z "$CODEX_WAVE_PID" ]; then
+if [ "${#WORKERS[@]}" -eq 0 ] && [ -z "$DISPATCHER" ]; then
   echo "  ✓ nothing to stop — no dispatcher, no in-flight workers"
   echo "════════════════════════════════════════════════════════"
   exit 0
@@ -214,12 +187,10 @@ if [ "${#WORKERS[@]}" -gt 0 ]; then
   log ""
   log "cleared $INFLIGHT_DIR (${KEPT} lock(s) kept)"
 fi
-[ -z "$CODEX_WAVE_PID" ] || rm -f "$INFLIGHT_DIR/workflow-wave.lock" "$CODEX_WAVE_MARKER"
 
 # 4. Summary.
 DISP_COUNT=0
 [ -z "$DISPATCHER" ] || DISP_COUNT=1
-[ -z "$CODEX_WAVE_PID" ] || DISP_COUNT=$((DISP_COUNT + 1))
 echo ""
 echo "════════════════════════════════════════════════════════"
 echo "  stopped: ${#WORKERS[@]} worker(s), ${DISP_COUNT} dispatcher(s)"

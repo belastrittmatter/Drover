@@ -49,6 +49,8 @@ class Ports(RunnerCase):
         self.assertTrue(all(a['model'] == 'sonnet' for a in pre))
         self.assertNotIn('#9', ' '.join(a['prompt'] for a in pre), 'a Review card was pre-flighted')
         self.assertEqual(self.dispatched(), [1, 4, 6, 9])
+        order = re.findall(r'dispatch lane=\w+ issue=#(\d+) pid=', self.manifest())
+        self.assertEqual(order[0], '9', 'FR-RUN-3: Review is dispatched before Ready')
         board = self.read_board()
         self.assertEqual([board[n]['status'] for n in (2, 3, 5, 7)], ['Blocked', 'Blocked', 'Ready', 'Ready'])
         [hold] = self.comments(2)
