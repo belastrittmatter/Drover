@@ -1,4 +1,4 @@
-"""Commit style detection (specs/conventions.md FR-CNV-1/2): scripts/drover-commit-style.py.
+"""Commit style detection (specs/conventions.md FR-CNV-1/2): lib/drover-commit-style.py.
 
 Run directly:  python3 tests/test_commit_style.py
 """
@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SCRIPT = ROOT / "scripts" / "drover-commit-style.py"
+SCRIPT = ROOT / "lib" / "drover-commit-style.py"
 _spec = importlib.util.spec_from_file_location("commit_style", SCRIPT)
 cs = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(cs)
@@ -88,7 +88,7 @@ def test_cli_reads_the_base_branch_and_prompt_has_three_subjects():
 
 
 def test_lane_prompts_carry_the_style():
-    for rel in ("scripts/drover-run.sh", "scripts/drover-lane.sh",
+    for rel in ("lib/drover-run.sh", "lib/drover-lane.sh",
                 "skills/drover-build/scripts/drover-build-dispatch.sh", "workflows/drover-wave.js"):
         assert "drover-commit-style.py" in (ROOT / rel).read_text(encoding="utf-8"), f"{rel} prompt lacks the commit style"
 

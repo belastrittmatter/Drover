@@ -27,7 +27,7 @@ CARDS='[{"number":1,"status":"Ready","title":"one"},{"number":2,"status":"Review
 echo '{"max_workers":1,"verify_commands":["git diff --check"]}' > "$T/config.json"
 echo '{"max_workers":1}' > "$T/unready.json"
 fail() { echo "FAIL: $*" >&2; cat "$T/stderr" >&2 2>/dev/null || true; exit 1; }
-wave() { bash "$KIT/scripts/drover-codex-wave.sh" --cards "$CARDS" "$@" 2>"$T/stderr"; }
+wave() { bash "$KIT/lib/drover-codex-wave.sh" --cards "$CARDS" "$@" 2>"$T/stderr"; }
 
 # The summary object literal in the workflow is the one source of the key set.
 python3 - "$KIT/workflows/drover-wave.js" > "$T/keys.json" <<'PY'

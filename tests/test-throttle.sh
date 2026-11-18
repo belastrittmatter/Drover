@@ -4,7 +4,7 @@
 # rate_limit and the GraphQL rateLimit reads from env vars.
 set -euo pipefail
 KIT=$(cd "$(dirname "$0")/.." && pwd)
-S="$KIT/scripts/drover-throttle.sh"
+S="$KIT/lib/drover-throttle.sh"
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 fail() { echo "FAIL: $1" >&2; exit 1; }
 mkdir -p "$T/bin"

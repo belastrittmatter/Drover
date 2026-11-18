@@ -34,11 +34,10 @@ DOC_DIR = "docs/drover/findings"
 
 
 def resolver():
-    """Load drover-skills-ready.py: installed .claude/bin, else the pack's scripts/."""
+    """Load drover-skills-ready.py from DROVER_BIN, DROVER_HOME/lib, else this pack's lib/."""
     here = Path(__file__).resolve().parent
-    bin_env = os.environ.get("DROVER_BIN")
-    dirs = ([Path(bin_env)] if bin_env else []) + [Path(".claude/bin"), here.parents[2] / "bin",
-                                                   here.parents[2] / "scripts"]
+    dirs = [Path(os.environ[k]) / s for k, s in (("DROVER_BIN", ""), ("DROVER_HOME", "lib")) if os.environ.get(k)]
+    dirs.append(here.parents[2] / "lib")
     for d in dirs:
         path = d / "drover-skills-ready.py"
         if path.is_file():
@@ -46,7 +45,7 @@ def resolver():
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
             return mod
-    print("collect-handoff: cannot find drover-skills-ready.py — set DROVER_BIN or run install.sh",
+    print("collect-handoff: cannot find drover-skills-ready.py — set DROVER_BIN or DROVER_HOME",
           file=sys.stderr)
     sys.exit(2)
 

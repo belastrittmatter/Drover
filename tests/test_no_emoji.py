@@ -1,6 +1,6 @@
 """No emoji in text drover writes (specs/conventions.md FR-CNV-3, specs/README.md SC-7).
 
-Scans every shipped file under scripts/, skills/, hooks/, workflows/, .github/, .claude-plugin/,
+Scans every shipped file under lib/, bin/, harnesses/, skills/, hooks/, workflows/, .github/, .claude-plugin/,
 install.sh, README.md and CLAUDE.md: the comments, block notes, PR body text, logs, status
 output and chat output all come from there.
 Exempt (FR-CNV-3): the visual skill's page assets, which are page design. Arrows (→ ↳ ←) and
@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SCOPE = ("scripts/", "skills/", "hooks/", "workflows/", "install.sh", "README.md", "CLAUDE.md", ".github/", ".claude-plugin/")
+SCOPE = ("lib/", "bin/", "harnesses/", "skills/", "hooks/", "workflows/", "install.sh", "README.md", "CLAUDE.md", ".github/", ".claude-plugin/")
 EXEMPT = ("skills/visual/assets/",)
 
 # Unicode Emoji=Yes code points, minus the ASCII keycap bases, (c) (R) (TM) and the arrows.
@@ -62,7 +62,7 @@ def test_no_emoji_in_shipped_text():
 
 def test_scope_is_not_empty():
     files = shipped()
-    assert any(f.startswith("scripts/") for f in files) and "install.sh" in files
+    assert any(f.startswith("lib/") for f in files) and "bin/drover" in files and "install.sh" in files
     assert not any(f.startswith(EXEMPT) for f in files)
 
 

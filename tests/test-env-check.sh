@@ -3,7 +3,7 @@
 # never a byte of any value on stdout or stderr.
 set -euo pipefail
 cd "$(dirname "$0")"
-EC="$PWD/../scripts/drover-env-check.sh"
+EC="$PWD/../lib/drover-env-check.sh"
 fail() { echo "FAIL: $1" >&2; exit 1; }
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 SECRET="sk_$(printf 'live')_$(printf 'abc123')"

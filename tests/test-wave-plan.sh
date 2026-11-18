@@ -10,7 +10,7 @@
 # after their blockers had closed.
 set -euo pipefail
 cd "$(dirname "$0")"
-PLAN="../scripts/drover-wave-plan.sh"
+PLAN="../lib/drover-wave-plan.sh"
 CFG=fixtures/wave-config.json
 ITEMS=fixtures/wave-items.json
 DEPS=fixtures/wave-deps.json

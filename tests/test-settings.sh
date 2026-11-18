@@ -3,7 +3,7 @@
 # write only after approval, keep every existing key, add each rule once.
 set -euo pipefail
 cd "$(dirname "$0")"
-S="$PWD/../scripts/drover-settings.py"
+S="$PWD/../lib/drover-settings.py"
 fail() { echo "FAIL: $1" >&2; exit 1; }
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 F="$T/.claude/settings.json"; mkdir -p "$T/.claude"

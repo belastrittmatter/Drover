@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 KIT = Path(__file__).resolve().parents[1]
-CLI = KIT / 'scripts/drover-project-verifier.py'
+CLI = KIT / 'lib/drover-project-verifier.py'
 
 
 class ProjectVerifier(unittest.TestCase):
@@ -138,16 +138,14 @@ class ProjectVerifier(unittest.TestCase):
         self.save()
         self.assertNotEqual(initial['inputs']['map'], self.run_cli()['inputs']['map'])
 
-    def test_installed_helper_inspects_project_without_creating_verifier_coverage(self):
-        process = subprocess.run(['bash', str(KIT / 'install.sh'), '--no-hooks', str(self.root)],
-                                 capture_output=True, text=True)
-        self.assertEqual(process.returncode, 0, process.stderr)
-        installed = self.root / '.claude/bin/drover-project-verifier.py'
-        process = subprocess.run([sys.executable, str(installed), 'inspect', '--root', str(self.root),
-                                  '--map', self.map], capture_output=True, text=True)
+    def test_drover_command_inspects_project_without_creating_verifier_coverage(self):
+        before = sorted(str(p.relative_to(self.root)) for p in self.root.rglob('*'))
+        process = subprocess.run([str(KIT / 'bin/drover'), 'project-verifier', 'inspect', '--root', str(self.root),
+                                  '--map', self.map], capture_output=True, text=True, cwd=self.root)
         self.assertEqual(process.returncode, 0, process.stderr or process.stdout)
         self.assertEqual(json.loads(process.stdout)['features'], ['cart.total'])
-        starter = self.root / '.claude/skills/drover-qa/templates/project-verifier/feature-map.json'
+        self.assertEqual(before, sorted(str(p.relative_to(self.root)) for p in self.root.rglob('*')))
+        starter = KIT / 'skills/drover-qa/templates/project-verifier/feature-map.json'
         self.assertEqual(json.loads(starter.read_text())['features'], [])
         self.assertEqual((self.root / self.skill).read_text(), 'Real app instructions')
 

@@ -3,7 +3,7 @@
 # asks for a host instead of guessing.
 set -euo pipefail
 KIT=$(cd "$(dirname "$0")/.." && pwd)
-S="$KIT/scripts/drover-host.sh"
+S="$KIT/lib/drover-host.sh"
 fail() { echo "FAIL: $1" >&2; exit 1; }
 # A clean env, so the test answers the same inside Claude Code, Codex or CI.
 host() { env -i PATH="$PATH" "$@" bash "$S"; }

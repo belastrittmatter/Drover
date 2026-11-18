@@ -47,7 +47,7 @@
 #             "needsYou": false, "needsYouDone": false } }
 #
 # `needsYou` — the newest Block comment carries the [needs-you] reason tag
-# (scripts/drover-reasons.json), or the issue
+# (lib/drover-reasons.json), or the issue
 # has the `needs-you` label: a human-only command is waiting (block-template.md).
 # `needsYouDone` — verified by drover-approval.py: a trusted human replied
 # done after a pinned request for the current PR head. Labels are never authority.

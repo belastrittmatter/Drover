@@ -76,7 +76,7 @@ esac
 STUB
 chmod +x "$WORK/gh"
 export PATH="$WORK:$PATH" GH_LOG="$WORK/gh.log" BODY_LOG="$WORK/body.filed" COMMENT_LOG="$WORK/comment.body"
-export DROVER_BIN="$REPO_ROOT/scripts"
+export DROVER_BIN="$REPO_ROOT/lib"
 
 run() { : > "$GH_LOG"; : > "$BODY_LOG"; : > "$COMMENT_LOG"; "$SCRIPT" --config "$WORK/config.json" "$@" 2>"$WORK/err"; }
 code() { run "$@" >/dev/null; echo $?; }
@@ -179,10 +179,10 @@ is  "Sentry 441 is not a duplicate of Sentry 4411" \
 
 echo "── SKILL.md setup step 3: source the gh guard, then sb_gh_guard_check"
 if command -v zsh >/dev/null; then
-  RC=0; (cd "$WORK" && zsh -c "source '$REPO_ROOT/scripts/drover-gh-guard.sh'; sb_gh_halt_check" >/dev/null 2>&1) || RC=$?
+  RC=0; (cd "$WORK" && zsh -c "source '$REPO_ROOT/lib/drover-gh-guard.sh'; sb_gh_halt_check" >/dev/null 2>&1) || RC=$?
   is "gh guard works when sourced from zsh" 0 "$RC"
 fi
-RC=0; (cd "$WORK" && bash -c "source '$REPO_ROOT/scripts/drover-gh-guard.sh'; sb_gh_halt_check" >/dev/null 2>&1) || RC=$?
+RC=0; (cd "$WORK" && bash -c "source '$REPO_ROOT/lib/drover-gh-guard.sh'; sb_gh_halt_check" >/dev/null 2>&1) || RC=$?
 is "gh guard works when sourced from bash" 0 "$RC"
 
 echo

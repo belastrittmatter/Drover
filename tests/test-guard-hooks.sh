@@ -53,6 +53,9 @@ expect deny  guard-secrets.py "$(bash_cmd "bash${NL}cat $D${NL}.claude/bin/drove
 expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/drover-env-check.sh --file $D K${NL}")" "env-check: trailing newline"
 expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/drover-env-check.sh --file $SUB")" "env-check: substitution in args"
 expect allow guard-secrets.py "$(bash_cmd ".claude/bin/drover-env-check.sh SENTRY_AUTH_TOKEN")" "env-check direct call"
+expect allow guard-secrets.py "$(bash_cmd "drover env-check SENTRY_AUTH_TOKEN")" "drover env-check"
+expect allow guard-secrets.py "$(bash_cmd "drover env-check --file ${D}.local K")" "drover env-check with --file"
+expect deny  guard-secrets.py "$(bash_cmd "drover env-check K; cat $D")" "drover env-check chained with cat"
 expect allow guard-secrets.py "$(bash_cmd "  sh /abs/path/.claude/bin/drover-env-check.sh	--file=${D}.local K ")" "env-check sh, tab, abs path"
 
 # ---- guard-key-literals -----------------------------------------------------
@@ -92,7 +95,7 @@ rm -rf "$REPO"
 REPO=$(mktemp -d); REPO=$(cd "$REPO" && pwd -P)
 git -C "$REPO" init -q -b main
 git -C "$REPO" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
-mkdir -p "$REPO/.claude/drover/configs"; echo '{"base_branch":"staging"}' > "$REPO/.claude/drover/configs/app.json"
+mkdir -p "$REPO/.drover"; echo '{"base_branch":"staging"}' > "$REPO/.drover/config.json"
 pp() { CLAUDE_PROJECT_DIR="$REPO" expect "$1" guard-protected-push.py "$(bash_cmd "$2" "${4:-$REPO}")" "$3"; }
 pp deny  'git push --force origin main'                 "force push to main"
 pp deny  'git push -f origin staging'                   "force push to config base_branch"

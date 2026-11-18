@@ -7,7 +7,7 @@
 # duplicate — it is a sequencing problem, and must not hold the card.
 set -euo pipefail
 cd "$(dirname "$0")"
-PRE="$(pwd)/../scripts/drover-preflight.sh"
+PRE="$(pwd)/../lib/drover-preflight.sh"
 
 fail() { echo "FAIL: $1" >&2; exit 1; }
 

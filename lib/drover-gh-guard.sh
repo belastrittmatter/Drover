@@ -9,8 +9,9 @@
 # of the dispatcher (and every other worker on the same machine) opens to
 # "0 remaining".
 #
-# Usage from a worker:
-#   source scripts/drover-gh-guard.sh
+# Usage from a worker: `drover gh-guard check [min]` or `drover gh-guard summary`.
+# Usage from a script:
+#   source lib/drover-gh-guard.sh
 #   sb_gh_guard_check 200     # sleep until reset if GraphQL remaining < 200
 #   sb_gh_budget_spend 5      # decrement worker-local call budget; halt if 0
 #   sb_gh_guard_summary       # log remaining quota; safe to call frequently
@@ -102,3 +103,13 @@ sb_gh_budget_remaining() {
   [ -f "$SB_GH_GUARD_STATE_FILE" ] || sb_gh_budget_init
   cat "$SB_GH_GUARD_STATE_FILE"
 }
+
+# Run as a command (`drover gh-guard check [min]` / `summary`): no `source` needed,
+# so a headless worker's allowlist covers it with one `drover` rule.
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  case "${1:-}" in
+    check) sb_gh_guard_check "${2:-}" ;;
+    summary) sb_gh_guard_summary ;;
+    *) echo "usage: drover gh-guard check [min-remaining] | summary" >&2; exit 64 ;;
+  esac
+fi

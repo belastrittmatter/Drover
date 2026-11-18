@@ -87,13 +87,14 @@ REPO_FLAG=()
 
 BIN="${DROVER_BIN:-}"
 if [ -z "$BIN" ]; then
-  # Installed: .claude/skills/drover-collect/scripts → .claude/bin. Pack: skills/… → scripts/.
-  ROOT3=$(cd "$(dirname "$0")/../../.." 2>/dev/null && pwd)
-  for d in ".claude/bin" "$ROOT3/bin" "$ROOT3/scripts"; do
+  # The drover install folder: DROVER_HOME (set by bin/drover), else this skill's pack
+  # (cd -P follows the ~/.claude/skills link back to it).
+  ROOT3=$(cd -P "$(dirname "$0")/../../.." 2>/dev/null && pwd)
+  for d in "${DROVER_HOME:-$ROOT3}/lib" "$ROOT3/lib"; do
     [ -x "$d/drover-qa-file-bug.sh" ] && { BIN="$d"; break; }
   done
 fi
-[ -n "$BIN" ] || die "cannot find drover-qa-file-bug.sh — set DROVER_BIN or run install.sh" 70
+[ -n "$BIN" ] || die "cannot find drover-qa-file-bug.sh — set DROVER_BIN or DROVER_HOME" 70
 
 # Router-owned duplicate/adopt writes share the same halt as the child filers.
 GITHUB_READ="$BIN/drover-github-read.py"

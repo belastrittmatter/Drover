@@ -118,7 +118,7 @@ def test_standard_commit_examples_are_valid_subjects():
 def test_no_attribution_lines():
     """FR-CNV-5: no Co-Authored-By or generated-by footer in any shipped template."""
     footer = re.compile(r"^\W*(Co-Authored-By:|Generated (with|by) )", re.I)
-    for p in list((ROOT / "skills").rglob("*.md")) + list((ROOT / "scripts").glob("*")) + list((ROOT / "workflows").glob("*.js")):
+    for p in list((ROOT / "skills").rglob("*.md")) + list((ROOT / "lib").glob("*")) + list((ROOT / "workflows").glob("*.js")):
         if "visual" in p.parts or not p.is_file():
             continue
         for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
@@ -174,7 +174,7 @@ def test_owner_word():
     """FR-CNV-7: the person who must act is `owner`, never a name."""
     assert "| Next | `builder` · `qa` · `reviewer` · `owner` · `none` |" in STANDARD
     name = re.compile(r"\bEric\b(?! Tech)")
-    for p in list((ROOT / "skills").rglob("*.md")) + list((ROOT / "workflows").glob("*.js")) + list((ROOT / "scripts").glob("*")):
+    for p in list((ROOT / "skills").rglob("*.md")) + list((ROOT / "workflows").glob("*.js")) + list((ROOT / "lib").glob("*")):
         if p.is_file():
             for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
                 assert not name.search(line), f"names a person at {p.relative_to(ROOT)}:{n}: {line.strip()}"
@@ -196,7 +196,7 @@ def test_ticket_template_has_required_sections_in_order():
 
 
 def test_bug_filer_matches_the_standard():
-    src = (ROOT / "scripts" / "drover-qa-file-bug.sh").read_text(encoding="utf-8")
+    src = (ROOT / "lib" / "drover-qa-file-bug.sh").read_text(encoding="utf-8")
     for s in ["Problem", "Context", "Evidence", "Fix", "Acceptance Criteria", "Risk"]:
         assert f'"{s}"' in src, f"drover-qa-file-bug.sh does not require {s}"
     rows = re.search(r'EVIDENCE_ROWS="([^"]+)"', src)[1].split("|")
@@ -213,7 +213,7 @@ def test_ticket_title_shape():
     assert not title.match("Bug /imports — CSV upload silently drops rows")
     example = next(b for b in fenced(STANDARD) if "## Problem" in b and "## Blocked by" in b).splitlines()[0]
     assert title.match(example), f"writing-standard.md ticket example title is off-standard: {example}"
-    src = (ROOT / "scripts" / "drover-qa-file-bug.sh").read_text(encoding="utf-8")
+    src = (ROOT / "lib" / "drover-qa-file-bug.sh").read_text(encoding="utf-8")
     assert 'FULL_TITLE="${BADGE} ${SCOPE}: ${TITLE}"' in src
 
 
@@ -267,14 +267,14 @@ def test_block_template_uses_the_header():
     assert "drover-reasons.json" in text, "block-template.md must point at the one tag list"
 
 
-REASONS = json.loads((ROOT / "scripts" / "drover-reasons.json").read_text(encoding="utf-8"))
+REASONS = json.loads((ROOT / "lib" / "drover-reasons.json").read_text(encoding="utf-8"))
 
 
 def test_reason_tags_are_defined_once():
     """Every tag a writer or reader names is in drover-reasons.json, and no file keeps its own table."""
     known = set(REASONS["tags"]) | {REASONS["dropped"]}
     tag = re.compile(r"\[(?:blocked:[a-z-]+|needs-you|dropped)\]")
-    paths = [p for p in list((ROOT / "skills").rglob("*")) + list((ROOT / "scripts").glob("*")) + list((ROOT / "workflows").glob("*"))
+    paths = [p for p in list((ROOT / "skills").rglob("*")) + list((ROOT / "lib").glob("*")) + list((ROOT / "workflows").glob("*"))
              if p.is_file() and p.suffix in (".md", ".sh", ".py", ".js")]
     for p in paths:
         for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
@@ -284,7 +284,7 @@ def test_reason_tags_are_defined_once():
     listed = [t for t in REASONS["tags"] if t in template]
     assert len(listed) < len(REASONS["tags"]) // 2, "block-template.md copies the tag list; point at drover-reasons.json"
     for script in ("drover-status.py", "drover-approval.py", "drover-deps.sh"):
-        src = (ROOT / "scripts" / script).read_text(encoding="utf-8")
+        src = (ROOT / "lib" / script).read_text(encoding="utf-8")
         assert "drover-reasons.json" in src, f"{script} must read the tags from drover-reasons.json"
 
 
@@ -306,7 +306,7 @@ def test_needs_you_comment_is_checklist_first():
 # ── PR body ──────────────────────────────────────────────────────────────────
 
 def test_pr_body_markers():
-    out = subprocess.run(["bash", str(ROOT / "scripts" / "drover-pr-body.sh"), "--skeleton"],
+    out = subprocess.run(["bash", str(ROOT / "lib" / "drover-pr-body.sh"), "--skeleton"],
                          capture_output=True, text=True, check=True).stdout
     for b in PR_BLOCKS:
         assert f"<!-- sb:{b} -->" in out and f"<!-- /sb:{b} -->" in out, f"skeleton lacks {b}"

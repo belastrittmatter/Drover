@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests scripts/drover-review-file-refactor.sh. Deterministic, no network: `gh`
+# Tests lib/drover-review-file-refactor.sh. Deterministic, no network: `gh`
 # is a stub on PATH. Covers arg validation, fingerprint dedupe, Backlog
 # placement, and the guarantee that board failures never fail the script —
 # a mergeable PR must not be stranded because a card would not place.
@@ -9,7 +9,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/drover-review-file-refactor.sh"
+SCRIPT="$REPO_ROOT/lib/drover-review-file-refactor.sh"
 WORK="$(mktemp -d)"
 export SB_GITHUB_RETRY_DELAY=0 SB_GITHUB_HALT_FILE="$WORK/halt.json"
 trap 'rm -rf "$WORK"' EXIT
