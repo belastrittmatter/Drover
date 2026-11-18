@@ -164,7 +164,9 @@ check(len(scanned) >= 10 and seen.get("drover", 0) > 5 and seen.get("gh", 0) > 5
 # 3 — the tools the role rules depend on are allowed.
 for tool in ("Read", "Edit", "Write", "Task", "Skill"):
     check(tool in PERMS["tools"], f"harness permissions should allow the {tool} tool")
-check(any("{drover_home}" in d for d in PERMS["add_dirs"]), "workers need the drover install folder (skills, run.md)")
+check("{drover_home}" in PERMS["read_only_dirs"] and {"Edit", "Write"} <= set(PERMS["read_only_deny"]),
+      "workers read the drover install folder (skills, run.md) and never edit it")
+check("add_dir_flag" not in PERMS, "no --add-dir: the install folder is read-only for workers")
 
 if failures:
     print("\n".join("FAIL: " + f for f in failures), file=sys.stderr)

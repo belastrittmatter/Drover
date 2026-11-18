@@ -78,6 +78,8 @@ import os, signal, sys, time
 from pathlib import Path
 d = Path(os.environ['WORKER_DIR']); d.mkdir(exist_ok=True)
 (d / str(os.getpid())).write_text(' '.join(sys.argv[1:]))
+(d / ('argv-%d' % os.getpid())).write_text('\0'.join(sys.argv[1:]))
+(d / ('env-%d' % os.getpid())).write_text('DROVER_ROLE=%s DROVER_ISSUE=%s' % (os.environ.get('DROVER_ROLE'), os.environ.get('DROVER_ISSUE')))
 if os.environ.get('FAKE_CLAUDE') == 'exit':
     sys.exit(0)
 signal.signal(signal.SIGTERM, lambda *a: sys.exit(0))
@@ -163,7 +165,7 @@ class RunnerRounds(unittest.TestCase):
         return self._pids()
 
     def _pids(self):
-        return sorted(int(p.name) for p in self.workers.iterdir()) if self.workers.exists() else []
+        return sorted(int(p.name) for p in self.workers.iterdir() if p.name.isdigit()) if self.workers.exists() else []
 
     def lock(self, issue):
         path = self.state / 'inflight' / str(issue)
@@ -278,11 +280,20 @@ class RunnerRounds(unittest.TestCase):
         [pid] = self.worker_pids(expect=1)
         argv = (self.workers / str(pid)).read_text()
         harness = json.loads((KIT / 'harnesses/claude.json').read_text())['permissions']
-        for flag in (harness['allow_flag'], harness['mode_flag'], harness['add_dir_flag'], harness['deny_flag']):
+        for flag in (harness['allow_flag'], harness['mode_flag'], harness['deny_flag']):
             self.assertIn(' %s ' % flag, argv)
+        self.assertNotIn('--add-dir', argv)
         self.assertIn('Bash(drover:*)', argv)
         self.assertIn('Bash(true:*)', argv)  # the project's verify command
-        self.assertIn(str(KIT), argv)
+        home = '//' + str(KIT).lstrip('/') + '/**'
+        args = (self.workers / ('argv-%d' % pid)).read_text().split('\0')
+        allow = args[args.index(harness['allow_flag']) + 1].split(',')
+        deny = args[args.index(harness['deny_flag']) + 1].split(',')
+        self.assertIn('Read(%s)' % home, allow)  # the install folder is readable ...
+        for tool in ('Edit', 'Write', 'MultiEdit', 'NotebookEdit'):
+            self.assertIn('%s(%s)' % (tool, home), deny)  # ... and never edited
+        self.assertIn('Bash(gh pr merge:*)', deny)
+        self.assertEqual((self.workers / ('env-%d' % pid)).read_text(), 'DROVER_ROLE=build DROVER_ISSUE=8')
         self.assertIn('Skills for this card', argv)
         self.assertIn('mattpocock-skills:diagnosing-bugs=' + str(self.root / '.claude/skills/diagnosing-bugs/SKILL.md'), argv)
         self.assertNotIn('drover-skills-ready', argv)  # no readiness command left for the worker

@@ -124,9 +124,19 @@ def configured_harness(cwd=None):
     return cfg.get("harness", "claude")
 
 
+def read_only(entry):
+    """Path rules for the folders a worker may read but never edit (the drover install).
+    `//` starts an absolute path in a Claude permission rule."""
+    perms = entry.get("permissions", {})
+    dirs = [d.replace("{drover_home}", str(HOME)) for d in perms.get("read_only_dirs", [])]
+    return ([f"Read(//{d.lstrip('/')}/**)" for d in dirs],
+            [f"{tool}(//{d.lstrip('/')}/**)" for d in dirs for tool in perms.get("read_only_deny", [])])
+
+
 def allowed(entry, cfg):
     """The permission rules a headless worker starts with (FR-HRN-4): the harness's tools,
-    one Bash rule per command word, and the first word of each project verify command."""
+    one Bash rule per command word, the first word of each project verify command, and Read
+    on the read-only folders. The allow list is broad on purpose: hooks hold the boundary."""
     perms = entry.get("permissions", {})
     words = list(perms.get("commands", []))
     for cmd in cfg.get("verify_commands") or []:
@@ -134,7 +144,7 @@ def allowed(entry, cfg):
             first = (part.split() or [""])[0]
             if first and first not in words and re.fullmatch(r"[A-Za-z0-9._/-]+", first):
                 words.append(first)
-    return list(perms.get("tools", [])) + [f"Bash({w}:*)" for w in words]
+    return list(perms.get("tools", [])) + [f"Bash({w}:*)" for w in words] + read_only(entry)[0]
 
 
 def worker_argv(role, prompt, cwd=None):
@@ -151,10 +161,9 @@ def worker_argv(role, prompt, cwd=None):
     if perms.get("mode"):
         argv += [perms["mode_flag"], perms["mode"]]
     argv += [perms["allow_flag"], ",".join(allowed(entry, cfg))]
-    if perms.get("deny"):
-        argv += [perms["deny_flag"], ",".join(perms["deny"])]
-    for d in perms.get("add_dirs", []):
-        argv += [perms["add_dir_flag"], d.replace("{drover_home}", str(HOME))]
+    deny = list(perms.get("deny", [])) + read_only(entry)[1]
+    if deny:
+        argv += [perms["deny_flag"], ",".join(deny)]
     return argv
 
 
