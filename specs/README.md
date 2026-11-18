@@ -86,6 +86,7 @@ It is super-board cut down and made harness-independent:
 | Skills | Keep all upstream skills; remove one only for an observed reason | Remove by audit verdict up front |
 | Metrics | FactoryBench: one attempt per try at a card, lanes from the run manifest (metrics.md) | One attempt per worker; drover's own metrics store |
 | Bot account | Deferred; known issue in metrics.md | Separate GitHub login for drover in v1 |
+| Run dashboard | Deferred. v1: `/drover run` starts the runner, prints PID and log path, and ends; progress via `drover status`. Later: runner writes `.drover/runs/state.json` each tick, workers report phases (`drover phase <name>`), a Claude Code mod shows a docked pane (runs list, lanes, worker phases, log tail) plus a status-line entry, and a harness-agnostic `drover dash` terminal UI serves herdr/hc (stages 9-10) | In-session wave loop that holds the run in the chat |
 | Domain glossary, spec links, when-to-use rule | Not in v1 | Glossary file checked by reviewer; `spec:` card links with progress; README routing rule |
 
 ## 3. Domain model
@@ -211,7 +212,7 @@ New or changed:
 | 4 conventions | conventions.md FR-CNV, board.md FR-BRD-6 |
 | 5 CLI + harness | config.md (incl. FR-HRN-4) |
 | 0 baseline | also metrics.md FR-MET-1 |
-| 6 runner | runner.md FR-RUN-2, 5, 7, 8, 13, FR-WRK-1/2/6/8/10; board.md FR-BRD-3, 5, 7, 8; metrics.md FR-MET |
+| 6 runner | runner.md FR-RUN-2, 5, 7, 8, 13, 14, 15, 16, FR-WRK-1/2/6/8/10; board.md FR-BRD-3, 5, 7, 8; metrics.md FR-MET |
 | 7 reviewer | roles.md FR-REV-1, 3, 6, 8-12, FR-BLD-7, FR-CTX; gate.md FR-MRG-4 |
 | 8 evidence | conventions.md FR-EVD |
 | 9 hc add-on | runner.md FR-WRK-3/4/5/7, board.md FR-STS-2 |

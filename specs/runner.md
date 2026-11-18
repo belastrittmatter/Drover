@@ -37,6 +37,18 @@ reference.
   `migration`, `payments`, `auth`. It shall add missing risk labels and say
   why in one comment; it shall never remove a label or add `qa`.
   (Upstream: type and complexity only, `workflow` backend only.)
+- **FR-RUN-14 (new)** `/drover run` in a harness session shall start
+  `drover run` in the background, print its PID and manifest path, and end
+  the turn. Progress is read with `drover status`.
+- **FR-RUN-15 (new)** When the classifier (FR-RUN-7) adds a risk label, it
+  shall post one comment `[orchestrator] [classify] added label <label>`
+  with `Did: classified as <type>, complexity <tier>` and `Why: <one line>`;
+  no comment when it adds nothing.
+- **FR-RUN-16 (new)** The run manifest gains these additive line types
+  (FR-MET-2 lines unchanged): `preflight batch #a #b: proceed #a, hold #b
+  (<reason>)`, `usage pause: <n>% >= <pct>%, no new workers`, `usage resume:
+  <n>%`, `unblocked #<n>: blocker #<m> closed, back to <column>`, `approval
+  resume #<n>: owner approved head <sha7>, back to Review`.
 - **FR-RUN-8 (changed)** While the harness's usage probe reports plan usage at
   or above `usage_pause_pct` (default 95), the system shall start no new
   worker, let running workers finish, and resume when usage drops. If the
