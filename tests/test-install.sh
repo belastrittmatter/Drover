@@ -71,4 +71,17 @@ for n in 5 2; do TMPDIR="$B" DROVER_ROLE=build DROVER_ISSUE=7 "$HOME/.local/bin/
 [ "$(TMPDIR="$B" DROVER_ROLE=build DROVER_ISSUE=7 "$HOME/.local/bin/drover" gh-guard budget)" = 143 ] || fail "separate calls must share the budget"
 [ "$(TMPDIR="$B" DROVER_ROLE=qa DROVER_ISSUE=7 "$HOME/.local/bin/drover" gh-guard budget)" = 150 ] || fail "another worker has its own budget"
 
-echo "PASS: test-install.sh (link, no project writes, kept files, skills links, validation, gh-guard budget)"
+# 7 — edge cases: a flag without a value, an unreadable config, a git dir kept elsewhere.
+RC=0; "$HOME/.local/bin/drover" skills install --dest >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 64 ] || fail "--dest without a value should exit 64, got $RC"
+echo '{"project":{"owner":"o","number":3}}' > "$P/.drover/config.json"; chmod 000 "$P/.drover/config.json"
+if [ ! -r "$P/.drover/config.json" ]; then  # root can read anything; skip there
+  RC=0; ERR=$(cd "$P" && "$HOME/.local/bin/drover" config validate 2>&1) || RC=$?
+  [ "$RC" -eq 65 ] && echo "$ERR" | grep -q "cannot be read" || fail "an unreadable config should exit 65 and say so, got $RC: $ERR"
+fi
+chmod 644 "$P/.drover/config.json"
+G="$T/sep"; mkdir -p "$G/work"; git init -q --separate-git-dir "$G/gitdir" "$G/work"
+[ "$(cd "$G/work" && "$HOME/.local/bin/drover" config path)" = "$(cd "$G/work" && pwd -P)/.drover/config.json" ] \
+  || fail "a separate git dir should still find the checkout: $(cd "$G/work" && "$HOME/.local/bin/drover" config path)"
+
+echo "PASS: test-install.sh (link, no project writes, kept files, skills links, validation, gh-guard budget, edge cases)"

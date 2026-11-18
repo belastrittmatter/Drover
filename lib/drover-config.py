@@ -32,7 +32,13 @@ def root(cwd=None):
     if r.returncode:
         return Path(cwd or ".").resolve()
     common = (Path(cwd or ".") / r.stdout.strip()).resolve()
-    return common.parent if common.name == ".git" else common
+    if common.name == ".git":
+        return common.parent
+    # A git dir kept elsewhere (--separate-git-dir, a submodule) gives no main checkout path:
+    # use this checkout's top level.
+    # shortcut: a linked worktree of such a repo resolves to itself; resolve the main checkout if that ever matters.
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=cwd, capture_output=True, text=True)
+    return Path(top.stdout.strip()).resolve() if top.returncode == 0 and top.stdout.strip() else Path(cwd or ".").resolve()
 
 
 def config_path(cwd=None):
@@ -102,6 +108,8 @@ def validate(path):
         cfg = json.loads(Path(path).read_text())
     except ValueError as e:
         return [f"(config): not valid JSON ({e})"]
+    except OSError as e:
+        return [f"(config): cannot be read ({e.strerror or e})"]
     return errors(cfg, json.loads(SCHEMA.read_text()))
 
 
@@ -211,8 +219,15 @@ def main(argv):
     elif cmd == "worker-argv" and len(argv) == 3:
         sys.stdout.write("".join(a + "\0" for a in worker_argv(argv[1], argv[2])))
     elif cmd == "skills-install":
-        dest = argv[argv.index("--dest") + 1] if "--dest" in argv else None
-        name = argv[argv.index("--harness") + 1] if "--harness" in argv else None
+        def opt(flag):
+            if flag not in argv:
+                return None
+            i = argv.index(flag)
+            if i + 1 >= len(argv) or argv[i + 1].startswith("--"):
+                print(f"drover skills install: {flag} needs a value", file=sys.stderr)
+                raise SystemExit(64)
+            return argv[i + 1]
+        dest, name = opt("--dest"), opt("--harness")
         return skills_install(dest, name)
     else:
         print(__doc__, file=sys.stderr)
