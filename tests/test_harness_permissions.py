@@ -202,8 +202,9 @@ check(len(scanned) >= 10 and seen.get("drover", 0) > 5 and seen.get("gh", 0) > 5
 # 3 — the tools the role rules depend on are allowed.
 for tool in ("Read", "Edit", "Write", "Task", "Skill"):
     check(tool in PERMS["tools"], f"harness permissions should allow the {tool} tool")
-check("{drover_home}" in PERMS["read_only_dirs"] and {"Edit", "Write"} <= set(PERMS["read_only_deny"]),
-      "workers read the drover install folder (skills, run.md) and never edit it")
+# Claude's Edit(path) rule covers every file-editing tool; Write/MultiEdit/NotebookEdit path rules are rejected.
+check("{drover_home}" in PERMS["read_only_dirs"] and PERMS["read_only_deny"] == ["Edit"],
+      "workers read the drover install folder (skills, run.md) and never edit it (one Edit(path) rule)")
 check("add_dir_flag" not in PERMS, "no --add-dir: the install folder is read-only for workers")
 
 if failures:

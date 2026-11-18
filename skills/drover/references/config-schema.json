@@ -209,6 +209,17 @@
         }
       }
     },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow_commands": {
+          "type": "array",
+          "description": "Extra command words a headless worker may run, merged into the harness allow list as Bash(<word>:*) (config.md FR-HRN-4), e.g. a wrapper a global hook rewrites commands to.",
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9._/-]+$" }
+        }
+      }
+    },
     "hc": {
       "type": "object",
       "additionalProperties": false,

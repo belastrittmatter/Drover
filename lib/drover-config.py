@@ -134,7 +134,8 @@ def configured_harness(cwd=None):
 
 def read_only(entry):
     """Path rules for the folders a worker may read but never edit (the drover install).
-    `//` starts an absolute path in a Claude permission rule."""
+    `//` starts an absolute path in a Claude permission rule. Claude's `Edit(path)` rule covers
+    every file-editing tool and rejects path rules on Write, MultiEdit and NotebookEdit."""
     perms = entry.get("permissions", {})
     dirs = [d.replace("{drover_home}", str(HOME)) for d in perms.get("read_only_dirs", [])]
     return ([f"Read(//{d.lstrip('/')}/**)" for d in dirs],
@@ -143,10 +144,12 @@ def read_only(entry):
 
 def allowed(entry, cfg):
     """The permission rules a headless worker starts with (FR-HRN-4): the harness's tools,
-    one Bash rule per command word, the first word of each project verify command, and Read
-    on the read-only folders. The allow list is broad on purpose: hooks hold the boundary."""
+    one Bash rule per command word (the harness's, then the config's permissions.allow_commands),
+    the first word of each project verify command, and Read on the read-only folders. The allow
+    list is broad on purpose: hooks hold the boundary."""
     perms = entry.get("permissions", {})
     words = list(perms.get("commands", []))
+    words += [w for w in (cfg.get("permissions") or {}).get("allow_commands", []) if w not in words]
     for cmd in cfg.get("verify_commands") or []:
         for part in re.split(r"&&|\|\||;|\|", cmd):
             first = (part.split() or [""])[0]
