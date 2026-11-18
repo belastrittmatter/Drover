@@ -29,8 +29,8 @@ Nothing else. Stop is intentionally tolerant — its job is to bring the system 
 
 ## What stop reads
 
-- `.claude/drover/inflight/<issue-N>` — one file per in-flight worker: `HANDLE=process:<pid>\nLANE=…\nSTARTED=…\nCOLUMN=…`. Older `PID=…` and single-line PID locks are also read.
-- `.claude/drover/runner.lock` — this repo's dispatcher (`HANDLE=process:<pid>`).
+- `.claude/drover/inflight/<issue-N>` — one file per in-flight worker: `HANDLE=process:<pid>:<start>\nLANE=…\nSTARTED=…\nCOLUMN=…`. Older `PID=…` and single-line PID locks are also read.
+- `.claude/drover/runner.lock` — this repo's dispatcher (`HANDLE=process:<pid>:<start>`). A pid whose start time no longer matches is dead and never signalled; an older `PID=` lock is reported, never signalled.
 
 Stop touches only these (runner.md FR-WRK-8): it never searches the process table, so another
 repo's runner and workers are left alone. Liveness and signals go through `lib/drover-worker.sh`.
@@ -61,7 +61,7 @@ cannot start a new worker during the wrap-up.
 ## What stop does NOT do (deliberate)
 
 - **Does not wait for workers to finish.** `claude -p` workers have no SIGTERM handler that flushes a partial commit. Worktree files remain, but unsaved in-memory work may be lost. Inspect uncommitted edits before resuming; restart recovery keeps dirty worktrees for inspection.
-- **Does not touch worktrees** under `.drover/worktrees/` or the pre-rename `.claude/worktrees/issue-*` location. A legacy board worktree halts the next run until inspected/moved to the canonical folder; cleanup never force-removes it.
+- **Does not touch worktrees** under `.drover/worktrees/` or the legacy `.worktrees/` and `.claude/worktrees/issue-*` locations. A legacy board worktree halts the next run until inspected/moved to the canonical folder; cleanup never force-removes it.
 - **Does not touch branches or PRs.** Both persist. State lives on the GitHub Project board — cards stay in whichever column they were in when stopped.
 - **Does not modify the config.** A stopped run is not a deactivated config; `.drover/config.json` is untouched.
 - **Does not bypass the GitHub assignee mutex.** It releases the mutex, then kills. If the GitHub API is unreachable, release is best-effort and the orphan-scan + reap-on-next-start covers the gap.
@@ -112,7 +112,7 @@ Per the cardinal orchestrator/worker rule:
 ## Lock file format
 
 ```
-HANDLE=process:12345
+HANDLE=process:12345:Tue_May_24_18:42:10_2026
 LANE=qa
 STARTED=2026-05-24T18:42:11Z
 COLUMN=QA

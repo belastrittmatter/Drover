@@ -59,7 +59,7 @@ Progress: [done] onboard  →  [done] lint  →  run (you are here)
 | `pre-flight.md` all items `[✓]` | Halt: "Pre-flight incomplete — fix these: [list]." |
 | No issues missing ACs in active columns | Halt: "N issues need clarification. Run `/drover lint`." |
 | Clean git working tree on base branch | Halt: "Working tree dirty. Stash or commit before running." |
-| Legacy worktrees | If a pre-rename `.claude/worktrees/issue-*` exists, halt before dispatch. Stop its worker, inspect/preserve edits, then `git worktree move` it to the matching `.drover/worktrees/` path. Never delete it as part of an upgrade. |
+| Legacy worktrees | If `.worktrees/issue-*` or a pre-rename `.claude/worktrees/issue-*` exists, halt before dispatch. Stop its worker, inspect/preserve edits, then `git worktree move` it to the matching `.drover/worktrees/` path. Never delete it as part of an upgrade. |
 | Stale worktree scan | Scan only `.drover/worktrees/issue-<N>` and `issue-<N>-build/qa/review`. If its named branch is gone, use `git worktree remove` without force. Keep detached, dirty, locked, unregistered, or unrelated folders; log failures for inspection. A missing board label alone is not permission to delete work. |
 | Production-merge guard | If `base_branch == "main"` AND `human_approves_merge == false` AND `merge_policy.default != "human"` AND `merge_policy.allow_auto_on_production != true` AND production-detection signals fire (see onboard → base branch), halt with: `Refusing to start: would auto-merge to production main. Set merge_policy.default: "human", switch base_branch to staging, or re-run drover onboard to opt in explicitly.` |
 | Leftover-worker check (added 2026-05-22 after #381 worker storm) | No lock in `.claude/drover/inflight/` may name a live worker, and `.claude/drover/runner.lock` may not name a live runner (`drover worker alive`). Otherwise halt with: `${N} drover workers already running ... Stop them first: drover stop`. The dispatcher must never run while leftover workers exist — they will collide on assignee claims and produce duplicate PRs. |
@@ -635,9 +635,9 @@ Worker-side assignee claim alone is **not sufficient** — `claude -p` cold-star
 The dispatcher MUST also:
 
 1. **Claim BEFORE spawning the worker** — `try_claim_assignee` runs in the dispatcher and only proceeds to start the worker (`drover worker start`) if it wins the assignee write. Closes the cold-start race.
-2. **Write a local in-flight lock** — `.claude/drover/inflight/<issue-N>` holds `HANDLE=process:<pid>`, `LANE=`, `STARTED=` and `COLUMN=` (the card's column at dispatch); older `PID=<pid>` locks still read. `top_card_in_column` skips any issue with a lock even if the assignee write hasn't propagated yet.
+2. **Write a local in-flight lock** — `.claude/drover/inflight/<issue-N>` holds `HANDLE=process:<pid>:<start>` (`<start>` from `ps -o lstart=`, so a recycled pid reads as dead and is never signalled), `LANE=`, `STARTED=` and `COLUMN=` (the card's column at dispatch), written atomically. Older `PID=<pid>` locks still read: they block a run start but are never signalled. `top_card_in_column` skips any issue with a lock even if the assignee write hasn't propagated yet.
 3. **Cap workers per lane** — at most `roles.<role>.max_workers` (default 1) live locks per lane; downstream first (Review, QA, then Ready).
-4. **Reap stale locks each tick** — `reap_finished_locks` removes a lock only when its worker is no longer alive. A worker that exited with its card still in its dispatch column is a failed dispatch; two in a row on one card halt the run and print the last 20 lines of its worker log.
+4. **Reap stale locks each tick** — `reap_finished_locks` removes a lock only when its worker is no longer alive. A worker that exited with its card still in its dispatch column (or in Building, where no lane looks; the card then goes back to Ready) and with no `[<role>] [report]` or `[<role>] [blocker]` comment on the issue since it started is a failed dispatch; two in a row on one card halt the run with exit 76 and print the last 20 lines of its worker log. Other lanes' workers keep running with their locks.
 5. **Leftover-worker check on startup** — refuse to start while any lock names a live worker.
 6. **One board read per tick** — `drover card items` once per tick, not per column lookup (~1 GraphQL point per 100 cards).
 
@@ -807,7 +807,7 @@ Different from the multi-attempt-move issue above: there the worker exited witho
 
 **Auto-remediation (now implemented in `drover-run.sh` as anti-zombie control #7):**
 
-Every tick — both cheap and expensive — `sweep_lane_zombies` checks every live worker lock. A worker whose card's current column is NOT in its lane's expected source set (nor the column it was dispatched from) gets one more tick to finish its handoff; if the card is still out of the lane on the next tick, the worker is stopped:
+On every tick that reads the board fresh, `sweep_lane_zombies` checks every live worker lock (a pending grace tick forces that read even when every lane is at its cap). A worker whose card's current column is NOT in its lane's expected source set (nor the column it was dispatched from) gets one more tick to finish its handoff; if the card is still out of the lane on the next tick, the worker is stopped:
 
 | Lane    | Expected source columns | Anything else means → |
 |---------|-------------------------|-----------------------|
@@ -815,6 +815,6 @@ Every tick — both cheap and expensive — `sweep_lane_zombies` checks every li
 | qa      | QA                      | zombie                |
 | review  | Review                  | zombie                |
 
-On first sight: log `<lane> worker on #<N> (pid=<P>) — card moved to '<col>'; one more tick to finish its handoff`. A tick later: `SIGTERM` + 1s + `SIGKILL` through `drover worker stop`, remove the inflight lock once the worker is dead, idempotently sweep the assignee, log `zombie <lane> worker on #<N> (pid=<P>) — card moved to '<col>'; killing`. Uses the cached project items only — zero extra API calls per tick.
+On first sight: log "<lane> worker on #<N> (pid=<P>) left its lane (now '<col>'); one more tick to finish its handoff" (not "card moved to": FR-MET-1 readers take that as the outcome line). A card back in its lane drops the mark. A tick later: `SIGTERM` + 1s + `SIGKILL` through `drover worker stop`, remove the inflight lock once the worker is dead, idempotently sweep the assignee, log `zombie <lane> worker on #<N> (pid=<P>) — card moved to '<col>'; killing`. Uses the cached project items only — zero extra API calls per tick.
 
 Trade-off: if someone (human or external tool) manually moves a card out of its source column while a worker is legitimately mid-work, the watchdog will kill that worker. Acceptable — manual board edits during an active run are an anti-pattern, and the worker would fail on its own column-move anyway.
