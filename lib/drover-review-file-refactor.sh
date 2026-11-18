@@ -104,7 +104,7 @@ fi
 # Where the card lands, and it is decided by the card, not by a default.
 #
 # A card with real acceptance criteria is buildable, so it goes to `Ready` and the
-# next wave takes it. A card without them is a note, and `Ready` feeds the Builder
+# next round takes it. A card without them is a note, and `Ready` feeds the Builder
 # lane directly — so it goes to the holding column and waits for `drover
 # lint` like any other unrefined ticket.
 #
@@ -122,10 +122,10 @@ trap 'rm -f "$BODY_TMP"' EXIT
   cat "$BODY_FILE"
 
   # Every card the loop can pick up needs these two sections, and a card filed
-  # mid-wave by an agent is the one most likely to arrive without them. Six were
+  # mid-run by an agent is the one most likely to arrive without them. Six were
   # filed that way on 2026-08-21 and every one had to be completed by hand before
   # it could move: a missing `## Blocked by` is not the same as `- None.`, so the
-  # wave planner correctly refuses to guess and the card sits in Todo forever.
+  # runner correctly refuses to guess and the card sits in Todo forever.
   #
   # Appended only when absent, so a caller that wrote its own keeps it.
   if ! grep -qiE '^## +Acceptance criteria *$' "$BODY_FILE"; then
@@ -149,7 +149,7 @@ trap 'rm -f "$BODY_TMP"' EXIT
     echo "- None."
     echo
     echo "> Filed mid-review with nothing blocking it. Stated explicitly rather than left silent:"
-    echo "> the wave planner treats a missing section as unreadable, not as None."
+    echo "> the runner treats a missing section as unreadable, not as None."
   fi
 
   echo

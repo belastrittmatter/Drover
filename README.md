@@ -169,7 +169,7 @@ MIT © Eric Tech (upstream) and belastrittmatter ([LICENSE](LICENSE)). Built on 
 ### Worker skill availability
 
 Setup and dispatch resolve real, nonempty `SKILL.md` files for the actual
-Claude or Codex host. Missing required skills halt before claims or workers;
+worker harness. Missing required skills halt before claims or workers;
 lockfiles and arbitrary plugin caches do not count. The shared registry in
 `lib/drover-skills-ready.py` owns lane dependencies, overrides and the
 two declared ponytail fallbacks. The QA lane requires the bundled

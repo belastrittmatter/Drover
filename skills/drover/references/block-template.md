@@ -95,7 +95,7 @@ Reason tag:  [blocked:creds]
 There is no "Needs you" column: the card goes to **Blocked**, tagged `[needs-you]`, with the `needs-you`
 label on the issue and the PR. Use it whenever the next step is a command the robot must not run
 itself — the merge gate's exit 7 (merge_policy routes the merge to a human: review and merge
-it yourself, or comment `done` to approve and let the next wave merge it) and exit 8 (migrations against a database outside `migrations.allowed_envs`,
+it yourself, or comment `done` to approve and let the next round merge it) and exit 8 (migrations against a database outside `migrations.allowed_envs`,
 an allowed migrate command that failed, a declared human step), or any lane that hits one.
 
 Checklist first: the person sees what to do before why. The why and the evidence fold away.
@@ -108,7 +108,7 @@ that policy hold too: the approval covers those human steps as well as the code.
 - [ ] Run `<exact command 1, copy-paste ready>` on the **<env>** database
 - [ ] <exact command 2, if any>
 - [ ] Comment `done` here
-After a trusted human confirms this version, the next wave returns it to Review for verification.
+After a trusted human confirms this version, the next round returns it to Review for verification.
 
 <details><summary>Why, and what I checked</summary>
 
@@ -127,7 +127,7 @@ Example (what the person sees on GitHub):
 > - [ ] Run `npx prisma migrate deploy` on the **live** database
 > - [ ] Comment `done` here
 >
-> After a trusted human confirms this version, the next wave returns it to Review for verification.
+> After a trusted human confirms this version, the next round returns it to Review for verification.
 > ▸ Why, and what I checked
 
 The `Reason tag:` and `blocked-by: -` lines stay (inside the fold): the planner reads them

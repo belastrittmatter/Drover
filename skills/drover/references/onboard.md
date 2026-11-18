@@ -207,12 +207,12 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    ├─ Second account (AskUserQuestion, header "Robot account"); explain in four short lines:
    │      The robot's gh issue, gh pr and gh project GraphQL calls share your 5,000 points/hr.
    │      Finfluencer (2026-10-03/04): 3 cards cost ~2,850 (~950/card); 14 used all 5,000 in ~40 min.
-   │      Board moves then failed; nearly every wave left the board idle for up to an hour.
+   │      Board moves then failed; the board sat idle for up to an hour after every round.
    │      Your browsing and tools share that budget. A bot gets its own 5,000 points/hr.
    │    "Want a second GitHub account for the robot? It gives the board its own hourly budget,
    │    so it can run more cards before pausing. Takes about 10 minutes."
    │      • Yes, set it up now (Recommended)
-   │      • Not now — stay on my account; waves pause when the hourly limit runs out
+   │      • Not now — stay on my account; runs pause when the hourly limit runs out
    │    Save the choice with the GitHub answers. Yes → follow references/second-account.md;
    │    keep the owner active through step 3, then finish bot access before step 4. Keep the
    │    repo/project owner unchanged. Already on a verified bot → keep it; don't create another.
@@ -223,7 +223,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
 3. BOARD — one question: which board
    ├─ One checklist line, one labels line, no question about either:
    │      Columns: ✓ Backlog ✓ Ready ✓ Building ✓ QA ✓ Review ✓ Blocked ✓ Done
-   │      Labels: feature · bug · qa (qa skips Building; no label = feature)
+   │      Labels: feature · bug · qa (qa skips Building; no label = feature) · risk: security · migration · payments · auth
    ├─ drover setup board-rank --owner <owner>   (boards ranked by matching
    │    columns; `recommend` = the best with ≥ 4 of 7)
    │  drover setup names                         (two names from
@@ -415,7 +415,7 @@ remove a pending recovery record; use its saved state to reconcile a conflict be
 2. **One tracked file** — `git status --porcelain` lists `.drover/config.json` and nothing else
    that onboard wrote.
 3. **Board columns and labels** — `gh project field-list <n> --owner <o>` returns Backlog, Ready,
-   Building, QA, Review, Blocked, Done (no Skipped); `gh label list` has qa, bug, feature.
+   Building, QA, Review, Blocked, Done (no Skipped); `gh label list` has qa, bug, feature, security, migration, payments, auth.
 4. **Setup green** — `drover setup check` exits 0 (or only `needs`
    the user declined).
 

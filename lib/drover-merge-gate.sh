@@ -80,7 +80,7 @@
 #      review" — or merge_policy.default "human"). Stdout lists each
 #      `human-gate: <category> — <evidence>`. Nothing ran, nothing merged; the
 #      card → Blocked with the [needs-you] template: the human reviews and merges it, or
-#      comments "done" after its pinned request to approve — the next wave re-runs
+#      comments "done" after its pinned request to approve — the next round re-runs
 #      the gate, which then skips the policy check and merges.
 #   9  verification-readiness: repair config.verify_commands and restart; preserve
 #      card/worktree/approval state. Never bounce to Build or retry a rebase.

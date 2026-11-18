@@ -38,7 +38,7 @@ Accept any of these inputs:
 - GitHub PR number or URL;
 - commit range;
 - user-provided file list;
-- QA report, screenshots, or drover wave report;
+- QA report, screenshots, or drover run report;
 - release goal / done definition;
 - `prior_report` — the previous review's findings on this PR (see "Review remembers"). Empty on a first review.
 
@@ -116,7 +116,7 @@ If the input is ambiguous, default to reviewing the current branch against its u
      The `--body-file` uses the ticket format (writing-standard.md § 3): `## Problem`,
      `## Context` (`- **Where:**` the module and files), `## Fix` — the filer refuses a body
      without them. **Write real acceptance criteria too.** A card that carries an
-     `## Acceptance Criteria` checklist is filed straight into `Ready` and the next wave builds it;
+     `## Acceptance Criteria` checklist is filed straight into `Ready` and the next round builds it;
      one without lands in the holding column and waits for `/drover lint`. That is the whole
      difference between a finding that gets fixed this week and a note nobody grades. Two or three
      checkable lines is enough — what must be true when this is done, in terms a test can assert.
@@ -164,7 +164,7 @@ Next: <builder | qa | owner | none>
   `filed #<issue>`.
 - Human gates: the header says `human-gated` and `Next: owner`; the decision goes in a row.
 
-For short summaries (wave reports), keep it phone-friendly:
+For short summaries (run reports), keep it phone-friendly:
 
 ```markdown
 [reviewer] [report] blocked · PR #123
@@ -362,13 +362,13 @@ two complete builds. In order, no shortcuts:
      an additive migration follows `migrations.allowed_envs`, and a live DB is always human.
      Card → **Blocked** with the `[needs-you]` block comment: `Why blocked` quotes the gate's
      `human-gate:` lines; `To unblock` = review PR #<P> and merge it yourself, OR comment
-     `done` to approve (the next wave re-runs the gate, which merges). Label `needs-you`.
+     `done` to approve (the next round re-runs the gate, which merges). Label `needs-you`.
    - **Exit 8 — `[needs-you]`.** Migrations for a database outside
      `migrations.allowed_envs`, an allowed migrate command that failed, or a declared
      human-only step. Card → **Blocked** with the `[needs-you]` block comment
      (`block-template.md` → "`[needs-you]`"), the gate's `needs-you:` commands copied
      verbatim into `To unblock`, label `needs-you`, `blocked-by: -`. After the human
-     comments `done` after the current pinned request, the next wave verifies their
+     comments `done` after the current pinned request, the next round verifies their
      permission and the head, then moves it to Review. Re-run the gate; labels do not
      authorize it. For exits 7 and 8, copy `approval-request:` into the canonical
      issue block and link it from the PR (no duplicate request); see block-template.md.

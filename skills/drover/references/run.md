@@ -248,9 +248,13 @@ Two agents must never build the same thing, and nothing already on the base bran
 twice. So before a Builder starts, a **fresh, cheap sub-agent** (no code, no worktree) checks the
 card. The runner does it before any build claim: one short agent (role `preflight`, model
 `sonnet`, `haiku` on a `low` tier) per batch of up to 5 Ready build cards, which returns one
-JSON verdict per card. The agent writes nothing; the runner posts the Block template, moves held
-and sequenced cards to Blocked, and logs one "preflight batch" manifest line per batch.
-Builders the same batch cleared may run side by side (`roles.build.max_workers`).
+JSON verdict per card. The agent runs with the harness's read-only `agent` profile (read tools,
+the pre-flight script, GitHub reads through drover github-read, gh issue and pr view or list,
+git log, show and diff; no edits, no GitHub writes) and JSON output, and is stopped after 120 s. The runner posts the Block
+template, then moves held and sequenced cards to Blocked, and logs one "preflight batch"
+manifest line per batch. Builders the same batch cleared may run side by side
+(`roles.build.max_workers`); a clearance lapses when the card leaves Ready or after 3 ticks,
+and a later build is checked again.
 
 ```
 [ ] drover gh-guard check 200
@@ -294,15 +298,20 @@ The agent may turn a `proceed` into a `hold` on evidence. It may turn a mechanic
 | `sequence` — `blockedBy` empty | proceed (card stays Ready, return column `Ready`), comment `expected conflict with PR #<P> on <files> — the merge gate will rebase` | — |
 | `halted` | script exit 79: required evidence unavailable; leave the card untouched, stop this run, resume explicitly after recovery | — |
 
-A card the pre-flight agent returns no verdict for is treated as `skipped` (a verdict, not a
-column), never built unchecked; the next tick asks again. `qa` cards are not pre-flighted: nothing is built.
+A card the pre-flight agent returns no verdict for (no answer, bad JSON, a timeout) is treated
+as `skipped` (a verdict, not a column) and never built unchecked. It is asked again two ticks
+later; after 3 such answers it goes to Blocked `[blocked:unclear]`. `qa` cards are not pre-flighted: nothing is built.
 
 ### Classifier (before any Ready claim)
 
-A fast agent (role `classify`, model `haiku`, `sonnet` on a `high` tier) reads each Ready card
-once per run and returns `kind`, `complexity` and `risk`. The runner then:
+A fast agent (role `classify`, model `haiku`, `sonnet` on a `high` tier, the same read-only
+profile and 120 s limit) reads each Ready card once per run and returns `kind`, `complexity` and
+`risk`. With no usable answer the card waits and is asked again on the next tick, at most twice;
+then it is claimed unclassified. The runner then:
 
-- adds `feature` or `bug` when the card has no type label (it never overrides one, never adds `qa`);
+- adds `feature` or `bug` when the card has no type label (any routing label counts: `qa`, `bug`,
+  `feature` and every key of `labels` in `lib/drover-routing.json` or the config, e.g. `ux`,
+  `refactor`, `tech-debt`, `tests`, `docs`); it never overrides one, never adds `qa`;
 - adds each missing risk label of `security`, `migration`, `payments`, `auth`;
 - never removes a label;
 - when it added a label, posts one comment `[orchestrator] [classify] added label <labels>` with
@@ -492,16 +501,16 @@ on the base branch**.
      2 → the branch no longer builds against the base → **rebase pass** (see below)
      3 → GitHub refused after a green verify (branch protection, required check)
           → Blocked with the §4 template; this one really is a human's
-     4 → another card holds the merge lock → leave the card in Review, next wave retries
+     4 → another card holds the merge lock → leave the card in Review, next round retries
      5 → the base does not merge in cleanly → **rebase pass** (see below)
      6 → the PR head is not the commit you reviewed (a push after review, or during
           verify). Your evidence is void: leave the card in Review with a `[reviewer]`
-          comment naming both shas; the next wave reviews the new head
+          comment naming both shas; the next round reviews the new head
      7 → merge_policy: a human merges this one. Stdout carries one
           `human-gate: <money|auth|schema|size|default|policy> — <evidence>` line per
           hit. Card Review → **Blocked** `[needs-you]` (block-template.md): `Why blocked` names the
           category and evidence; `To unblock` = "[ ] review PR #<P> and merge it
-          yourself" OR "[ ] comment `done` to approve — the next wave merges it";
+          yourself" OR "[ ] comment `done` to approve — the next round merges it";
           label `needs-you`, `blocked-by: -`. A human merge moves the card to Done the
           usual way; a `done` brings it back through `resume`, and the gate clears the
           policy hold only with a verified trusted approval of the current request.
@@ -665,8 +674,14 @@ Before each dispatch the runner runs the harness's `usage_probe` (`harnesses/<ha
 Claude: `drover usage check --threshold <usage_pause_pct>`). At or above `usage_pause_pct`
 (default 95) it starts no new worker, lets running workers finish, and logs
 `usage pause: <n>% >= <pct>%, no new workers`; when usage drops it logs `usage resume: <n>%` and
-dispatches again. Paused rounds do not count toward the runaway halt. A harness with no probe,
-or a probe with no reading, is said once per run and never pauses.
+dispatches again. Paused rounds do not count toward the runaway halt. Every change between
+paused, running and no reading is logged.
+
+**When the reading goes blind.** A pause holds while the probe has no reading (snapshot deleted,
+unreadable) until the reset time of the window that paused the run, or until a fresh reading
+below the threshold arrives: usage cannot fall inside a window. A run that was not paused and
+gets no reading keeps dispatching: the guard is blind, and Claude Code's own limit at 100% is the
+backstop. A harness with no probe is said once per run and never pauses.
 
 Claude's reading is the `rate_limits` block Claude Code pipes to the status line. It reaches
 the probe only if the owner's status-line command records it; add one line after it reads stdin:
@@ -697,7 +712,7 @@ members to the same interface on purpose. The Reviewer refused — correctly, be
 never pushes to the branch it is judging** — and moved the card to `Blocked`. Two further cards
 were waiting on that one and parked behind it. The resolution, when a human finally did it, was
 "keep both sides" in twelve of the thirteen hunks and one block of setup code moved into a
-function. Three cards lost a wave to a mechanical edit.
+function. Three cards lost a round to a mechanical edit.
 
 **The rule.** On merge-gate exit 2 or 5:
 
@@ -736,11 +751,13 @@ before it dispatches anything that tick:
   the build, and runs allowed migrations. New code or a newer request needs fresh
   human approval; a label or old bare comment cannot bypass that hold.
 - **refreshes** a card whose PR head changed while it was `Blocked`: moves it to **Review** with a
-  comment that the old approval does not cover the new head. The Reviewer reviews the new code
+  comment that the old approval does not cover the new head, and removes a stale
+  `needs-you:done` display label. The Reviewer reviews the new code
   and lets the gate produce a new pinned request, then returns it to **Blocked** for a fresh
   human reply. This is not an approved resume.
 - **holds** a `Ready` card whose blockers are still open, whose `## Blocked by` line cannot be
-  parsed, or which the graph does not know: it is not claimed. An unreadable line gets one comment
+  parsed, or which the graph does not know: it is not claimed (and costs no per-card GitHub read
+  when the graph lists it). An unreadable line, on a Ready or a Blocked card, gets one comment
   per run asking for `- #N` bullets or `- None.`. Never guess: a card treated as free on an
   unreadable line gets built against a base that does not have what it needs.
 

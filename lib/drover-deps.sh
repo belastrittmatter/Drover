@@ -6,7 +6,7 @@
 #      wrote when it most recently parked the card)
 #   2. the issue body's `## Blocked by` section (what the ticket was written with)
 #
-# This is the dependency primitive. The wave planner uses it to size a wave and to
+# This is the dependency primitive. The runner uses it to pick claimable cards and to
 # sweep the Blocked column; anything else that needs to know "what is waiting on
 # what" should call this rather than re-parse issue bodies.
 #
@@ -35,7 +35,7 @@
 # FAIL SAFE, NOT FAIL OPEN. An issue this script cannot read confidently is
 # reported `parseable: false` and callers must treat it as blocked. Guessing
 # "runnable" on an ambiguous line is how a card gets built against a base branch
-# that does not have what it needs yet — one wave saved, one rewrite spent.
+# that does not have what it needs yet — one round saved, one rewrite spent.
 #
 # Usage:
 #   drover-deps.sh --repo <owner/name> [--issues 12,34] [--from <payload.json>]
