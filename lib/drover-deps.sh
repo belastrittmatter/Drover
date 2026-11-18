@@ -49,6 +49,7 @@
 # `needsYou` — the newest Block comment carries the [needs-you] reason tag
 # (lib/drover-reasons.json), or the issue
 # has the `needs-you` label: a human-only command is waiting (block-template.md).
+# `reasonTag` — the reason tag of the newest Block comment, or null.
 # `needsYouDone` — verified by drover-approval.py: a trusted human replied
 # done after a pinned request for the current PR head. Labels are never authority.
 # Saved --from payloads stay offline and cannot assert verified human approval.
@@ -148,6 +149,9 @@ echo "$ISSUES" | jq --arg only "$ONLY" --arg needs_tag "$(jq -r .needs_you "$HER
                   | map(select(.value | split("\n") | any(.[]; (split("Reason tag:")[1:] | any(.[]; contains($needs_tag))))))
                   | last | .key ) // null;
   def needs_you: (label_names | index("needs-you") != null) or (needs_at != null);
+  # The reason tag of the newest Block comment ("Reason tag:  [blocked:sequenced]"), or null.
+  def reason_tag: [ bodies[] | split("\n")[] | select(test("^Reason tag:[ \t]*\\["))
+                    | sub("^Reason tag:[ \t]*"; "") | split(" ")[0] ] | last // null;
 
 
   ( [ .[] | .number ] ) as $open
@@ -191,6 +195,7 @@ echo "$ISSUES" | jq --arg only "$ONLY" --arg needs_tag "$(jq -r .needs_you "$HER
           runnable: ($p.parseable and ($p.human_gated | not) and (($stillOpen | length) == 0)),
           why: $p.why,
           needsYou: ($i | needs_you),
+          reasonTag: ($i | reason_tag),
           needsYouDone: false }
     ]
   | ( if $filter == null then . else map(select(.number as $n | $filter | index($n))) end )
