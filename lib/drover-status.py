@@ -2,7 +2,7 @@
 """drover-status.py — read-only live snapshot of the drover pipeline.
 
 Renders the richer status template defined in
-`.claude/skills/drover/references/status.md` (fixed 80-col Kanban
+`skills/drover/references/status.md` (fixed 80-col Kanban
 plus dedicated Workers / Block-reasons / Recent / Health sections).
 
 The same template can be hand-rendered by the model — but the token-by-
@@ -11,7 +11,7 @@ view impractical in practice. This script renders it in ≈1.3 s by doing
 the layout as a single Python pass.
 
 What it does:
-  1. Resolve config slug: arg | `.claude/drover/active` | sole config.
+  1. Read .drover/config.json; the run slug is the repo name.
   2. ONE GraphQL call for project items (number, title, labels, Status).
   3. ONE `gh issue view` per Blocked card for reason-tag extraction.
   4. Read today's manifest and pipe everything to the locked-template
@@ -27,12 +27,11 @@ Cross-platform: pure Python 3 stdlib + `gh` CLI. Works on macOS, Linux,
 Windows (PowerShell / CMD / Git Bash / WSL). No bash, no jq.
 
 Usage:
-  python .claude/bin/drover-status.py [<config-slug>]
+  drover status
 
 Exit codes:
   0  ok
-  64 missing arg + no active marker + no single config
-  66 config not found
+  64 no .drover/config.json, or an argument given
   67 gh / network failure
 """
 
@@ -73,7 +72,7 @@ COLLAPSED_TAIL = {"Backlog": "(not started, collapsed)", "Done": "(squash-merged
 
 
 # ───────────────────────────── manifest grammar ─────────────────────────────
-# The dispatcher's log format lives in `scripts/drover-run.sh`. These
+# The dispatcher's log format lives in `lib/drover-run.sh`. These
 # regexes are the contract between the two. When the dispatcher changes a
 # log line, update the regex here AND add a fixture to `tests/` so the
 # divergence can't sneak back in.
@@ -337,38 +336,13 @@ def field_status(node: dict[str, Any]) -> str:
 
 # ───────────────────────────── side-effecting helpers ─────────────────────────────
 
-# Slugs are file-system identifiers (configs/<slug>.json, runs/<date>-<slug>.md),
-# so we constrain them to a safe character class up front. Without this, a
-# slug like `../../../../etc/passwd` would slide through `Path(f"...{slug}...")`
-# and let an arg read arbitrary `.json` files relative to CWD. The script is
-# read-only so the blast radius is limited, but the read-only contract in
-# `status.md` reads stronger than what the unguarded code delivers — close
-# the gap here.
-_SLUG_RE = re.compile(r"\A[A-Za-z0-9._-]+\Z")
-
-
-def valid_slug(slug: str) -> bool:
-    # `.` and `..` are pure-dot literals that pass the regex's char class but
-    # are path-traversal sentinels — reject them explicitly. (`Path(.json)`
-    # would land at `.claude/drover/configs/.json` which still wouldn't
-    # escape the configs dir, but the manifest path uses the same slug too
-    # and `..` there does escape.)
-    if slug in (".", ".."):
-        return False
-    return bool(_SLUG_RE.match(slug))
-
-
-def resolve_config_slug(argv: list[str]) -> str:
-    if len(argv) > 1 and argv[1]:
-        return argv[1]
-    active = Path(".claude/drover/active")
-    if active.is_file():
-        return active.read_text().strip()
-    cfgs = sorted(Path(".claude/drover/configs").glob("*.json"))
-    if len(cfgs) == 1:
-        return cfgs[0].stem
-    print(f"usage: {argv[0]} <config-slug>  (or set .claude/drover/active)", file=sys.stderr)
-    sys.exit(64)
+def drover_config():
+    """lib/drover-config.py: the config path and the run slug (the repo name, FR-CFG-1)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("drover_config", Path(__file__).with_name("drover-config.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def gh(*args: str, check: bool = True) -> str:
@@ -517,23 +491,20 @@ def render_kanban(
 
 
 def main() -> int:
-    config_slug = resolve_config_slug(sys.argv)
-    if not valid_slug(config_slug):
-        print(
-            f"invalid config slug: {config_slug!r} "
-            f"(allowed chars: letters, digits, '.', '_', '-')",
-            file=sys.stderr,
-        )
+    if len(sys.argv) > 1:
+        print("usage: drover status  (one config per repo: .drover/config.json)", file=sys.stderr)
         return 64
-    config_path = Path(f".claude/drover/configs/{config_slug}.json")
+    dc = drover_config()
+    config_path = dc.config_path()
     if not config_path.is_file():
-        print(f"config not found: {config_path}", file=sys.stderr)
-        return 66
+        print(f"no config: {config_path} (run drover onboard)", file=sys.stderr)
+        return 64
+    config_slug = dc.slug()
 
     cfg = json.loads(config_path.read_text())
     project_owner: str = cfg["project"]["owner"]
     project_number: int = int(cfg["project"]["number"])
-    runs_dir = cfg.get("paths", {}).get("runs_dir", "docs/drover/runs")
+    runs_dir = "docs/drover/runs"
     run_date = datetime.date.today().isoformat()
     manifest_path = Path(runs_dir) / f"{run_date}-{config_slug}.md"
 
@@ -669,7 +640,7 @@ def main() -> int:
         or cfg.get("claim", {}).get("assignee_login")
         or "?"
     )
-    max_workers = cfg.get("max_workers", 3)
+    max_workers = sum(((cfg.get("roles") or {}).get(r) or {}).get("max_workers", 1) for r in ("build", "qa", "review"))
 
     print(f"drover · {proj['title']} (#{proj['number']})")
     print("─" * 80)

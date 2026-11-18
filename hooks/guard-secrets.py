@@ -24,11 +24,11 @@ SECRET_RE = re.compile("|".join([
     r"\.pem" + E,
 ]))
 
-# The one sanctioned way to ask "is KEY set?": drover-env-check.sh prints
+# The one sanctioned way to ask "is KEY set?": `drover env-check` (lib/drover-env-check.sh) prints
 # present / empty / missing per key and never a value. Allowed only as a single
 # plain call -- no pipe, redirect, chain or substitution can ride along.
 ENV_CHECK = re.compile(
-    r"^[ \t]*(?:(?:bash|sh)[ \t]+)?(?:[A-Za-z0-9_./-]*/)?drover-env-check\.sh"
+    r"^[ \t]*(?:drover[ \t]+env-check|(?:(?:bash|sh)[ \t]+)?(?:[A-Za-z0-9_./-]*/)?drover-env-check\.sh)"
     r"(?:[ \t]+[A-Za-z0-9_./=-]+)*[ \t]*\Z")
 
 REASON = ("Blocked by guard-secrets: this touches a secret file. Read the checked-in example env "

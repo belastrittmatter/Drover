@@ -7,7 +7,7 @@
 # plus the mutation — and that a stale option id is recovered, not mis-moved.
 set -euo pipefail
 cd "$(dirname "$0")"
-CARD="$PWD/../scripts/drover-card.sh"
+CARD="$PWD/../lib/drover-card.sh"
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 fail() { echo "FAIL: $1" >&2; exit 1; }
 pass=0; ok() { pass=$((pass + 1)); echo "  ✅ $1"; }

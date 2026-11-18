@@ -53,7 +53,7 @@ FORMS = {
                'repository(owner:$owner,name:$repo){ issues(states:OPEN,first:100,after:$endCursor){ '
                'pageInfo{ hasNextPage endCursor } nodes{ number title body state labels(first:30){ nodes{ name } } '
                'comments(last:8){ nodes{ body } } } } } }\' -F owner=<owner> -F repo=<repo> '
-               '(see .claude/bin/drover-deps.sh; not issue list)'),
+               '(see drover deps; not issue list)'),
 }
 
 

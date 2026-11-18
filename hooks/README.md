@@ -6,17 +6,19 @@ so a broken guard never stops unrelated work. All of the below are on by default
 protected-push guard (opt-in).
 
 - `guard-worktree-path.py` — PreToolUse `Bash`: denies `git worktree add|move` whose target resolves outside `<repo>/.drover/worktrees/` and `<repo>/.claude/worktrees/` (honours `cd X &&`, `git -C X`).
-- `guard-secrets.py` — PreToolUse `Bash|Read|Grep`: denies reading or piping dotenv files, SSH keys, `.npmrc`, `credentials(.json)`, service-account JSON and `.pem`; `.env.example` stays readable. One plain call to `drover-env-check.sh KEY…` is allowed: it prints present / empty / missing per key and never a value (no pipe, chain or redirect may ride along).
+- `guard-secrets.py` — PreToolUse `Bash|Read|Grep`: denies reading or piping dotenv files, SSH keys, `.npmrc`, `credentials(.json)`, service-account JSON and `.pem`; `.env.example` stays readable. One plain call to `drover env-check KEY…` (or `drover-env-check.sh KEY…`) is allowed: it prints present / empty / missing per key and never a value (no pipe, chain or redirect may ride along).
 - `guard-key-literals.py` — PreToolUse `Edit|MultiEdit|Write|NotebookEdit|Bash`: denies writing a live-looking API key into a file; PostToolUse `Edit|MultiEdit|Write|NotebookEdit`: flags one already on disk. Reports line numbers, never the value.
 - `guard-delete-outside.py` — PreToolUse `Bash`: denies `rm`, `rmdir`, `unlink`, `find … -delete` / `-exec rm` and `git clean` whose target resolves outside `$CLAUDE_PROJECT_DIR`, and always `/` or `~` itself (honours `cd X &&`, `git -C X`, `~`, `$HOME`). Inside `/tmp`, `/private/tmp`, `/var/folders` and `$TMPDIR` stays allowed. A path whose value is only known at run time (`$(…)`, a variable set earlier in the same command) is allowed.
-- `cleanup-wt.py` — SessionStart (`--auto`): when a base branch tip moved since the last session, removes worktrees and local branches already merged into it. The merge gate also runs it with `--post-merge` after every merge. Never deletes unmerged work (a dirty worktree on a merged branch is wip-committed and its branch kept), never touches bases or the worktree it runs in, and writes a recovery TSV to `<git-common-dir>/cleanup-wt/<timestamp>.tsv` before acting. Restore with `git branch <name> <sha>`. A manual dry run (`python3 .claude/hooks/cleanup-wt.py`, then `--apply`) still works.
+- `cleanup-wt.py` — SessionStart (`--auto`): when a base branch tip moved since the last session, removes worktrees and local branches already merged into it. The merge gate also runs it with `--post-merge` after every merge. Never deletes unmerged work (a dirty worktree on a merged branch is wip-committed and its branch kept), never touches bases or the worktree it runs in, and writes a recovery TSV to `<git-common-dir>/cleanup-wt/<timestamp>.tsv` before acting. Restore with `git branch <name> <sha>`. A manual dry run (`python3 "$(drover config home)/hooks/cleanup-wt.py"`, then `--apply`) still works.
 
 ## Enable
 
-`install.sh` does this for you: it copies the scripts to `.claude/hooks/` in the target
-project and merges the block below (kept in `settings-snippet.json`) into
-`.claude/settings.json`, backing the file up first and never adding a command twice.
-`./install.sh --no-hooks` skips both (and with it the merge gate's post-merge cleanup, which needs `cleanup-wt.py`). By hand, copy the scripts and merge this:
+`drover onboard` does this for you, through the harness entry (`harnesses/claude.json` →
+`hooks`): it merges the block below (kept in `settings-snippet.json`) into the untracked
+`.claude/settings.local.json`, with `{drover_home}` filled in, backing the file up first and
+never adding a command twice. The hooks run from the drover install folder; nothing is
+copied into the project. `drover onboard --no-hooks` skips them. By hand, merge this
+(with `{drover_home}` replaced by `drover config home`):
 
 ```json
 {
@@ -27,11 +29,11 @@ project and merges the block below (kept in `settings-snippet.json`) into
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-worktree-path.py"
+            "command": "python3 \"{drover_home}/hooks/guard-worktree-path.py\""
           },
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-delete-outside.py"
+            "command": "python3 \"{drover_home}/hooks/guard-delete-outside.py\""
           }
         ]
       },
@@ -40,7 +42,7 @@ project and merges the block below (kept in `settings-snippet.json`) into
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-secrets.py"
+            "command": "python3 \"{drover_home}/hooks/guard-secrets.py\""
           }
         ]
       },
@@ -49,7 +51,7 @@ project and merges the block below (kept in `settings-snippet.json`) into
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-key-literals.py"
+            "command": "python3 \"{drover_home}/hooks/guard-key-literals.py\""
           }
         ]
       }
@@ -60,7 +62,7 @@ project and merges the block below (kept in `settings-snippet.json`) into
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-key-literals.py"
+            "command": "python3 \"{drover_home}/hooks/guard-key-literals.py\""
           }
         ]
       }
@@ -70,7 +72,7 @@ project and merges the block below (kept in `settings-snippet.json`) into
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 .claude/hooks/cleanup-wt.py --auto --fetch 2>/dev/null || true"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 \"{drover_home}/hooks/cleanup-wt.py\" --auto --fetch 2>/dev/null || true"
           }
         ]
       }
@@ -82,24 +84,22 @@ project and merges the block below (kept in `settings-snippet.json`) into
 ## Opt-in: block pushes to the base branch
 
 `guard-protected-push.py` — PreToolUse `Bash`: denies a `git push` that would update or delete
-`main`, `master`, any `base_branch` in `.claude/drover/configs/*.json`, or a name in
+`main`, `master`, any `base_branch` in `.drover/config.json`, or a name in
 `SB_PROTECTED_BRANCHES` (comma-separated). That covers force pushes (`-f`, `--force`,
 `--force-with-lease`, `+ref`), explicit refspecs (`feat:main`, `HEAD:refs/heads/main`), `--delete`,
 `--all` / `--mirror`, and a bare `git push` while the base is checked out. Force pushes to feature
 branches stay allowed: the rebase pass needs them. `SB_ALLOW_PROTECTED_PUSH=1` turns it off for a
 session.
 
-It is installed but not wired by default: a brand-new repo often pushes its first commits straight
-to `main`. `drover onboard` asks once ("Block direct/force pushes to main? Recommended for
-existing apps; skip for brand-new repos"), and `./install.sh --protect-main` wires it. After a
-`--no-hooks` install, onboard does not wire a script that is not there; it names
-`./install.sh --no-hooks --protect-main <dir>`, which installs this one guard alone. Either way the
-entry is `settings-protect-main.json`:
+It is wired by default with the other guards (`drover onboard`, `drover setup fix`);
+`SB_ALLOW_PROTECTED_PUSH=1` turns it off for a session, `--no-hooks` skips all guards.
 
-```
-{ "matcher": "Bash", "hooks": [ { "type": "command",
-  "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-protected-push.py" } ] }
-```
+- `guard-merge.py` — PreToolUse `Bash`: denies any merge outside the merge gate: `gh pr merge`
+  (with global flags such as `--repo`, and inside `bash -c`, `sh -c`, `eval`, `env`, `xargs`),
+  and `gh api` calls to `pulls/<n>/merge` or with a merge mutation. When `DROVER_ROLE` is set (the
+  runner sets it per worker) and is not `review`, it also denies `drover gate`. The gate's own merge
+  runs inside `lib/drover-merge-gate.sh`, out of the hook's sight. Headless workers have a broad
+  allow list (`harnesses/claude.json`); this hook and the push guard are the boundary.
 
 Tests: `tests/test-guard-hooks.sh` (all guards), `tests/test-cleanup-wt.sh`.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Whole runner rounds (scripts/drover-run.sh) with fakes on PATH for gh, claude
+"""Whole runner rounds (lib/drover-run.sh) with fakes on PATH for gh, claude
 and pgrep (NFR-7). The board is a JSON file the fake gh serves; nothing reaches GitHub,
 and no real worker or dispatcher on this machine is ever matched or signalled."""
 import json
@@ -22,7 +22,7 @@ NAMES = ['drover', 'drover-build', 'drover-qa', 'drover-review', 'drover-collect
 FAKE_GH = r'''
 import glob, json, os, re, sys
 args = sys.argv[1:]
-manifest = ''.join(open(p).read() for p in glob.glob('docs/drover/runs/*-fixture.md'))
+manifest = ''.join(open(p).read() for p in glob.glob('docs/drover/runs/*.md'))
 phase = 'round' if 'initial Ready count' in manifest else 'startup'
 with open(os.environ['CALL_LOG'], 'a') as f:
     f.write(json.dumps({'phase': phase, 'args': args}) + '\n')
@@ -78,6 +78,8 @@ import os, signal, sys, time
 from pathlib import Path
 d = Path(os.environ['WORKER_DIR']); d.mkdir(exist_ok=True)
 (d / str(os.getpid())).write_text(' '.join(sys.argv[1:]))
+(d / ('argv-%d' % os.getpid())).write_text('\0'.join(sys.argv[1:]))
+(d / ('env-%d' % os.getpid())).write_text('DROVER_ROLE=%s DROVER_ISSUE=%s' % (os.environ.get('DROVER_ROLE'), os.environ.get('DROVER_ISSUE')))
 if os.environ.get('FAKE_CLAUDE') == 'exit':
     sys.exit(0)
 signal.signal(signal.SIGTERM, lambda *a: sys.exit(0))
@@ -124,7 +126,7 @@ class RunnerRounds(unittest.TestCase):
             skill.parent.mkdir(parents=True, exist_ok=True)
             skill.write_text('fixture skill instructions')
         self.state = self.root / '.claude/drover'
-        (self.state / 'configs').mkdir(parents=True)
+        (self.root / '.drover').mkdir()
         self.addCleanup(self.stop_workers)
 
     def git(self, *args, cwd=None):
@@ -136,17 +138,16 @@ class RunnerRounds(unittest.TestCase):
 
     def run_board(self, cycles):
         # no_progress_cycles=N stops the run after N rounds with no new Done card.
-        (self.state / 'configs/fixture.json').write_text(json.dumps(dict(
-            project=dict(owner='o', number=1), base_branch='main', worker_backend='claude-p',
-            max_workers=3, bot_identity='bot', verify_commands=['true'], human_approves_merge=True,
-            tick_seconds=0, no_progress_cycles=cycles)))
-        result = subprocess.run(['bash', str(KIT / 'scripts/drover-run.sh'), 'fixture'], cwd=self.root,
+        (self.root / '.drover/config.json').write_text(json.dumps(dict(
+            project=dict(owner='o', number=1), base_branch='main', notifications=dict(bot_identity='bot'),
+            verify_commands=['true'], human_approves_merge=True, tick_seconds=0, no_progress_cycles=cycles)))
+        result = subprocess.run(['bash', str(KIT / 'lib/drover-run.sh')], cwd=self.root,
                                 env=self.env, text=True, capture_output=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
 
     def stop(self):
-        result = subprocess.run(['bash', str(KIT / 'scripts/drover-stop.sh'), 'fixture'], cwd=self.root,
+        result = subprocess.run(['bash', str(KIT / 'lib/drover-stop.sh')], cwd=self.root,
                                 env=self.env, text=True, capture_output=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout
@@ -164,7 +165,7 @@ class RunnerRounds(unittest.TestCase):
         return self._pids()
 
     def _pids(self):
-        return sorted(int(p.name) for p in self.workers.iterdir()) if self.workers.exists() else []
+        return sorted(int(p.name) for p in self.workers.iterdir() if p.name.isdigit()) if self.workers.exists() else []
 
     def lock(self, issue):
         path = self.state / 'inflight' / str(issue)
@@ -189,7 +190,7 @@ class RunnerRounds(unittest.TestCase):
         [pid] = self.worker_pids(expect=1)
         self.assertTrue(alive(pid), 'the fake worker should still be running')
         self.assertIn('PID=%d\n' % pid, self.lock(7) or '', 'live worker lost its lock')
-        manifest = next((self.root / 'docs/drover/runs').glob('*-fixture.md')).read_text()
+        manifest = next((self.root / 'docs/drover/runs').glob('*-repo.md')).read_text()
         self.assertNotIn('reaped stale lock', manifest)
         self.assertEqual(manifest.count('dispatch lane=build issue=#7'), 1, manifest)
         self.assertNotIn(['issue', 'edit', '7', '--remove-assignee', 'bot'], self.calls())
@@ -271,6 +272,31 @@ class RunnerRounds(unittest.TestCase):
         self.assertFalse([c for c in calls if c[:2] in (['pr', 'create'], ['pr', 'close'])])
         [second] = [p for p in self.worker_pids(expect=2) if p != first]
         self.assertIn('Run drover-build on issue #12 ', (self.workers / str(second)).read_text())
+
+    # FR-HRN-4: the worker starts with the harness's permissions and the checked skills.
+    def test_worker_starts_with_harness_permissions(self):
+        self.board({'number': 8, 'status': 'Ready', 'labels': ['bug']})
+        self.run_board(cycles=1)
+        [pid] = self.worker_pids(expect=1)
+        argv = (self.workers / str(pid)).read_text()
+        harness = json.loads((KIT / 'harnesses/claude.json').read_text())['permissions']
+        for flag in (harness['allow_flag'], harness['mode_flag'], harness['deny_flag']):
+            self.assertIn(' %s ' % flag, argv)
+        self.assertNotIn('--add-dir', argv)
+        self.assertIn('Bash(drover:*)', argv)
+        self.assertIn('Bash(true:*)', argv)  # the project's verify command
+        home = '//' + str(KIT).lstrip('/') + '/**'
+        args = (self.workers / ('argv-%d' % pid)).read_text().split('\0')
+        allow = args[args.index(harness['allow_flag']) + 1].split(',')
+        deny = args[args.index(harness['deny_flag']) + 1].split(',')
+        self.assertIn('Read(%s)' % home, allow)  # the install folder is readable ...
+        for tool in ('Edit', 'Write', 'MultiEdit', 'NotebookEdit'):
+            self.assertIn('%s(%s)' % (tool, home), deny)  # ... and never edited
+        self.assertIn('Bash(gh pr merge:*)', deny)
+        self.assertEqual((self.workers / ('env-%d' % pid)).read_text(), 'DROVER_ROLE=build DROVER_ISSUE=8')
+        self.assertIn('Skills for this card', argv)
+        self.assertIn('mattpocock-skills:diagnosing-bugs=' + str(self.root / '.claude/skills/diagnosing-bugs/SKILL.md'), argv)
+        self.assertNotIn('drover-skills-ready', argv)  # no readiness command left for the worker
 
     # NFR-6 measurement: GitHub calls in one round with nothing to do. Prints the
     # call list; asserts only the count measured at the fork point (docs/baseline.md).

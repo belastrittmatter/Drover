@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# drover: the one command on PATH. `drover <command> [args]` runs lib/drover-<command>.sh
+# or .py from the install folder; install.sh links this file into ~/.local/bin.
+# Every command except the setup ones first validates .drover/config.json (FR-CFG-2).
+set -euo pipefail
+
+src="${BASH_SOURCE[0]}"
+while [ -L "$src" ]; do  # follow the ~/.local/bin link (and any chain) to the install folder
+  dir=$(cd -P "$(dirname "$src")" && pwd)
+  src=$(readlink "$src")
+  case "$src" in /*) ;; *) src="$dir/$src" ;; esac
+done
+DROVER_HOME=$(cd -P "$(dirname "$src")/.." && pwd)
+PATH="$DROVER_HOME/bin:$PATH"  # workers and scripts started from here find `drover` too
+export DROVER_HOME PATH
+LIB="$DROVER_HOME/lib"
+
+usage() {
+  cat <<'EOF'
+usage: drover <command> [args]
+
+  onboard [--owner O --number N ...]  write .drover/config.json, git excludes and harness hooks
+  run | stop | status                 the headless runner, its stop, the board summary
+  card | gate | pr-body | github-read | gh-guard | skills-ready | qa-file-bug |
+  review-file-refactor | commit-style | preflight | ...   any lib/drover-<name> script
+  skills install [--dest DIR]         link drover's skills into the harness's user skill folder
+  config path|slug|validate|harness   the project config and harness entries
+  version | help
+EOF
+}
+
+cmd="${1:-help}"
+[ $# -eq 0 ] || shift
+case "$cmd" in
+  help|-h|--help) usage; exit 0 ;;
+  version|--version) tr -d '[:space:]' < "$DROVER_HOME/VERSION"; echo; exit 0 ;;
+  gate|merge-gate)
+    cmd=merge-gate
+    # Only the review lane merges (hooks/guard-merge.py denies it too); the runner sets DROVER_ROLE.
+    if [ -n "${DROVER_ROLE:-}" ] && [ "$DROVER_ROLE" != review ]; then
+      echo "drover: the gate runs only in the review lane (DROVER_ROLE=$DROVER_ROLE)" >&2; exit 77
+    fi ;;
+  onboard) set -- onboard "$@"; cmd=setup ;;
+  skills)
+    [ "${1:-}" = install ] || { echo "usage: drover skills install [--dest DIR]" >&2; exit 64; }
+    shift; exec python3 "$LIB/drover-config.py" skills-install "$@" ;;
+esac
+case "$cmd" in
+  *[!a-z0-9-]*|-*) echo "drover: unknown command '$cmd' (drover help)" >&2; exit 64 ;;
+esac
+
+case "$cmd" in
+  setup|config|settings) ;;  # these write or check the config themselves
+  *) python3 "$LIB/drover-config.py" validate ;;
+esac
+
+if [ -f "$LIB/drover-$cmd.sh" ]; then exec bash "$LIB/drover-$cmd.sh" "$@"; fi
+if [ -f "$LIB/drover-$cmd.py" ]; then exec python3 "$LIB/drover-$cmd.py" "$@"; fi
+echo "drover: unknown command '$cmd' (drover help)" >&2
+exit 64

@@ -20,12 +20,12 @@
 # - Claude Code sets CLAUDECODE=1.
 #
 # ORDER. DROVER_HOST, Codex ids, OPENCODE, CLAUDECODE, then the config's top-level
-# `host` key (--config <file>), else exit 65. A live env sign beats the saved config.
+# `harness` key (--config <file>; older configs: `host`), else exit 65. A live env sign beats the saved config.
 #
 # Usage: drover-host.sh [--config <config.json>]
 #        prints `claude`, `codex` or `opencode`, exit 0
 #        exit 65   no sign: nothing on stdout, how to choose on stderr
-#        exit 64   DROVER_HOST or config `host` is not one of the three
+#        exit 64   DROVER_HOST or config `harness` is not one of the three
 # DROVER_HOST=claude|codex|opencode forces the answer (tests, or a host the check
 # misreads).
 set -euo pipefail
@@ -49,12 +49,12 @@ elif [ -n "${OPENCODE:-}" ]; then
   echo opencode
 elif [ -n "${CLAUDECODE:-}" ]; then
   echo claude
-elif saved=$( [ -f "$config" ] && jq -r '.host // empty' "$config" 2>/dev/null ) && [ -n "$saved" ]; then
+elif saved=$( [ -f "$config" ] && jq -r '.harness // .host // empty' "$config" 2>/dev/null ) && [ -n "$saved" ]; then
   case "$saved" in
     claude|codex|opencode) echo "$saved" ;;
-    *) echo "drover-host.sh: config host must be claude, codex or opencode, got '$saved'" >&2; exit 64 ;;
+    *) echo "drover-host.sh: config harness must be claude, codex or opencode, got '$saved'" >&2; exit 64 ;;
   esac
 else
-  echo "drover-host.sh: unknown agent host. Pick one: DROVER_HOST=claude|codex|opencode, or set \"host\" in the board config" >&2
+  echo "drover-host.sh: unknown agent host. Pick one: DROVER_HOST=claude|codex|opencode, or set \"harness\" in .drover/config.json" >&2
   exit 65
 fi

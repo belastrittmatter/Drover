@@ -78,8 +78,7 @@ closed as not planned (`gh issue close <N> --reason "not planned"`) and moves to
 
 ## Reason tags
 
-The tags are plain text, defined once in `.claude/bin/drover-reasons.json` (pack source
-`scripts/drover-reasons.json`): `tags` maps each tag to what it is for. Read that file and pick
+The tags are plain text, defined once in `lib/drover-reasons.json` (in the drover install folder): `tags` maps each tag to what it is for. Read that file and pick
 the one tag that fits; never invent a tag. `drover status` groups Blocked cards by the tag on
 the `Reason tag:` line, and the planner reads `needs_you` from the same file. A card dropped on
 purpose takes `dropped` (`[dropped]`) and goes to Done, not Blocked.

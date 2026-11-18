@@ -9,8 +9,9 @@
 # of the dispatcher (and every other worker on the same machine) opens to
 # "0 remaining".
 #
-# Usage from a worker:
-#   source scripts/drover-gh-guard.sh
+# Usage from a worker: `drover gh-guard check [min]`, `summary`, `spend [n]` or `budget`.
+# Usage from a script:
+#   source lib/drover-gh-guard.sh
 #   sb_gh_guard_check 200     # sleep until reset if GraphQL remaining < 200
 #   sb_gh_budget_spend 5      # decrement worker-local call budget; halt if 0
 #   sb_gh_guard_summary       # log remaining quota; safe to call frequently
@@ -20,7 +21,9 @@ SB_GH_GUARD_MIN_REMAINING_DEFAULT=200
 SB_GH_GUARD_REST_MIN_REMAINING=500
 SB_GH_GUARD_BUDGET_DEFAULT=150     # per-worker soft cap on gh calls
 SB_GH_GUARD_SUBAGENT_BUDGET=50     # per adversarial-mode sub-agent cap
-SB_GH_GUARD_STATE_FILE="${SB_GH_GUARD_STATE_FILE:-${TMPDIR:-/tmp}/drover-gh-budget-$$}"
+# One budget per worker across separate `drover gh-guard` calls: keyed on the role and
+# issue the runner sets (DROVER_ROLE, DROVER_ISSUE), else on the calling shell's parent.
+SB_GH_GUARD_STATE_FILE="${SB_GH_GUARD_STATE_FILE:-${TMPDIR:-/tmp}/drover-gh-budget-${DROVER_ROLE:-x}-${DROVER_ISSUE:-$PPID}}"
 
 # This file's own path: BASH_SOURCE under bash, the %x prompt escape under zsh.
 if [ -n "${BASH_SOURCE[0]:-}" ]; then _sb_guard_src="${BASH_SOURCE[0]}"; else eval '_sb_guard_src="${(%):-%x}"'; fi
@@ -102,3 +105,15 @@ sb_gh_budget_remaining() {
   [ -f "$SB_GH_GUARD_STATE_FILE" ] || sb_gh_budget_init
   cat "$SB_GH_GUARD_STATE_FILE"
 }
+
+# Run as a command (`drover gh-guard check [min]` / `summary`): no `source` needed,
+# so a headless worker's allowlist covers it with one `drover` rule.
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  case "${1:-}" in
+    check) sb_gh_guard_check "${2:-}" ;;
+    summary) sb_gh_guard_summary ;;
+    spend) sb_gh_budget_spend "${2:-1}" ;;
+    budget) sb_gh_budget_remaining ;;
+    *) echo "usage: drover gh-guard check [min-remaining] | summary | spend [n] | budget" >&2; exit 64 ;;
+  esac
+fi

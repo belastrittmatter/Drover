@@ -21,11 +21,11 @@ exit 8 unless the gate verifies a head-bound approval. `done` stays false for
 compatibility: labels never supply authority. Exit 2 on
 unreadable metadata, so the gate fails safe to "human".
 
-Rules, from references/config-schema.json → merge_policy / migrations:
+Rules, from skills/drover/references/config-schema.json → merge_policy / migrations:
 - merge_policy.default "human" → everything waits for a human.
-- config `host` other than "claude" (codex, opencode) with merge_policy.default
+- config `harness` (older configs: `host`) other than "claude" with merge_policy.default
   unset → everything waits for a human; an explicit "auto" merges as usual.
-  Read from config only (no host detection). No `host` key → the Claude
+  Read from config only (no host detection). No such key → the Claude
   default ("auto"), so configs written before the key existed do not change.
 - merge_policy.auto_max_lines (default 400; 0 = no cap): changed lines
   (additions + deletions) above it → human ("big PR — please review"). Files
@@ -134,7 +134,7 @@ def main() -> int:
 
     policy = cfg.get("merge_policy") or {}
     human = []
-    host = cfg.get("host")
+    host = cfg.get("harness", cfg.get("host"))  # `host` is the pre-drover name
     if (policy.get("default") or "auto") == "human":
         human.append({"category": "default", "why": "merge_policy.default is \"human\""})
     elif not policy.get("default") and host not in (None, "claude"):

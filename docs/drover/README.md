@@ -62,7 +62,7 @@ merge with a hand-off; a card labelled `qa` skips Building.
 Stop at any step: the answers are saved, and the next run shows them and continues. Testing a
 live site with no repo is not a board: `/drover-qa <url>`. The full screen-by-screen contract is
 `skills/drover/references/onboard.md`; the deterministic half is
-`scripts/drover-setup.py`.
+`lib/drover-setup.py`.
 
 **Labels.** Every board has the same seven columns. Three labels route a card: `qa` goes Ready →
 QA → Review → Done (test what exists), `bug` and `feature` go through Building first, and a card
@@ -72,18 +72,17 @@ card dropped on purpose is closed as not planned and moved to Done with a 🤷 c
 ## Setup notes
 
 - Needs Claude Code, `gh` (authenticated for the board's owner), `jq`, bash 3.2+ and Python 3.
-- Or install from a checkout: `./install.sh [--no-hooks] [--protect-main] /path/to/your-project`.
+- Install from a checkout: `./install.sh` links `drover` into `~/.local/bin`; `drover skills install` links the skills into `~/.claude/skills`. Nothing is copied into a project: `drover onboard` writes `.drover/config.json`, the git excludes and the hooks in the untracked `.claude/settings.local.json`.
 - The board is a GitHub Project (v2) with a `Status` field: `Backlog, Ready, Building, QA, Review, Blocked, Done`. `onboard` reuses your best-matching board (adding what is missing, keeping every card) or creates one.
 - Three labels route cards: `qa` skips Building (test what exists), `bug` and `feature` are built first; no label is built too.
-- Default backend is in-session dynamic workflows: turn them on in `/config`. Headless `claude -p` is opt-in (`worker_backend: "claude-p"`).
+- Default backend is in-session dynamic workflows: turn them on in `/config`. The headless runner is `drover run` in a shell (or `/drover run --headless`).
 - Set `verify_commands` in the config. Without them the merge gate cannot prove the result builds, and says so.
-- `onboard` fixes what the board needs without asking (skills, scripts, workflows, guards, settings, old folders, config keys) and asks only to install a system tool or sign in. An older drover is upgraded in place.
+- `onboard` fixes what the board needs without asking (skill links, guard hooks, old in-project copies, config keys) and asks only to install a system tool or sign in. An older drover is upgraded in place.
 - `onboard` asks once what the robot may do: auto-merge normal changes up to 400 changed lines (money, auth, destructive schema like DROP/TRUNCATE/RENAME, and bigger PRs wait for you; additive migrations run only on the databases you allow, never live), protect main, and which databases it may migrate (default test + staging). Anything only you may run lands in Blocked tagged 🙋 with the exact command; comment `done` and the next wave merges.
-- Auto-merge needs the merge-gate and `gh pr merge` lines in your allowlist; `onboard` offers them as a diff.
-- Plugin install: the command is `/drover:drover onboard`, and its 🔍 Checks step installs the missing scripts, workflows and hooks.
+- In-session runs need `Bash(drover:*)` in your allowlist; `onboard` offers it as a diff. Headless workers get their permissions from `harnesses/claude.json`.
 - Bug sources take any extra source in onboard — a link, app name, API URL, MCP server or command — proven readable (read-only) before it is saved; `/drover-collect` runs it like the built-ins.
 - Testing a live site with no repo is not a board: `/drover-qa <url>` runs on its own.
-- To enable the usage check, add `printf '%s' "$input" | bash <repo>/.claude/bin/drover-usage.sh record` to your status-line script.
+- To enable the usage check, add `printf '%s' "$input" | drover usage record` to your status-line script.
 - Cards need acceptance criteria: QA grades against them, and `lint` tells you which are missing.
 
 ## Skills
@@ -103,13 +102,12 @@ card dropped on purpose is closed as not planned and moved to Done with a 🤷 c
 
 Lane lifecycles are identical in both.
 
-| | `workflow` (default since 1.6.0) | `claude-p` (opt-in) |
+| | `workflow` (default of `/drover run`) | headless runner (`drover run`) |
 |---|---|---|
 | Runs as | in-session dynamic workflow waves | headless `claude -p` workers |
-| Needs | dynamic workflows on in `/config` | nothing extra |
-| Reference | `skills/drover/references/run-workflow.md` | `scripts/drover-run.sh` |
+| Needs | dynamic workflows on in `/config` | `harnesses/<harness>.json` (permissions passed at worker start) |
+| Reference | `skills/drover/references/run-workflow.md` | `lib/drover-run.sh` |
 
-The legacy dispatcher refuses to run (exit 78) unless the config sets it.
 
 **Stop and resume.** `/drover stop` posts a "stopped mid-flight" comment on every in-flight
 issue and PR (lane, last commit, resume hint), releases the assignee mutex, and kills workers and
@@ -208,10 +206,10 @@ equivalents: a wave lock that keeps the two backends from running at once, assig
 crash-recovery sweep of leaked assignees, the rate guard and the usage guard
 (`references/run-workflow.md`).
 
-Guard hooks, installed by `install.sh` unless `--no-hooks`: worktrees only under
+Guard hooks, wired by `drover onboard` unless `--no-hooks`: worktrees only under
 `.drover/worktrees/`, no reading of secret files, no API keys written into source, no deleting
 outside the project, and merged-worktree cleanup at session start. Blocking direct and force pushes
-to the base branch is opt-in (`onboard` asks once, or `install.sh --protect-main`). See
+to the base branch is on by default, and `guard-merge.py` keeps every merge inside the gate. See
 `hooks/README.md`.
 
 **Who merges, and which databases the robot touches** (v2.6.0, config `merge_policy` and
@@ -237,30 +235,31 @@ the robot runs them on the databases you allowed. A live database is always your
 
 ## Configuration
 
-Minimal config at `.claude/drover/configs/<slug>.json`:
+Minimal config at `.drover/config.json` (one per repo; schema: `skills/drover/references/config-schema.json`):
 
 ```json
 {
-  "worker_backend": "workflow",
   "project": { "owner": "your-gh-login-or-org", "number": 12 },
   "base_branch": "main",
   "human_approves_merge": false,
   "verify_commands": ["npm ci --silent && npm run typecheck && npm test"],
   "rebuild_cap": 2,
-  "notifications": { "bot_identity": "your-bot-login" }
+  "notifications": { "bot_identity": "your-bot-login" },
+  "evidence": { "mode": "branch", "branch": "drover-evidence" }
 }
 ```
 
 ```
-  worker_backend        workflow | claude-p
+  harness               claude (harnesses/<name>.json)
+  roles, labels         skill routing: roles.<role>.skills + labels.<label>.<role> + the issue's Skills: line
   columns               Backlog · Ready · Building · QA · Review · Blocked · Done (always all seven)
   human_approves_merge  legacy: true = never auto-merge (prefer merge_policy.default "human")
   merge_policy          default auto|human · auto_max_lines (400) · size_exclude · always_human {money, auth, schema}
   migrations            globs · allowed_envs (test, staging, live) · target_env · commands
   verify_commands       run by the merge gate against the current base before every merge
   rebuild_cap           bounces allowed before a card goes Blocked
-  max_workers           optional wave throttle; absent or 0 = unlimited (claude-p defaults to 3)
-  tick_seconds          claude-p GraphQL budget floor, default 120
+  roles.<role>.max_workers  workers per role, default 1
+  tick_seconds          headless runner GraphQL budget floor, default 120
   usage_pause_pct       pause new waves at this % of the Claude usage window, default 95
   refine, collect       optional blocks for ui-refine-loop and drover-collect (collect.custom = extra sources)
 ```
@@ -330,11 +329,13 @@ Missing, unreadable or stale evidence is a hold for a person, never a pass.
 ```
   skills/<name>/   SKILL.md (agent prompt) · README.md · references/ · scripts/
   workflows/       drover-wave.js, ui-refine-loop.js
-  scripts/         dispatcher, planner, merge gate, usage check, filers
+  bin/drover       the entry point: drover <command> runs lib/drover-<command>
+  lib/             dispatcher, planner, merge gate, usage check, filers, config
+  harnesses/       one file per worker harness (claude)
   hooks/           guard hooks, cleanup-wt, settings snippets
   tests/           bash/python tests, no network: bash tests/test-*.sh
 ```
 
-The minimal `.claude-plugin/plugin.json` exists for plugin installs;
-`install.sh` stays the install path. The full lane-to-skill mapping, including the skills kept
+The minimal `.claude-plugin/plugin.json` is a leftover;
+`install.sh` is the install path. The full lane-to-skill mapping, including the skills kept
 because Matt's pack has no equivalent, is in `skills/drover-build/references/decision-policy.md`.

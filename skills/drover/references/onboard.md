@@ -3,12 +3,13 @@
 Config schema and field notes: `config-schema.json`. Loaded by `SKILL.md` for `drover onboard`.
 
 **Where it runs:** the current Claude Code session, in the user's folder. Not headless.
-Invoked as `/drover onboard` (install.sh) or `/drover:drover onboard`
-(plugin install — skill names carry the plugin prefix).
+Invoked as `/drover onboard`. Needs `drover` on PATH (`./install.sh` from a drover checkout) and
+the skills linked (`drover skills install`). Its writer is the CLI `drover onboard`; the project
+gets exactly one tracked file, `.drover/config.json` (FR-CFG-1).
 
 ## Host-visible skill checks
 
-Checks use `.claude/bin/drover-skills-ready.py --profile setup --host
+Checks use `drover skills-ready --profile setup --host
 <claude|codex>` and show `helper_readiness`: exact files, declared fallbacks,
 optional skips and missing names. Setup checks the unconditional union; a
 selected card may need fewer helpers. Node or `skills-lock.json` never proves
@@ -19,7 +20,7 @@ Cloudflare's `security-audit` is an optional QA entry (no lane runs it): when `s
 `fix` runs `npx -y skills@latest add cloudflare/security-audit-skill --skill security-audit`
 (same `--no-helpers` rule); `skills-lock.json` listing it, or a resolved file, skips that.
 A failed download is a note, never a red check. The bundled `pr-security-review` is a pack
-skill: install.sh ships it and the QA lane requires it.
+skill: `drover skills install` links it and the QA lane requires it.
 A host plugin inventory may be supplied with `--catalog <active-skills.json>`;
 only enabled entries applying to this project count.
 
@@ -31,25 +32,24 @@ only enabled entries applying to this project count.
 | Minimal text | what it found in one line, then the question. Details go in an option's description or one dim line under it — never a paragraph |
 | Recommended first | every question puts its recommended option FIRST, labelled `(Recommended)`, so Enter takes it |
 | One tool | ask with `AskUserQuestion` (≤ 4 questions per call, ≤ 4 options per question; the built-in "Other" box is the free-text option). NEVER free-text a choice that has options |
-| Fix, don't ask | a must-have (skills, scripts, workflows, guard hooks, settings entries, old folders, config keys, labels, columns) is fixed with NO question and listed under "Fixed for you". Only system tools and sign-ins are asked — through Claude Code's own permission prompt on the exact command |
+| Fix, don't ask | a must-have (skill links, guard hooks, old in-project copies, old folders, config keys, labels, columns) is fixed with NO question and listed under "Fixed for you". Only system tools and sign-ins are asked — through Claude Code's own permission prompt on the exact command |
 | Save as you go | every answer is written to `.claude/drover/onboard-answers.json` the moment it is given |
-| Write once | files in the repo (config, settings.json allow lines, docs) change only at step 7, after "Write everything". GitHub-side actions the user just picked (create or extend the board, create `staging`) run in their own step |
-| Secrets | NEVER read, grep, cat or source a dotenv file. Key names only, via `.claude/bin/drover-env-check.sh` |
+| Write once | `.drover/config.json` and the untracked `.claude/settings.local.json` change only at step 7, after "Write everything". GitHub-side actions the user just picked (create or extend the board, create `staging`) run in their own step |
+| Secrets | NEVER read, grep, cat or source a dotenv file. Key names only, via `drover env-check` |
 
-**Scripts.** `SB=.claude/bin` after an install. Plugin install before step 1 has run: the plugin's
-own copy, `PACK=$(dirname "$(find ~/.claude/plugins -path '*drover*' -name install.sh -not -path
-'*/node_modules/*' 2>/dev/null | head -1)")`, `SB=$PACK/scripts`. `$PACK` empty → `Can't find the
-drover plugin files. Run ./install.sh <this-dir> from a checkout,
-then re-run onboard.`
+**Scripts.** Every script runs as `drover <command>` from the install folder; nothing is copied
+into the project. `drover` not on PATH → `drover isn't installed. Run ./install.sh from a drover
+checkout, then re-run onboard.`
 
 | Script | Used in |
 |---|---|
-| `python3 $SB/drover-setup.py check / fix --text` | 1 Checks |
-| `python3 $SB/drover-setup.py board-rank / board-migrate / names` | 1 (upgrade), 3 Board |
-| `python3 $SB/drover-setup.py branch` | 4 Branch |
-| `python3 $SB/drover-commit-style.py --base <base>` | 4 Branch (commit style, no question) |
-| `python3 $SB/drover-settings.py allow … --dry-run` | 5 Policies |
-| `python3 .claude/skills/drover-collect/scripts/collect_custom.py classify / ping / add` | 6 Bug sources |
+| `drover setup check / fix --text` | 1 Checks |
+| `drover setup board-rank / board-migrate / names` | 1 (upgrade), 3 Board |
+| `drover setup branch` | 4 Branch |
+| `drover commit-style --base <base>` | 4 Branch (commit style, no question) |
+| `drover settings allow … --dry-run` | 5 Policies |
+| `drover onboard --from <staged> …` | 7 Review (the only config writer) |
+| `python3 ~/.claude/skills/drover-collect/scripts/collect_custom.py classify / ping / add` | 6 Bug sources |
 
 ---
 
@@ -111,14 +111,14 @@ the step-7 table, then "Onboard found an existing setup. What now?" [Keep all �
 
 ## The answers file
 
-`.claude/drover/onboard-answers.json` (gitignored — step 7 adds it):
+`.claude/drover/onboard-answers.json` (untracked — step 7 excludes `.claude/drover/`):
 
 ```json
 { "version": 2, "updated": "<iso>", "last_step": "policies",
   "answers": { "github": {"login": "my-org", "remote": "github.com/my-org/my-app"},
                "board": {"owner": "my-org", "number": 4, "title": "Ledgerly Roadmap", "reused": true},
                "base_branch": "staging",
-               "policies": {"merge_default": "auto", "protect_main": true, "allowed_envs": ["test", "staging"]},
+               "policies": {"merge_default": "auto", "allowed_envs": ["test", "staging"]},
                "permissions": "add", "collect": ["sentry", "github", "prs", "architecture", "linear"],
                "custom": [{"name": "linear", "kind": "mcp", "target": "linear"}] } }
 ```
@@ -131,13 +131,13 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
 
 ```
 0. SILENT DETECT (no questions, nothing printed but the start screen)
-   ├─ answers file, .claude/drover/configs/*.json → resume / re-run screens
-   ├─ manifests + README (board names), branches + deploy signals ($SB/drover-setup.py branch)
+   ├─ answers file, .drover/config.json (or an older .claude/drover/configs/*.json) → resume / re-run screens
+   ├─ manifests + README (board names), branches + deploy signals (drover setup branch)
    ├─ migration dirs (supabase/migrations, prisma/migrations, drizzle, **/migrations/*.sql,
    │    db/migrate, alembic/versions) and migrate scripts in the manifest (db:migrate, …)
    ├─ collect signals: Sentry (@sentry/* / sentry-sdk in manifests, Sentry.init(, .sentryclirc),
    │    PostHog (posthog-js / posthog-node / posthog, posthog.init(, NEXT_PUBLIC_POSTHOG_* names);
-   │    key names: bash $SB/drover-env-check.sh SENTRY_AUTH_TOKEN POSTHOG_PERSONAL_API_KEY
+   │    key names: drover env-check SENTRY_AUTH_TOKEN POSTHOG_PERSONAL_API_KEY
    ├─ verification commands: preserve valid `verify_commands`; otherwise inspect the owning
    │    project's documented checks and stage those commands. Unresolved checks are a setup
    │    halt. Never save placeholders or invent a universal runner.
@@ -149,18 +149,18 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
       's#.*zoneinfo/##', else timedatectl show -p Timezone --value, else "UTC". Shown at step 7.
 
 1. CHECKS — nothing asked except system tools and sign-ins
-   ├─ python3 $SB/drover-setup.py fix --host <actual-worker-host> --text
+   ├─ drover setup fix --host <actual-worker-host> --text
    │    Fixes with NO question, backed up first to .claude/drover/backup/<ts>/:
-   │    skills, .claude/bin scripts, workflows, guard hooks + settings.json entries (runs the
-   │    pack's install.sh), removes old skill folders (super-refine, cleanup-wt, arch-loop),
+   │    skill links in ~/.claude/skills (`drover skills install`), guard hooks in the untracked
+   │    .claude/settings.local.json, removes what an older drover copied into the project
+   │    (.claude/ and .agents/ skills, bin, workflows, hooks, its .claude/settings.json hook
+   │    entries) and old skill folders (super-refine, cleanup-wt, arch-loop),
    │    migrates every config to the v3 keys, git init, Matt Pocock's helper skills and
    │    Cloudflare's optional security-audit skill (Node present).
    ├─ Print its list exactly, one ✓ per line:
    │      Fixed for you:
-   │        ✓ drover skills and scripts installed
-   │        ✓ board engine (workflow) installed
+   │        ✓ drover skills linked into ~/.claude/skills
    │        ✓ 6 safety guards switched on
-   │        ✓ settings.json entries added (backup kept)
    │        ✓ git repo found
    │        ✓ security-audit skill installed (optional, run on demand)
    ├─ Each `needs` item (a system tool): one line, then run its `command` with Bash — Claude
@@ -176,20 +176,20 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    ├─ Re-check (`check --text`) after every install; move on only when it says all green.
    ├─ Workflow runtime: syntax-check the installed workflow (same command run.md uses):
    │      { echo '(async function(){'; sed 's/^export const meta/const meta/' \
-   │        .claude/workflows/drover-wave.js; echo '})'; } | node --check --input-type=module
-   │    Fails → fix re-copies it; still failing → halt (error table). Remind once: dynamic
+   │        "$(drover config home)/workflows/drover-wave.js"; echo '})'; } | node --check --input-type=module
+   │    Fails → halt (error table). Remind once: dynamic
    │    workflows must be ON in /config.
    └─ OLDER DROVER (the result says `upgraded: true`): same rule, no question. Header
       `1 of 7 · Checks — found drover v<from>; upgrading to v<pack>.` and the list:
           Upgraded for you (backup: .claude/drover/backup/<ts>/)
             ✓ skills updated; added drover-collect, visual, git-sync, ui-refine-loop, pr-security-review
             ✓ removed old folders: super-refine, cleanup-wt, arch-loop
-            ✓ scripts, board engine and safety guards updated
-            ✓ config moved to the new keys (merge rule, migrations, sources)
+            ✓ removed 31 files an older drover copied into the project
+            ✓ config moved to .drover/config.json (from .claude/drover/configs/<slug>.json)
             ✓ labels mapped: build→feature · bug-fix→bug · qa-only→qa (14)
             ✓ Skipped column: 4 cards moved to Done, column removed
             ✓ re-checked: all green
-      The two board lines come from `python3 $SB/drover-setup.py board-migrate --config
+      The two board lines come from `drover setup board-migrate --config
       <config>` — run it here when `gh auth status` already has the project scope, else in
       step 3 (it then prints them there). It adds missing columns, creates qa · bug · feature,
       maps old labels, labels every card `qa` on a board that was "qa-only", moves Skipped
@@ -229,9 +229,9 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    ├─ One checklist line, one labels line, no question about either:
    │      Columns: ✓ Backlog ✓ Ready ✓ Building ✓ QA ✓ Review ✓ Blocked ✓ Done
    │      Labels: feature · bug · qa (qa skips Building; no label = feature)
-   ├─ python3 $SB/drover-setup.py board-rank --owner <owner>   (boards ranked by matching
+   ├─ drover setup board-rank --owner <owner>   (boards ranked by matching
    │    columns; `recommend` = the best with ≥ 4 of 7)
-   │  python3 $SB/drover-setup.py names                         (two names from
+   │  drover setup names                         (two names from
    │    package.json / README / folder)
    ├─ AskUserQuestion "Which board?" (header "Board"):
    │    • Use <title> (#<n>) — <m> of 7 columns match, I'll add <missing> (Recommended)
@@ -249,7 +249,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    Second account chosen in step 2 → finish references/second-account.md now; verify bot access.
 
 4. BRANCH
-   ├─ python3 $SB/drover-setup.py branch → one line:
+   ├─ drover setup branch → one line:
    │      Found: main (deploys to production via Vercel), no staging.
    ├─ AskUserQuestion "Where should finished work merge?" (header "Branch"):
    │    no staging:   • Create staging from main (Recommended) — "nothing goes live until you
@@ -257,9 +257,14 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │                  • main — every merge goes live (or just "main" with no deploy signal)
    │    staging found: • staging (Recommended) — already exists · • main — every merge goes live
    ├─ Create staging → Bash(git push origin main:staging) right away (the pick is the OK).
-   ├─ Commit style, no question: python3 $SB/drover-commit-style.py --base <base> → stage its
+   ├─ Commit style, no question: drover commit-style --base <base> → stage its
    │    `commit_style` (conventional, bracket-tag, plain or other; fewer than 10 commits or no
    │    clear majority gives conventional). Shown at step 7.
+   ├─ Evidence (FR-EVD-1), AskUserQuestion "Where should QA screenshots and logs go?" (header "Evidence"):
+   │    • An orphan branch, drover-evidence (Recommended) — "the PR diff stays clean; images show
+   │      inline through SHA-pinned links" · • The PR branch, under docs/drover/evidence — "the
+   │      images are part of the PR". "Other" = a branch name or a folder. Staged as `evidence`
+   │      ({mode: branch, branch} or {mode: pr, path}); step 7 passes it as `--evidence`.
    └─ main kept with a deploy signal → step 5 defaults to "you merge everything", target_env "live".
 
 5. POLICIES — ONE AskUserQuestion call, two questions; details folded
@@ -270,24 +275,20 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
         migrate test + staging")
       • Review each
    Q2 header "Permissions", "Let it run its commands without asking each time?"
-      • Yes, add <N> lines to settings.json (Recommended)
+      • Yes, add <N> lines to settings.local.json (Recommended)
       • No, ask me each time
    Folded details = ONE dim line under each, never a table:
       merge_policy.default auto · always_human: money, auth, schema · push guard on (main, master,
       <base>) · migrations.allowed_envs: test, staging
       + Bash(gh project:*) + Bash(gh issue:*) + Bash(gh pr:*) + … (the --dry-run output, joined)
-   Review each → ONE more AskUserQuestion call, up to three questions:
+   Review each → ONE more AskUserQuestion call, up to two questions (the push guard is always on):
     a. "Merge" — "Who merges a change that passes review?" [Robot merges normal changes
        (Recommended) / I merge everything]; production base: the order flips, and robot-merges
        sets merge_policy.allow_auto_on_production: true (run.md's guard needs it).
        → merge_policy.default "auto" | "human"; auto_max_lines 400 (lockfiles, generated,
          snapshots, migration SQL not counted); always_human = schema defaults (money, auth,
          destructive schema). A matching PR parks in Blocked with `[needs-you]`.
-    b. "Push guard" — "Block pushing straight to main?" [Yes (Recommended for a repo with
-       commits) / No]. Skipped when settings.json already wires guard-protected-push.py. Script
-       missing (--no-hooks install) → record the answer and say: "Run ./install.sh --no-hooks
-       --protect-main <this-dir> — it installs only this guard."
-    c. "Databases" (multiSelect, only when migration dirs exist) — "Which databases may the robot
+    b. "Databases" (multiSelect, only when migration dirs exist) — "Which databases may the robot
        migrate?" [test (Recommended) / staging (Recommended) / live] → migrations.allowed_envs;
        target_env "live" on a production base, else "staging"; commands from the manifest's
        migrate scripts (ask only for a missing one). A command needing a DB URL resolves it
@@ -297,11 +298,11 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
        failure is fixed here, not discovered at the first merge. For Supabase the URL is the
        Session pooler string (port 5432) with special characters in the password URL-encoded,
        and a just-reset password takes ~20 s to reach the pooler — retry once before calling it wrong.
-   Permission lines: the base list in run-workflow.md → "Mid-run permission prompts", plus the
-   merge lines when merge_policy.default is "auto" ("Bash(bash .claude/bin/drover-merge-gate.sh:*)",
-   "Bash(gh pr merge:*)"), one "Bash(<migrate command>)" per allowed env, "Bash(bash
-   .claude/bin/drover-env-check.sh:*)" and the test runner. N counts what is NOT already in
-   settings.json: `drover-settings.py allow .claude/settings.json <rules…> --dry-run`.
+   Permission lines (in-session runs; headless workers get theirs from harnesses/claude.json):
+   the base list in run-workflow.md → "Mid-run permission prompts" (`Bash(drover:*)` covers every
+   drover command, the gate included), plus "Bash(gh pr merge:*)" when merge_policy.default is
+   "auto", one "Bash(<migrate command>)" per allowed env and the test runner. N counts what is NOT
+   already in settings.local.json: `drover settings allow .claude/settings.local.json <rules…> --dry-run`.
 
 6. BUG SOURCES — tick sources; "Add another source" is the free-text box
    ├─ AskUserQuestion multiSelect "Where should I look for problems?" (header "Bug sources"):
@@ -315,7 +316,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    Missing key → the exact .env line to add (name only) + scopes: Sentry `event:read
    │    project:read`; PostHog personal key `query:read error_tracking:read`. PostHog failure
    │    events: grep capture() calls for *_failed / *_error, propose them, user confirms.
-   ├─ "Add another source" text → C=.claude/skills/drover-collect/scripts/collect_custom.py
+   ├─ "Add another source" text → C=~/.claude/skills/drover-collect/scripts/collect_custom.py
    │    python3 $C classify "<text>" → kind mcp | http | cli (an app name resolves to one)
    │    python3 $C ping --kind <k> --target <t> [--auth-env <E>] --name <n>   (read-only)
    │      mcp → status "agent": call that server's read/list tool yourself, limit 1, read-only;
@@ -324,8 +325,8 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    fails → say why in one line (401 → the token name to add to .env); never saved; re-test by
    │         typing it again.
    ├─ Ping each built-in, read-only, before step 7:
-   │      python3 .claude/skills/drover-collect/scripts/collect_sentry.py  --config <staged> ping
-   │      python3 .claude/skills/drover-collect/scripts/collect_posthog.py --config <staged> ping
+   │      python3 ~/.claude/skills/drover-collect/scripts/collect_sentry.py  --config <staged> ping
+   │      python3 ~/.claude/skills/drover-collect/scripts/collect_posthog.py --config <staged> ping
    │      gh api graphql -f query='{viewer{login}}'          (github, prs)
    └─ One result block, one line per source; a failure leaves that source out, never halts:
           ok: linear — can read issues (12 open bugs); saved in this project's config
@@ -344,25 +345,25 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    ├─ AskUserQuestion "Write everything?" (header "Save") [Write everything (Recommended) /
    │    Change one thing → pick the step, walk only it, back here / Cancel — nothing written].
    ├─ Write, in order (each atomic; stop and report on the first failure — answers are kept):
-   │    ├─ .claude/drover/configs/<slug>.json (committed): description, project, target
-   │    │    {type: repo | repo+url}, repo, base_branch, timezone, commit_style, columns (the seven), labels,
-   │    │    paths, merge_policy, migrations, collect (incl. custom), notifications {channel:
-   │    │    "session", bot_identity}, worker_backend "workflow", host (always: `bash $SB/drover-host.sh`;
-   │    │    on exit 65 ask claude/codex/opencode), verify_commands (non-blank project checks). No `variant`.
-   │    ├─ .claude/drover/active ← <slug>
-   │    ├─ .gitignore += .claude/drover/active, onboard-answers.json, onboard-staged/,
-   │    │    backup/, inflight/, migrations/, upgrade.json (all under .claude/drover/)
-   │    ├─ settings.json: drover-settings.py allow … ; protect main →
-   │    │    drover-settings.py hooks .claude/settings.json <pack>/hooks/settings-protect-main.json
-   │    ├─ staged project verifier skill/map/scenarios/runner, if source-backed; then
-   │    │    inspect the saved map and resolve the local skill for the actual host.
-   │    └─ docs/agents/issue-tracker.md (a `## Ticket format` section from
-   │       references/ticket-format.md: create, or replace only that section);
-   │       docs/drover/PROJECT.md (a sub-agent drafts it from
-   │       manifests + README + tree, no question; listed in the table as "PROJECT.md drafted")
+   │    ├─ the staged config → .claude/drover/onboard-staged/config.json: description, project,
+   │    │    target {type: repo | repo+url}, repo, base_branch, timezone, merge_policy, migrations,
+   │    │    collect (incl. custom), notifications {channel: "session", bot_identity},
+   │    │    verify_commands (non-blank project checks). No `variant`, no `host`.
+   │    ├─ drover onboard --from .claude/drover/onboard-staged/config.json --evidence <branch[:name]|pr:path>
+   │    │    — the only writer of .drover/config.json (committed): it keeps every
+   │    │    key already set, adds `harness` (claude), the starting skill routing (`roles`,
+   │    │    `labels`), the detected `commit_style`, validates against config-schema.json and
+   │    │    writes nothing on a failure (it names the field). It also adds .drover/runs/,
+   │    │    .drover/worktrees/, .claude/settings.local.json* and .claude/drover/ to
+   │    │    .git/info/exclude and merges the guard hooks into .claude/settings.local.json.
+   │    ├─ settings.local.json: drover settings allow .claude/settings.local.json … (when picked)
+   │    └─ staged project verifier skill/map/scenarios/runner, if source-backed; then
+   │       inspect the saved map and resolve the local skill for the actual host.
+   │    No other tracked file: no .gitignore lines, no docs/agents/issue-tracker.md, no
+   │    docs/drover/PROJECT.md (paths.project_md stays null unless the owner points it at one).
    └─ Delete onboard-staged/; keep the answers file (re-runs use it).
 
-DONE — run `python3 $SB/drover-verification-ready.py --config <saved config>`;
+DONE — run `drover verification-ready --config .drover/config.json`;
       exit 9 reports setup incomplete (repair checks before run; do not reinstall/rebase).
       Then self-check, then the ONE place that names the next command:
       Bash(self-check)  ⎿  all good
@@ -382,11 +383,11 @@ answers are kept and it resumes at <step>".
 
 | Step | Failure | What the user sees |
 |---|---|---|
-| 1 | Pack files not found (plugin) | `Can't find the drover plugin files. Run ./install.sh <this-dir> from a checkout, then re-run onboard.` |
+| 1 | `drover` not on PATH | `drover isn't installed. Run ./install.sh from a drover checkout, then re-run onboard.` |
 | 1 | A tool install declined (git, gh) | `Without <tool> the board can't <why>. Your answers are saved — run <command>, then re-run onboard.` |
 | 1 | Node declined, or `npx skills add` fails | `Required worker skills remain unavailable: <exact names>. Install for <host> and restart.` Setup stays red; dispatch halts before claims. |
-| 1 | Workflow still fails `node --check` after the re-copy | `.claude/workflows/drover-wave.js is corrupt. Re-run ./install.sh <this-dir> — don't hand-edit it.` |
-| 1 | settings.json invalid JSON | `.claude/settings.json is not valid JSON; I left it untouched. Fix it, then re-run — only the settings entries repeat.` |
+| 1 | Workflow fails `node --check` | `workflows/drover-wave.js in the drover install folder is corrupt. Run git pull there — don't hand-edit it.` |
+| 1 | settings.local.json invalid JSON | `.claude/settings.local.json is not valid JSON; I left it untouched. Fix it, then re-run — only the settings entries repeat.` |
 | 2 | Scope refused in the browser | `GitHub asked for project,read:project,repo and you said no. Without them I can't read or move cards. Re-run: gh auth refresh -s project,read:project,repo.` |
 | 2 | Repo create refused | `GitHub refused to create the repo (org admin required, or the free-repo quota). Pick an existing repo, or create one in the web UI, then re-run.` |
 | 3 | Org project denied | `You can't create projects under <org>. Ask an org admin, or use your account: gh project create --owner @me.` |
@@ -416,15 +417,16 @@ remove a pending recovery record; use its saved state to reconcile a conflict be
 
 ## Worker self-check (mandatory before the completion screen)
 
-1. **Config validates** — `.claude/drover/configs/<slug>.json` parses, has every required
-   field from `config-schema.json` (incl. `notifications.bot_identity`, `merge_policy`,
-   `migrations`), has no `variant`, and `columns` is the seven.
-2. **Active pointer** — `.claude/drover/active` holds exactly the slug + `\n`.
+1. **Config validates** — `drover config validate` exits 0 on `.drover/config.json` (the JSON
+   schema `config-schema.json`: required `project`, no removed key such as `variant`,
+   `worker_backend` or `host`), and `columns` is the seven.
+2. **One tracked file** — `git status --porcelain` lists `.drover/config.json` and nothing else
+   that onboard wrote.
 3. **Board columns and labels** — `gh project field-list <n> --owner <o>` returns Backlog, Ready,
    Building, QA, Review, Blocked, Done (no Skipped); `gh label list` has qa, bug, feature.
-4. **Setup green** — `python3 .claude/bin/drover-setup.py check` exits 0 (or only `needs`
+4. **Setup green** — `drover setup check` exits 0 (or only `needs`
    the user declined).
-5. **Workflow runtime** — unless `worker_backend` is `"claude-p"`, the step-1 `node --check` passes.
+5. **Workflow runtime** — the step-1 `node --check` passes.
 
 Any check fails → no completion screen: name the failed check and say "re-run `/drover onboard` — it resumes there".
 

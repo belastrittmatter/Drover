@@ -10,7 +10,7 @@
 # after their blockers had closed.
 set -euo pipefail
 cd "$(dirname "$0")"
-PLAN="../scripts/drover-wave-plan.sh"
+PLAN="../lib/drover-wave-plan.sh"
 CFG=fixtures/wave-config.json
 ITEMS=fixtures/wave-items.json
 DEPS=fixtures/wave-deps.json
@@ -20,7 +20,7 @@ plan() { "$PLAN" --config "$1" --items "$ITEMS" --deps "$DEPS"; }
 
 # Uncapped is the default shape, so every scenario runs without a cap unless it
 # is specifically testing the throttle.
-NOCAP=$(jq 'del(.max_workers)' "$CFG")
+NOCAP=$(jq '.roles = {build: {max_workers: 99}, qa: {max_workers: 99}, review: {max_workers: 99}}' "$CFG")
 OUT=$(plan <(echo "$NOCAP"))
 
 # 1 — width follows the graph, not a knob. Free Ready cards are #12 alone:
@@ -61,11 +61,14 @@ echo "$OUT" | jq -e '.sweep[0].clearedBy == [9]' >/dev/null \
 echo "$OUT" | jq -e '[.cards[].number] | index(16) == null' >/dev/null \
   || fail "#16 must be swept, not dispatched from Blocked"
 
-# 7 — max_workers still throttles when set. It is a safety valve now, not the
-#     wave-sizing mechanism.
-OUT7=$(plan <(jq '.max_workers = 1' "$CFG"))
-echo "$OUT7" | jq -e '(.cards | length) == 1 and .cards[0].number == 10' >/dev/null \
-  || fail "max_workers=1 should keep only the leading in-flight card, got: $OUT7"
+# 7 — roles.<role>.max_workers caps each lane (default 1): with no roles set, every lane
+#     keeps one card, in downstream-first order.
+OUT7=$(plan <(jq 'del(.roles)' "$CFG"))
+echo "$OUT7" | jq -e '[.cards[].number] == [10,13,12]' >/dev/null \
+  || fail "default caps of 1 per lane should keep one card per lane, got: $OUT7"
+OUT7B=$("$PLAN" --config <(jq 'del(.roles)' "$CFG") --items fixtures/wave-items-review-heavy.json --deps "$DEPS")
+echo "$OUT7B" | jq -e '[.cards[] | select(.status == "Review")] | length == 1' >/dev/null \
+  || fail "roles.review.max_workers 1 keeps one review, got: $OUT7B"
 
 # 8 — the throttle does not suppress the sweep. A capped wave still frees cards,
 #     because sweeping is a board correction and costs no worker.

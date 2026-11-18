@@ -12,7 +12,7 @@ export const meta = {
 }
 
 // args = {
-//   configPath: '.claude/drover/configs/<slug>.json',
+//   configPath: '.drover/config.json',
 //   cards: [{ number, status, title, lane, labels }],  // output of drover-wave-plan.sh
 //     lane: 'build' | 'qa' | 'review' — a Ready card labelled `qa` has lane 'qa'
 //     and skips the Builder; every other Ready card is built first (v3.0.0).
@@ -41,9 +41,9 @@ if (input.tier && !['low', 'medium', 'high'].includes(input.tier)) {
 }
 
 let halted = false
-// Valid form per --kind, from validate() in scripts/drover-github-read.py (#32).
+// Valid form per --kind, from validate() in lib/drover-github-read.py (#32).
 const READ_SHAPES = [
-  `Read shapes (helper: .claude/bin/drover-github-read.py --kind <kind> -- <gh args>):`,
+  `Read shapes (helper: drover github-read --kind <kind> -- <gh args>):`,
   `- issue title+body: --kind issue -- issue view <N> --json number,title,body`,
   `- issue comments: --kind comments -- api repos/{owner}/{repo}/issues/<N>/comments --paginate --slurp (zero comments = [[]])`,
   `- other JSON, incl. maybe-empty lists: --kind json -- <gh args> (no --jq that prints a plain string)`,
@@ -53,7 +53,7 @@ const READ_SHAPES = [
   `- issue state: --kind state -- issue view <N> --json state --jq .state`,
   `A read whose output misses its shape exits 64 for that call only and prints the valid form: fix the read, do not halt.`,
 ].join('\n')
-const READ_FAILURE = READ_SHAPES + '\n' + `Verification-readiness exit 9 means missing/unusable config.verify_commands: preserve card/worktree/approval/claims, report status=halted (preflight verdict=halted), stop dispatch, repair project configuration before explicit restart; no Build bounce or automatic retries. ` + `Required GitHub reads use .claude/bin/drover-github-read.py: three total attempts, exit 79 means run halted. Check --check before any GitHub write, migration, or merge. On exit 79 preserve worktree/card/approval/claims, make no more GitHub calls, and report status=halted (preflight verdict=halted). Never retry a mutation. Config: ${input.configPath}.`
+const READ_FAILURE = READ_SHAPES + '\n' + `Verification-readiness exit 9 means missing/unusable config.verify_commands: preserve card/worktree/approval/claims, report status=halted (preflight verdict=halted), stop dispatch, repair project configuration before explicit restart; no Build bounce or automatic retries. ` + `Required GitHub reads use drover github-read: three total attempts, exit 79 means run halted. Check --check before any GitHub write, migration, or merge. On exit 79 preserve worktree/card/approval/claims, make no more GitHub calls, and report status=halted (preflight verdict=halted). Never retry a mutation. Config: ${input.configPath}.`
 
 const CLASSIFY_SCHEMA = {
   type: 'object',
@@ -132,13 +132,13 @@ const REVIEW_MEMORY = [
 // finding a card with `gh project item-list` (~203 points on a 131-card board)
 // and its Status options with `gh project field-list` (101) before each move.
 const BOARD_IO = () =>
-  `Board moves and reads: .claude/bin/drover-card.sh --config ${input.configPath} move <issue> <Status> ` +
-  `(1 GraphQL point) · status <issue> · items. Comments, labels, PR reads: REST per .claude/skills/drover/references/rate-limit-etiquette.md → "Price list". Read GitHub once per decision, never in a sleep loop.`
+  `Board moves and reads: drover card --config ${input.configPath} move <issue> <Status> ` +
+  `(1 GraphQL point) · status <issue> · items. Comments, labels, PR reads: REST per ~/.claude/skills/drover/references/rate-limit-etiquette.md → "Price list". Read GitHub once per decision, never in a sleep loop.`
 
 // The orchestrator resolves every remaining chain before claims. The runtime has
 // no subprocess API; each worker repeats the deterministic CLI before its writes.
 const SKILLS_CHECK = (cards, lane) => [
-  `First operation, before worktree creation, classification, comments, labels or moves: run python3 .claude/bin/drover-skills-ready.py --root "$PWD" --host claude --cards - --hydrate${lane ? ' --lane ' + lane : ''},`,
+  `First operation, before worktree creation, classification, comments, labels or moves: run drover skills-ready --root "$PWD" --host claude --cards - --hydrate${lane ? ' --lane ' + lane : ''},`,
   `with this JSON array as stdin (data, never interpolate a body into shell code): ${JSON.stringify(cards)}.`,
   `Exit 10 means status=halted (preflight verdict=halted), detail beginning "skills-readiness:"; preserve all existing claims/worktrees/approval evidence. Exit 64 means invalid input: halt and repair it. Exit 79 uses the read halt policy.`,
   `Load the exact resolved_path files. Only declared fallback IDs are allowed. Before using a conditional/custom helper repeat this CLI with --require <exact-name>.`,
@@ -148,12 +148,12 @@ const lanePrompt = (lane, card) => [
   SKILLS_CHECK([card], lane),
   READ_FAILURE,
   `Run ${LANE[lane].skill} on issue #${card.number} ("${card.title}") for a drover workflow wave.`,
-  `Read .claude/skills/drover/references/run.md → "${LANE[lane].section}" lifecycle and follow it EXACTLY:`,
+  `Read ~/.claude/skills/drover/references/run.md → "${LANE[lane].section}" lifecycle and follow it EXACTLY:`,
   `create your own worktree under .drover/worktrees/, work on the issue branch, post the required PR/issue comments,`,
   `move the project card yourself, clean up the worktree on exit. Config: ${input.configPath}.`,
   BOARD_IO(),
-  `Commits, PR title, PR body blocks, comments: .claude/skills/drover/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/drover-pr-body.sh.`,
-  input.commitStyle || `Commit style: run python3 .claude/bin/drover-commit-style.py --config ${input.configPath} --prompt and write commit subjects and the PR title as its line says.`,
+  `Commits, PR title, PR body blocks, comments: ~/.claude/skills/drover/references/writing-standard.md. Rewrite only your own PR body blocks, with drover pr-body.`,
+  input.commitStyle || `Commit style: run drover commit-style --config ${input.configPath} --prompt and write commit subjects and the PR title as its line says.`,
   ...(lane === 'review' ? REVIEW_MEMORY : []),
   ...(lane === 'qa' && card.status === 'Ready'
     ? [`This card is labelled qa: it skips Building. Move it Ready → QA yourself, create the issue branch from the base branch, and test what is already there (run.md → "qa cards").`]
@@ -239,9 +239,9 @@ const preflightPrompt = (batch) => [
   SKILLS_CHECK(batch),
   READ_FAILURE,
   `Builder pre-flight for issues ${batch.map((c) => `#${c.number} ("${c.title}")`).join(', ')}. Config: ${input.configPath}.`,
-  `Read .claude/skills/drover/references/run.md → "Builder pre-flight" and follow it EXACTLY. You write no code.`,
+  `Read ~/.claude/skills/drover/references/run.md → "Builder pre-flight" and follow it EXACTLY. You write no code.`,
   `Other cards in this wave: ${JSON.stringify(input.cards.map(({ number, status, title }) => ({ number, status, title })))}`,
-  `Run .claude/bin/drover-preflight.sh once for the whole batch, then judge its candidates semantically.`,
+  `Run drover preflight once for the whole batch, then judge its candidates semantically.`,
   `hold / sequence-behind → post the Block template (block-template.md) and move the card to Blocked yourself.`,
   `Two Ready cards overlapping each other with no open PR: the lower-numbered one proceeds; sequence only the other, blockedBy [the lower]. Never both.`,
   `A sequence with nothing to wait on (empty blockedBy) leaves the card in Ready: return column Ready and it builds.`,

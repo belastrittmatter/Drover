@@ -123,7 +123,7 @@ STUB
 chmod +x "$WORK/gh"
 export PATH="$WORK:$PATH" GH_LOG="$WORK/gh.log" BODY_LOG="$WORK/body.filed"
 export SB_COLLECT_STATE_DIR="$WORK/collect-state"
-export DROVER_BIN="$REPO_ROOT/scripts"
+export DROVER_BIN="$REPO_ROOT/lib"
 
 run() { [ "${KEEP_COLLECT_STATE:-0}" = 1 ] || rm -rf "$SB_COLLECT_STATE_DIR"; : > "$GH_LOG"; : > "$BODY_LOG"; "$SCRIPT" --config "$WORK/config.json" "$@" 2>"$WORK/err"; }
 BUG=(--type bug --source sentry --title "Checkout 500 on empty cart" --body-file "$WORK/bug.md" --fingerprint "err|sentry|4411")

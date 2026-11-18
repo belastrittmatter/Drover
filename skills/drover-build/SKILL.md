@@ -5,7 +5,7 @@ description: Builder lane of the drover pipeline — takes a `Ready` GitHub Proj
 
 # Drover Build — Builder lane and legacy headless GitHub-Project executor
 
-Inside `drover run`, Drover Build is the Builder lane: a lane agent in the in-session wave workflow (`workflows/drover-wave.js`) that follows "drover integration" below. Run on its own, `/drover-build` is the **legacy headless path (opt-in)**: you are the orchestrator, the source of truth is the **`Ready` column of the configured GitHub Project board**, and your job is to dispatch every issue in `Ready` (in board order) as a headless `claude -p` worker in its own git worktree, open a PR for each finished branch, and move its card to `QA` so the Tester and Reviewer take it from there. Drover Build never merges — merging happens only through the Reviewer's merge gate (`scripts/drover-merge-gate.sh`).
+Inside `drover run`, Drover Build is the Builder lane: a lane agent in the in-session wave workflow (`workflows/drover-wave.js`) that follows "drover integration" below. Run on its own, `/drover-build` is the **legacy headless path (opt-in)**: you are the orchestrator, the source of truth is the **`Ready` column of the configured GitHub Project board**, and your job is to dispatch every issue in `Ready` (in board order) as a headless `claude -p` worker in its own git worktree, open a PR for each finished branch, and move its card to `QA` so the Tester and Reviewer take it from there. Drover Build never merges — merging happens only through the Reviewer's merge gate (`drover gate`).
 
 **Curation contract:** the human moves cards into `Ready` when they should be worked. The loop never reads `Backlog`, `In Progress`, or `Done` cards. If `Ready` is empty, the loop reports "queue empty" and exits cleanly — no error.
 
@@ -17,7 +17,7 @@ Drover Build is the canonical builder. Do not use a separate `build-feature` wor
 
 Drover Build may implement, test, commit, push, open PRs, and move project cards to `QA`. It never merges, closes issues, or moves cards to `Done` — the Reviewer does that through the merge gate. It should not invent new product scope beyond the issue body. If the issue needs product/design/security judgment, apply the human-gate or WIP-partial path instead of guessing.
 
-**GitHub budget** — every "move card" is `.claude/bin/drover-card.sh --config <cfg> move <N> <Status>` (1 GraphQL point; `gh project item-list` / `field-list` cost ~100–200). Comments, labels and PR reads go over REST; [rate-limit-etiquette.md](../drover/references/rate-limit-etiquette.md) → "Price list" has the calls.
+**GitHub budget** — every "move card" is `drover card --config <cfg> move <N> <Status>` (1 GraphQL point; `gh project item-list` / `field-list` cost ~100–200). Comments, labels and PR reads go over REST; [rate-limit-etiquette.md](../drover/references/rate-limit-etiquette.md) → "Price list" has the calls.
 
 ## Configuration
 
@@ -52,11 +52,11 @@ Source column is `Ready` (override with `BUILD_LOOP_SOURCE_COLUMN`):
 ```bash
 SOURCE_COLUMN="${BUILD_LOOP_SOURCE_COLUMN:-Ready}"
 
-.claude/bin/drover-card.sh --owner "$BUILD_LOOP_OWNER" --number "$BUILD_LOOP_PROJECT" items \
+drover card --owner "$BUILD_LOOP_OWNER" --number "$BUILD_LOOP_PROJECT" items \
   | jq --arg col "$SOURCE_COLUMN" '.items[] | select(.status == $col and .content.type == "Issue")'
 ```
 
-`drover-card.sh items` is the `gh project item-list` shape for ~1 GraphQL point per 100 cards (item-list spends 101) — without bodies.
+`drover card items` is the `gh project item-list` shape for ~1 GraphQL point per 100 cards (item-list spends 101) — without bodies.
 
 For each Ready item:
 - Capture `content.number` (issue #), `content.title` and `labels`; read the body over REST: `gh api repos/{owner}/{repo}/issues/<N> --jq .body`.
@@ -74,7 +74,7 @@ If `Ready` is empty: print `Project board "Ready" column is empty — nothing to
 
 Hydrate each selected issue through `drover-github-read.py --kind issue --
 issue view <N> --json number,title,body`. Save a JSON array with number, Ready
-status, labels and literal body. Run `.claude/bin/drover-skills-ready.py
+status, labels and literal body. Run `drover skills-ready
 --root <repo> --host claude --cards <cards.json> --lane build` before label
 creation, stale-lock recovery, comments or dispatch. Exit 10 halts and names the
 missing helpers. Preserve existing claims and worktrees. No automatic helper
@@ -109,7 +109,7 @@ gh issue comment N --body "Dispatched by /drover-build — worker spinning up in
 
 c. **Dispatch:**
 ```bash
-bash .claude/skills/drover-build/scripts/drover-build-dispatch.sh N
+bash ~/.claude/skills/drover-build/scripts/drover-build-dispatch.sh N
 ```
 …via Bash with `run_in_background: true`. Capture each shell ID.
 
@@ -193,7 +193,7 @@ Drover Build treats acceptance criteria as the completion contract. Workers must
 - **Never modify code in the main worktree** while workers are running. Only run `gh` commands and push/PR operations.
 - **Conflicts** between concurrent workers' branches are not resolved here — they surface at the merge gate, and the card comes back to the Builder for a rebuild. Don't auto-resolve.
 - **Report cadence** (to the user, in the session): 1 message at start, 1 per dispatch wave, 1 per completion (success/fail), 1 final summary. Don't spam.
-- **Workers MUST use the right skills.** The worker preamble enforces: workers parse the `Skills:` line from the issue body if present; otherwise they route on the issue's **type label** (`bug` → `diagnosing-bugs`+`tdd`, `feature` → `implement`+`tdd`+`codebase-design`, `refactor`/`tech-debt` → `codebase-design`+`tdd`, `docs` → skip `tdd`), always adding `ponytail:ponytail` (simplest solution first, before any code; inline fallback when the plugin is absent), `verification-before-completion` and a `code-review` pass on their own diff. Test mechanics are picked by the localisation ladder, never by label. Decision points walk the decision ladder — acceptance criteria → repo precedent → smallest blast radius → human gate — and stop at the first rung that answers the question. No panel, no vote; `mattpocock-skills:grilling` is forbidden inside a worker (it waits on a user who is not there) and lives in `drover lint` instead. `mattpocock-skills:code-review` runs once against the worker's own diff before the final commit. See `references/decision-policy.md` for the skill map, the ladder, the human gates, and the `--- decision ---` commit trailer.
+- **Workers MUST use the right skills.** The worker preamble enforces: workers parse the `Skills:` line from the issue body if present; otherwise they route on the issue's **type label** (`bug` → `diagnosing-bugs`+`tdd`, `feature` → `implement`+`tdd`+`codebase-design`, `refactor`/`tech-debt` → `codebase-design`+`tdd`, `docs` → skip `tdd`), always adding `ponytail:ponytail` (simplest solution first, before any code; inline fallback when the plugin is absent), `verification-before-completion` and a `code-review` pass on their own diff. Test mechanics are picked by the localisation ladder, never by label. Decision points walk the decision ladder — acceptance criteria → repo precedent → smallest blast radius → human gate — and stop at the first rung that answers the question. No panel, no vote; `mattpocock-skills:grilling` is forbidden inside a worker (it waits on a user who is not there) and lives in `/drover lint` instead. `mattpocock-skills:code-review` runs once against the worker's own diff before the final commit. See `references/decision-policy.md` for the skill map, the ladder, the human gates, and the `--- decision ---` commit trailer.
 
 ## Worker preamble
 
@@ -237,7 +237,7 @@ When invoked by drover (env `DROVER_RUN=1` set by the runner, or invocation cont
 - Respect the single branch drover hands you (`issue-<N>-<slug>`). Don't create alternate branches.
 
 ### Lifecycle (Builder, first pass)
-Follow spec `.claude/skills/drover/references/run.md` → Builder (first pass). Summary:
+Follow spec `~/.claude/skills/drover/references/run.md` → Builder (first pass). Summary:
 1. Worktree off `config.base_branch`.
 2. Branch `issue-<N>-<slug>` from `config.base_branch`.
 3. Docs check (section below) — if the ticket touches a third-party surface, an upgrade, or auth/billing, read the current official docs first.
@@ -294,10 +294,10 @@ On any failure-handoff comment, include:
 ```
 root-cause-hash: <sha256 first 12 hex chars>
 ```
-Hash inputs (joined with `|`): lane (`build`) | error class | first 3 unique normalized file:line frames. See `.claude/skills/drover/references/run.md` → Root-cause hash.
+Hash inputs (joined with `|`): lane (`build`) | error class | first 3 unique normalized file:line frames. See `~/.claude/skills/drover/references/run.md` → Root-cause hash.
 
 ### Never merge
 Builder NEVER squash-merges. Reviewer owns merge.
 
 ### Block exits use the §4 mandatory template
-When moving a card to Blocked (or dropping it: closed as not planned, Done, `[dropped]`), populate the full template from `.claude/skills/drover/references/block-template.md`. A 1-line "needs creds" comment is a contract violation.
+When moving a card to Blocked (or dropping it: closed as not planned, Done, `[dropped]`), populate the full template from `~/.claude/skills/drover/references/block-template.md`. A 1-line "needs creds" comment is a contract violation.

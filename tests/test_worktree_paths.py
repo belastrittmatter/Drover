@@ -47,7 +47,7 @@ class WorktreePaths(unittest.TestCase):
         self.run_cmd(sys.executable, str(PACK / 'tests/fixtures/install_worker_skills.py'), str(self.root))
         helper_bin = self.root / '.claude/bin'; helper_bin.mkdir(parents=True)
         for name in ['drover-github-read.py', 'drover-skills-ready.py']:
-            shutil.copy2(PACK / 'scripts' / name, helper_bin / name)
+            shutil.copy2(PACK / 'lib' / name, helper_bin / name)
         self.env['DROVER_SKILLS_HOME'] = str(Path(self.tmp.name) / 'home')
         Path(self.env['DROVER_SKILLS_HOME']).mkdir()
         self.env.update(PATH=str(bin_dir) + os.pathsep + self.env["PATH"], BASE_BRANCH="main",
@@ -79,7 +79,7 @@ class WorktreePaths(unittest.TestCase):
 
     def runner_helper(self, body):
         return self.run_cmd("bash", "-c", 'SB_LIB_ONLY=1 . "$1"\n' + body, "fixture",
-                            str(PACK / "scripts/drover-run.sh"), check=False)
+                            str(PACK / "lib/drover-run.sh"), check=False)
 
     def test_runner_halts_for_legacy_checkout_without_removing_it(self):
         old = self.root / ".worktrees/issue-7-build"

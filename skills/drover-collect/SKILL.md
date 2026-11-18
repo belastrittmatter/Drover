@@ -42,16 +42,16 @@ No job, cadence or scheduler is created by this skill.
 
 ## Setup
 
-1. Resolve the config: `.claude/drover/active` → `.claude/drover/configs/<slug>.json`
+1. Resolve the config: `.drover/config.json` (one per repo)
    (shape: `../drover/references/config-schema.json`). No config, or no `collect` block for a
    requested source → stop and point at `/drover onboard` (its collect step sets sources up).
 2. Secrets come only from `.env` (nearest walking up): `SENTRY_AUTH_TOKEN`,
    `POSTHOG_PERSONAL_API_KEY`. Never print, echo or paste them.
-3. Source `.claude/bin/drover-gh-guard.sh`; `sb_gh_guard_check 200` before each gh burst.
-4. Snapshot the board through `.claude/bin/drover-github-read.py --kind items -- project item-list <number> --owner <owner> --format json --limit 500`. A count mismatch or read failure halts; never treat a partial board as complete.
+3. Run `drover gh-guard check 200` before each gh burst.
+4. Snapshot the board through `drover github-read --kind items -- project item-list <number> --owner <owner> --format json --limit 500`. A count mismatch or read failure halts; never treat a partial board as complete.
    It is the dedupe set for verification and the "not on the board" set for `github`.
 
-Scripts live in `.claude/skills/drover-collect/scripts/` (`S=` below). Every fetcher takes
+Scripts live in `~/.claude/skills/drover-collect/scripts/` (`S=` below). Every fetcher takes
 `--since` and prints JSON; a fetcher that cannot reach its source prints
 `{"status":"unavailable","error":…}` and exits 2. Record each source as `read (n)`, `empty`,
 `unavailable` or `truncated` — never report an unreachable source as empty.
@@ -206,7 +206,7 @@ $S/drover-collect-file.sh --config <cfg> --adopt <n> --type <t> [--yes]
 - `bug`, `feature`, `fix` → `drover-qa-file-bug.sh` (`fix` files as `tech-debt`); `refactor` →
   `drover-review-file-refactor.sh`. `--title` is the bare problem: the filers add the
   `[<kind>] <scope>:` prefix, so never pass one (`[bug] …` would appear twice). Every body uses the ticket format in
-  `.claude/skills/drover/references/writing-standard.md` § 3: Problem · Context (lettered
+  `~/.claude/skills/drover/references/writing-standard.md` § 3: Problem · Context (lettered
   steps under Where) · Fix · Acceptance Criteria (checklist) · Risk; bugs add the folded 12-row
   Evidence table (a missing row says `n/a — why`), fixes add an Evidence section. Evidence is
   links and counts — never secrets or user PII. The filer refuses a body that misses a section.

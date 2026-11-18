@@ -9,7 +9,7 @@ DOC=docs/hosts.md
 
 # The accepted values: the first case arm after `case "${DROVER_HOST:-}" in`.
 values=$(awk '/case "\$\{DROVER_HOST:-\}" in/{getline; sub(/^[ \t]*/, ""); sub(/\).*/, ""); print; exit}' \
-  scripts/drover-host.sh | tr '|' ' ')
+  lib/drover-host.sh | tr '|' ' ')
 [ -n "$values" ] || fail "no DROVER_HOST values found in drover-host.sh"
 n=0
 for v in $values; do

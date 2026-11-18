@@ -4,7 +4,7 @@ You are running UNATTENDED inside **Drover Build**, dispatched to work on a sing
 
 **Before worker writes or worktree creation:** follow [skill readiness](../../drover/references/skills-readiness.md).
 Resolve this lane for the actual host, load the report's files/fallbacks, halt
-on missing requirements and recheck each conditional helper before use.
+on missing requirements and check any helper the card did not route with `--require` before use.
 
 
 1. **For ANY decision point, AskUserQuestion-style prompt, or "should I X or Y?" branch:**
@@ -19,7 +19,7 @@ on missing requirements and recheck each conditional helper before use.
 
    There is no advisor panel and no vote. `mattpocock-skills:grilling` is
    **forbidden inside a worker** — its contract is to ask the user and wait, which
-   this run cannot do. Ambiguous tickets are `drover lint`'s job, upstream of
+   this run cannot do. Ambiguous tickets are `/drover lint`'s job, upstream of
    this loop; if you want to grill the ticket, that is a rule-3 human gate.
 
 2. **NEVER call `AskUserQuestion`. NEVER block waiting for the user.**

@@ -20,36 +20,31 @@
 #   - Touch branches or PRs. State lives on the GitHub Project board.
 #
 # Resume:
-#   drover run <slug>     — same command. The board is the state. Cards sit
+#   drover run            — same command. The board is the state. Cards sit
 #                                in whichever column they were in. Workers re-claim
 #                                from the "stopped" comment context.
 #
 # Usage:
-#   scripts/drover-stop.sh [<config-slug>]
+#   drover stop
 #
 # Exit codes:
 #   0  clean stop (or nothing to stop)
-#   64 missing arg + no .claude/drover/active
-#   66 config not found
+#   64 no .drover/config.json, or an argument given
 
 set -euo pipefail
 
 # ───────────────────────────── args + paths ─────────────────────────────
-CONFIG_SLUG="${1:-}"
-if [ -z "$CONFIG_SLUG" ]; then
-  if [ -f .claude/drover/active ]; then
-    CONFIG_SLUG=$(cat .claude/drover/active)
-  else
-    echo "usage: $0 <config-slug>  (or set .claude/drover/active)" >&2
-    exit 64
-  fi
+if [ $# -gt 0 ]; then
+  echo "usage: drover stop  (one config per repo: .drover/config.json)" >&2
+  exit 64
 fi
-
-CONFIG_PATH=".claude/drover/configs/${CONFIG_SLUG}.json"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_PATH=$(python3 "$HERE/drover-config.py" path)
 if [ ! -f "$CONFIG_PATH" ]; then
-  echo "config not found: $CONFIG_PATH" >&2
-  exit 66
+  echo "no config: $CONFIG_PATH (run drover onboard)" >&2
+  exit 64
 fi
+CONFIG_SLUG=$(python3 "$HERE/drover-config.py" slug)
 
 # ───────────────────────────── config read ─────────────────────────────
 BOT_LOGIN=$(jq -r '.notifications.bot_identity // .bot_identity // ""' "$CONFIG_PATH")
@@ -104,7 +99,7 @@ post_stop_comment() {
 Did: \`drover stop\` ended worker PID ${pid:-unknown} at ${TS}
 Done: resume point is the last pushed commit — ${commit}
 Not done: interrupted work may be uncommitted; inspect the preserved worktree
-Next: preserve edits before \`drover run ${CONFIG_SLUG}\`; dirty or legacy worktrees need inspection"
+Next: preserve edits before \`drover run\`; dirty or legacy worktrees need inspection"
 
   gh issue comment "$issue" --body "$body" >/dev/null 2>&1 \
     && log "  issue comment posted on #${issue}" \
@@ -246,5 +241,5 @@ echo ""
 echo "════════════════════════════════════════════════════════"
 echo "  stopped: ${#WORKERS[@]} worker(s), ${DISP_COUNT} dispatcher(s)"
 echo "  wrap-up comments posted on each in-flight issue + PR"
-echo "  Resume: drover run ${CONFIG_SLUG}"
+echo "  Resume: drover run"
 echo "════════════════════════════════════════════════════════"

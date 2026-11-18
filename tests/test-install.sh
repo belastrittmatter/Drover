@@ -1,415 +1,87 @@
 #!/usr/bin/env bash
-# Tests install.sh against plain, linked, and self-vendored target layouts.
-#
-# THIS FILE EXISTS BECAUSE INSTALL.SH ONCE DELETED 190 DIRECTORIES.
-#
-# On 2026-08-20 a symlink-aware install path resolved its destination by hand:
-#
-#   resolved=$(cd "$(dirname "$dest")" && cd "$(readlink "$dest")" && pwd)
-#
-# `cd ""` SUCCEEDS in bash. It is a no-op that returns 0 and leaves you where you
-# were. So when `readlink` produced nothing, `resolved` became the PARENT —
-# .claude/skills — and the `rm -rf "$dest"/*` that followed emptied the user's
-# entire skills tree rather than one skill's contents.
-#
-# Every scenario below plants decoy directories beside the four skills and
-# asserts they are still there afterwards. An installer is allowed to fail; it is
-# never allowed to take the neighbours with it.
+# Tests install.sh and `drover skills install` (specs/config.md FR-CFG-7): install.sh only
+# links bin/drover into ~/.local/bin and copies nothing into a project; skills install links
+# each skill into the harness's user skill folder and never replaces or deletes anything
+# that is not its own link. (An older copying installer once emptied a whole skills tree
+# through a mis-resolved symlink; the decoys below guard against anything like it.)
 set -euo pipefail
-cd "$(dirname "$0")"
-INSTALL="../install.sh"
-
+cd "$(dirname "$0")/.."
+KIT="$PWD"
 fail() { echo "FAIL: $1" >&2; exit 1; }
-plant_decoys() { for d in decoy-one decoy-two decoy-three; do mkdir -p "$1/.claude/skills/$d"; touch "$1/.claude/skills/$d/SKILL.md"; done; }
-decoys_intact() { [ "$(ls "$1/.claude/skills" | grep -c '^decoy')" -eq 3 ]; }
+T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+export HOME="$T/home"; mkdir -p "$HOME"
+unset DROVER_CONFIG
 
-# A Codex shell would add .codex/ links by detection; keep the default layout predictable.
-unset CODEX_THREAD_ID CODEX_SESSION_ID DROVER_HOST
+# 1 — install.sh links bin/drover, and the link finds its install folder.
+OUT=$(bash install.sh)
+[ -L "$HOME/.local/bin/drover" ] || fail "install.sh should link ~/.local/bin/drover: $OUT"
+[ "$(cd -P "$(dirname "$(readlink "$HOME/.local/bin/drover")")" && pwd)" = "$KIT/bin" ] || fail "link should point at bin/drover"
+[ "$("$HOME/.local/bin/drover" version)" = "$(tr -d '[:space:]' < VERSION)" ] || fail "drover version through the link"
+[ "$("$HOME/.local/bin/drover" config harness claude | jq -r .name)" = claude ] || fail "drover through the link should find harnesses/"
+bash install.sh >/dev/null || fail "a second install must succeed"
 
-SKILLS="drover drover-build drover-qa drover-review"
-ALL_SKILLS="$SKILLS drover-collect ui-refine-loop visual git-sync pr-security-review"
+# 2 — install.sh takes no project and writes nothing into one.
+P="$T/project"; mkdir -p "$P"; echo keep > "$P/AGENTS.md"
+RC=0; (cd "$P" && bash "$KIT/install.sh" "$P" >/dev/null 2>&1) || RC=$?
+[ "$RC" -eq 64 ] || fail "install.sh <project> should refuse with 64, got $RC"
+[ "$(ls -A "$P")" = AGENTS.md ] || fail "install.sh wrote into the project: $(ls -A "$P")"
 
-# 1 — a fresh project: plain directories, nothing to preserve. Every primary and
-#     secondary skill lands, and both workflows.
-T=$(mktemp -d)
-"$INSTALL" "$T" >/dev/null 2>&1
-for s in $ALL_SKILLS; do
-  [ -f "$T/.claude/skills/$s/SKILL.md" ] || fail "plain layout: $s/SKILL.md missing"
+# 3 — a real file at the link path is left alone.
+rm "$HOME/.local/bin/drover"; echo mine > "$HOME/.local/bin/drover"
+RC=0; bash install.sh >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 1 ] && [ "$(cat "$HOME/.local/bin/drover")" = mine ] || fail "a real file at the link path must stay (rc $RC)"
+rm "$HOME/.local/bin/drover"; bash install.sh >/dev/null
+
+# 4 — skills install links every skill, keeps decoys, a foreign folder and a foreign link.
+S="$HOME/.claude/skills"; mkdir -p "$S/decoy-one" "$S/visual" "$T/elsewhere"
+touch "$S/decoy-one/SKILL.md"; echo mine > "$S/visual/SKILL.md"
+ln -s "$T/elsewhere" "$S/git-sync"
+ln -s "$T/gone" "$S/drover-qa"   # dangling: an older install folder that moved
+RC=0; OUT=$("$HOME/.local/bin/drover" skills install 2>&1) || RC=$?
+[ "$RC" -eq 1 ] || fail "skills install should report the folders it left alone (exit 1), got $RC: $OUT"
+for s in drover drover-build drover-qa drover-review drover-collect ui-refine-loop pr-security-review; do
+  [ -L "$S/$s" ] && [ "$(cd -P "$S/$s" && pwd)" = "$KIT/skills/$s" ] || fail "$s should link to the install folder"
 done
-for w in drover-wave.js ui-refine-loop.js; do
-  [ -f "$T/.claude/workflows/$w" ] || fail "workflow $w was not installed"
-done
-rm -rf "$T"
+[ "$(cat "$S/visual/SKILL.md")" = mine ] || fail "a real skill folder of the same name must stay"
+[ "$(readlink "$S/git-sync")" = "$T/elsewhere" ] || fail "a link to somewhere else must stay"
+[ -f "$S/decoy-one/SKILL.md" ] || fail "DECOY DESTROYED"
+echo "$OUT" | grep -q "left alone $S/visual" || fail "the kept folder should be named: $OUT"
+rm -rf "$S/visual" "$S/git-sync"
+"$HOME/.local/bin/drover" skills install >/dev/null || fail "a clean skills install should exit 0"
+"$HOME/.local/bin/drover" skills install | grep -q "^ok drover$" || fail "a second run keeps the links"
+"$HOME/.local/bin/drover" skills install --dest "$T/other" >/dev/null && [ -L "$T/other/drover" ] || fail "--dest should be honoured"
 
-# 2 — a project that symlinks .claude/skills/<name> at a real tree elsewhere.
-#     The symlink must survive, the content must land at the target, and the
-#     neighbours must be untouched.
-T=$(mktemp -d)
-mkdir -p "$T/.claude/skills"
-for s in $SKILLS; do
-  mkdir -p "$T/.agents/skills/$s"
-  ( cd "$T/.claude/skills" && ln -s "../../.agents/skills/$s" "$s" )
-done
-plant_decoys "$T"
-"$INSTALL" "$T" >/dev/null 2>&1
-for s in $SKILLS; do
-  [ -L "$T/.claude/skills/$s" ] || fail "symlink layout: $s stopped being a symlink"
-  [ -f "$T/.agents/skills/$s/SKILL.md" ] || fail "symlink layout: $s content did not reach the real path"
-done
-decoys_intact "$T" || fail "symlink layout: DECOYS DESTROYED — the 2026-08-20 regression is back"
-rm -rf "$T"
+# 5 — unknown commands and an invalid config stop before anything runs.
+RC=0; "$HOME/.local/bin/drover" no-such-thing >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 64 ] || fail "unknown command should exit 64, got $RC"
+RC=0; "$HOME/.local/bin/drover" ../lib/drover-run >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 64 ] || fail "a path as command should exit 64, got $RC"
+mkdir -p "$P/.drover"; echo '{"project":{"owner":"o","number":"3"},"roles":{"build":{"max_workers":0}}}' > "$P/.drover/config.json"
+RC=0; ERR=$(cd "$P" && "$HOME/.local/bin/drover" status 2>&1) || RC=$?
+[ "$RC" -eq 65 ] || fail "an invalid config should stop the command with 65, got $RC: $ERR"
+echo "$ERR" | grep -q "project.number: expected integer" || fail "the failing field should be named: $ERR"
+echo "$ERR" | grep -q "roles.build.max_workers: must be >= 1" || fail "every failing field should be named: $ERR"
+echo '{"project":{"owner":"o","number":3},"worker_backend":"claude-p"}' > "$P/.drover/config.json"
+ERR=$(cd "$P" && "$HOME/.local/bin/drover" config validate 2>&1) && fail "a removed key must fail validation"
+echo "$ERR" | grep -q "worker_backend: unknown key" || fail "a removed key should be named: $ERR"
 
-# 3 — a symlink pointing nowhere. Skip it and say so; never guess, never delete.
-T=$(mktemp -d)
-mkdir -p "$T/.claude/skills"
-( cd "$T/.claude/skills" && ln -s ../../nowhere/drover drover )
-plant_decoys "$T"
-OUT=$("$INSTALL" "$T" 2>&1 || true)
-echo "$OUT" | grep -q "pointing nowhere" || fail "a dangling symlink should be reported, got: $OUT"
-decoys_intact "$T" || fail "dangling symlink: DECOYS DESTROYED"
-rm -rf "$T"
+# 6 — `drover gh-guard` calls of one worker share one budget (keyed on role and issue).
+B="$T/budget"; mkdir -p "$B"
+for n in 5 2; do TMPDIR="$B" DROVER_ROLE=build DROVER_ISSUE=7 "$HOME/.local/bin/drover" gh-guard spend "$n"; done
+[ "$(TMPDIR="$B" DROVER_ROLE=build DROVER_ISSUE=7 "$HOME/.local/bin/drover" gh-guard budget)" = 143 ] || fail "separate calls must share the budget"
+[ "$(TMPDIR="$B" DROVER_ROLE=qa DROVER_ISSUE=7 "$HOME/.local/bin/drover" gh-guard budget)" = 150 ] || fail "another worker has its own budget"
 
-# 4 — the guard of last resort. Even if resolution goes wrong, a destination that
-#     is not named after the skill is refused before anything is removed.
-T=$(mktemp -d)
-mkdir -p "$T/.claude/skills" "$T/elsewhere"
-( cd "$T/.claude/skills" && ln -s ../../elsewhere drover )
-plant_decoys "$T"
-OUT=$("$INSTALL" "$T" 2>&1 || true)
-echo "$OUT" | grep -q "which is not a drover directory" \
-  || fail "a mis-resolved destination should be refused by name, got: $OUT"
-[ "$(ls "$T/elsewhere" | wc -l | tr -d ' ')" -eq 0 ] || fail "the refused destination must not be written to"
-decoys_intact "$T" || fail "mis-resolved destination: DECOYS DESTROYED"
-rm -rf "$T"
-
-# 4b — a vendored pack is already exposed through two layers of skill links.
-#      Refreshing it must preserve the source and both links, on repeated runs.
-T=$(mktemp -d)
-PACK="$T/_skills/vendor/drover"
-mkdir -p "$PACK" "$T/.agents/skills" "$T/.claude/skills"
-cp -R ../install.sh ../VERSION ../skills ../scripts ../workflows ../hooks "$PACK/"
-for s in $ALL_SKILLS; do
-  ln -s "../../_skills/vendor/drover/skills/$s" "$T/.agents/skills/$s"
-  ln -s "../../.agents/skills/$s" "$T/.claude/skills/$s"
-done
-plant_decoys "$T"
-for run in 1 2; do
-  OUT=$("$PACK/install.sh" --no-hooks "$T" 2>&1) || fail "self-vendored refresh failed: $OUT"
-  diff -qr ../skills "$PACK/skills" >/dev/null || fail "self-vendored refresh changed the source skills"
-  for s in $ALL_SKILLS; do
-    [ -L "$T/.claude/skills/$s" ] && [ -L "$T/.agents/skills/$s" ] \
-      || fail "self-vendored refresh replaced a link for $s"
-    [ -f "$T/.claude/skills/$s/SKILL.md" ] || fail "self-vendored refresh lost $s"
-  done
-  decoys_intact "$T" || fail "self-vendored refresh: DECOYS DESTROYED"
-done
-rm -rf "$T"
-
-# 4c — individual helper links also point into the vendored pack. Both the full
-#      hook install and the push-guard-only path must tolerate the same files.
-T=$(mktemp -d)
-PACK="$T/_skills/vendor/drover"
-mkdir -p "$PACK" "$T/.claude/bin" "$T/.claude/workflows" "$T/.claude/hooks"
-cp -R ../install.sh ../VERSION ../skills ../scripts ../workflows ../hooks "$PACK/"
-for group in scripts workflows hooks; do
-  case "$group" in scripts) dest=bin ;; *) dest="$group" ;; esac
-  for src in "$PACK/$group/"*; do
-    [ -f "$src" ] || continue
-    ln -s "$src" "$T/.claude/$dest/$(basename "$src")"
-  done
-done
-for flags in '--protect-main' '--no-hooks --protect-main'; do
-  OUT=$("$PACK/install.sh" $flags "$T" 2>&1) || fail "linked helper refresh failed: $OUT"
-  for group in scripts workflows hooks; do
-    diff -qr "../$group" "$PACK/$group" >/dev/null || fail "linked helper refresh changed source $group"
-  done
-  for file in bin/drover-run.sh workflows/drover-wave.js hooks/guard-protected-push.py; do
-    [ -L "$T/.claude/$file" ] || fail "linked helper refresh replaced $file"
-    [ -s "$T/.claude/$file" ] || fail "linked helper refresh emptied $file"
-  done
-done
-rm -rf "$T"
-
-# 4d — a linked destination contains the pack itself. Refuse before clearing it.
-T=$(mktemp -d)
-PACK="$T/drover/vendor"
-mkdir -p "$PACK" "$T/.claude/skills"
-cp -R ../install.sh ../VERSION ../skills ../scripts ../workflows ../hooks "$PACK/"
-ln -s "$T/drover" "$T/.claude/skills/drover"
-plant_decoys "$T"
-if OUT=$("$PACK/install.sh" --no-hooks "$T" 2>&1); then
-  fail "a destination containing the source pack was accepted"
+# 7 — edge cases: a flag without a value, an unreadable config, a git dir kept elsewhere.
+RC=0; "$HOME/.local/bin/drover" skills install --dest >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 64 ] || fail "--dest without a value should exit 64, got $RC"
+echo '{"project":{"owner":"o","number":3}}' > "$P/.drover/config.json"; chmod 000 "$P/.drover/config.json"
+if [ ! -r "$P/.drover/config.json" ]; then  # root can read anything; skip there
+  RC=0; ERR=$(cd "$P" && "$HOME/.local/bin/drover" config validate 2>&1) || RC=$?
+  [ "$RC" -eq 65 ] && echo "$ERR" | grep -q "cannot be read" || fail "an unreadable config should exit 65 and say so, got $RC: $ERR"
 fi
-diff -qr ../skills "$PACK/skills" >/dev/null || fail "overlapping destination erased source skills"
-diff -qr ../scripts "$PACK/scripts" >/dev/null || fail "overlapping destination erased source scripts"
-echo "$OUT" | grep -q 'overlap' || fail "source overlap should be explained: $OUT"
-decoys_intact "$T" || fail "overlapping destination: DECOYS DESTROYED"
-rm -rf "$T"
+chmod 644 "$P/.drover/config.json"
+G="$T/sep"; mkdir -p "$G/work"; git init -q --separate-git-dir "$G/gitdir" "$G/work"
+[ "$(cd "$G/work" && "$HOME/.local/bin/drover" config path)" = "$(cd "$G/work" && pwd -P)/.drover/config.json" ] \
+  || fail "a separate git dir should still find the checkout: $(cd "$G/work" && "$HOME/.local/bin/drover" config path)"
 
-# 4e — copying a skill into a directory within itself is unsafe too. It must
-#      fail before partially copying files or changing the original source.
-T=$(mktemp -d)
-PACK="$T/pack"
-mkdir -p "$PACK" "$T/.claude/skills"
-cp -R ../install.sh ../VERSION ../skills ../scripts ../workflows ../hooks "$PACK/"
-mkdir -p "$PACK/skills/drover/nested/drover"
-ln -s "$PACK/skills/drover/nested/drover" "$T/.claude/skills/drover"
-cp -R "$PACK/skills" "$T/expected-skills"
-plant_decoys "$T"
-if OUT=$("$PACK/install.sh" --no-hooks "$T" 2>&1); then
-  fail "a destination inside the source skill was accepted"
-fi
-diff -qr "$T/expected-skills" "$PACK/skills" >/dev/null || fail "nested destination changed source skills"
-echo "$OUT" | grep -q 'overlap' || fail "nested source overlap should be explained: $OUT"
-decoys_intact "$T" || fail "nested destination: DECOYS DESTROYED"
-rm -rf "$T"
-
-# 5 — every dispatcher script the skills reference is actually shipped. A verb
-#     whose script was never installed fails only when a user reaches for it.
-T=$(mktemp -d)
-"$INSTALL" "$T" >/dev/null 2>&1
-for s in drover-run.sh drover-stop.sh drover-wave-plan.sh \
-         drover-lane.sh drover-codex-lane.sh drover-codex-wave.sh drover-card.sh drover-throttle.sh drover-host.sh \
-         drover-deps.sh drover-preflight.sh drover-merge-gate.sh drover-usage.sh drover-pr-body.sh \
-         drover-review-file-refactor.sh drover-qa-file-bug.sh drover-status.py drover-reasons.json drover-commit-style.py; do
-  [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed, or is not executable"
-done
-# The Codex shim runs the shared launcher installed beside it.
-[ -x "$T/.agents/bin/drover-lane.sh" ] && [ -e "$T/.agents/bin/drover-codex-lane.sh" ] || fail "drover-lane.sh must sit next to its codex shim in .agents/bin"
-rm -rf "$T"
-
-# 6 — guard hooks: scripts copied, settings merged into an existing file without
-#     losing its keys or hooks, backed up first, and a second run adds nothing.
-T=$(mktemp -d)
-mkdir -p "$T/.claude"
-cat > "$T/.claude/settings.json" <<'JSON'
-{"permissions":{"allow":["Bash(ls:*)"]},"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"echo mine"}]}],"Stop":[{"hooks":[{"type":"command","command":"echo stop"}]}]}}
-JSON
-"$INSTALL" "$T" >/dev/null 2>&1
-for h in guard-worktree-path.py guard-secrets.py guard-key-literals.py guard-delete-outside.py guard-protected-push.py cleanup-wt.py; do
-  [ -f "$T/.claude/hooks/$h" ] || fail "hook $h was not installed"
-done
-[ ! -e "$T/.claude/skills/cleanup-wt" ] || fail "cleanup-wt is a hook now, not a skill"
-S="$T/.claude/settings.json"
-jq -e '.permissions.allow == ["Bash(ls:*)"]' "$S" >/dev/null || fail "existing permissions were lost"
-jq -e '[.hooks.PreToolUse[].hooks[].command] | index("echo mine") != null' "$S" >/dev/null || fail "existing PreToolUse hook was lost"
-jq -e '.hooks.Stop[0].hooks[0].command == "echo stop"' "$S" >/dev/null || fail "existing Stop hook was lost"
-jq -e '[.hooks.PreToolUse[] | select(.matcher == "Bash")] | length == 1' "$S" >/dev/null || fail "Bash matcher entry duplicated"
-jq -e '[.hooks.SessionStart[].hooks[].command | select(contains("cleanup-wt.py --auto"))] | length == 1' "$S" >/dev/null \
-  || fail "the cleanup-wt SessionStart hook is not wired by default"
-jq -e '[.hooks[][].hooks[].command | select(contains("guard-protected-push"))] | length == 0' "$S" >/dev/null \
-  || fail "the protected-push guard is opt-in: it must not be wired without --protect-main"
-for h in guard-worktree-path guard-secrets guard-key-literals guard-delete-outside; do
-  jq -e --arg h "$h" '[.hooks[][].hooks[].command | select(contains($h))] | length > 0' "$S" >/dev/null || fail "$h not wired in settings"
-done
-ls "$T/.claude/" | grep -q '^settings.json.bak-' || fail "no backup written before changing settings.json"
-BEFORE=$(cat "$S")
-OUT=$("$INSTALL" "$T" 2>&1)
-[ "$(cat "$S")" = "$BEFORE" ] || fail "a second install changed settings.json"
-echo "$OUT" | grep -q "already present" || fail "a second install should report nothing to change, got: $OUT"
-jq -e '[.hooks[] | [.[].hooks[].command] as $c | ($c | length) == ($c | unique | length)] | all' "$S" >/dev/null \
-  || fail "a hook command appears twice in one event"
-rm -rf "$T"
-
-# 7 — --no-hooks: no hook scripts, no settings.json written.
-T=$(mktemp -d)
-"$INSTALL" --no-hooks "$T" >/dev/null 2>&1
-[ ! -e "$T/.claude/hooks" ] || fail "--no-hooks still installed hooks"
-[ ! -e "$T/.claude/settings.json" ] || fail "--no-hooks still wrote settings.json"
-[ -f "$T/.claude/skills/drover/SKILL.md" ] || fail "--no-hooks must still install the skills"
-rm -rf "$T"
-
-# 7b — --no-hooks --protect-main: exactly the one guard, wired; no other hook.
-#      Onboard names this command when protect-main finds no guard script.
-T=$(mktemp -d)
-"$INSTALL" --no-hooks --protect-main "$T" >/dev/null 2>&1
-[ "$(ls "$T/.claude/hooks")" = "guard-protected-push.py" ] || fail "--no-hooks --protect-main should install only the push guard, got: $(ls "$T/.claude/hooks")"
-jq -e '[.hooks[][].hooks[].command] == ["python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-protected-push.py"]' "$T/.claude/settings.json" >/dev/null \
-  || fail "--no-hooks --protect-main should wire only the push guard"
-rm -rf "$T"
-
-# 8 — a settings.json that is not valid JSON is left exactly as it was.
-T=$(mktemp -d)
-mkdir -p "$T/.claude"; printf '{ not json' > "$T/.claude/settings.json"
-OUT=$("$INSTALL" "$T" 2>&1 || true)
-[ "$(cat "$T/.claude/settings.json")" = "{ not json" ] || fail "invalid settings.json was modified"
-echo "$OUT" | grep -q "not valid JSON" || fail "invalid settings.json should be reported, got: $OUT"
-rm -rf "$T"
-
-# 10 — --protect-main wires the opt-in push guard, once, next to the defaults.
-T=$(mktemp -d)
-"$INSTALL" --protect-main "$T" >/dev/null 2>&1
-S="$T/.claude/settings.json"
-jq -e '[.hooks.PreToolUse[].hooks[].command | select(contains("guard-protected-push.py"))] | length == 1' "$S" >/dev/null \
-  || fail "--protect-main did not wire guard-protected-push"
-jq -e '[.hooks.PreToolUse[] | select(.matcher == "Bash")] | length == 1' "$S" >/dev/null || fail "--protect-main duplicated the Bash matcher"
-OUT=$("$INSTALL" --protect-main "$T" 2>&1)
-echo "$OUT" | grep -q "already present" || fail "a second --protect-main install should change nothing"
-rm -rf "$T"
-
-# 11 — AGENTS.md and CLAUDE.md are the project's own: install leaves both byte for
-#      byte, managed markers included; the last line names onboard as the one next step.
-T=$(mktemp -d)
-printf '# AGENTS.md\n\n- keep me\n<!-- drover:begin v0.0.1 -->\nold\n<!-- drover:end -->\n- and me\n' > "$T/AGENTS.md"
-printf '# Rules\n- pnpm\n' > "$T/CLAUDE.md"
-cp "$T/AGENTS.md" "$T/AGENTS.before"; cp "$T/CLAUDE.md" "$T/CLAUDE.before"
-OUT=$("$INSTALL" --no-hooks "$T" 2>&1)
-cmp -s "$T/AGENTS.md" "$T/AGENTS.before" || fail "install changed AGENTS.md"
-cmp -s "$T/CLAUDE.md" "$T/CLAUDE.before" || fail "install changed CLAUDE.md"
-[ "$(echo "$OUT" | tail -1)" = "next: open Claude Code here and run /drover onboard" ] || fail "last line should name onboard, got: $(echo "$OUT" | tail -1)"
-rm -rf "$T"
-# DROVER_QUIET_NEXT=1 (for a wrapper that prints its own header and next step)
-# prints only the installing group: one line per group of files, no per-file list.
-T=$(mktemp -d)
-OUT=$(DROVER_QUIET_NEXT=1 "$INSTALL" "$T" 2>&1)
-[ "$(echo "$OUT" | head -1)" = "installing" ] || fail "quiet mode should start at the installing group, got: $OUT"
-echo "$OUT" | grep -q "next:" && fail "quiet mode must not print the next step"
-echo "$OUT" | grep -q "✓ skills, scripts and workflows → .agents/" || fail "quiet mode should print the grouped files line"
-echo "$OUT" | grep -q "   6 guard hooks → .claude/settings.json (new file)" || fail "guard line should count hooks, got: $OUT"
-[ "$(echo "$OUT" | wc -l | tr -d ' ')" -le 3 ] || fail "grouped output should be ≤ 3 lines here, got: $OUT"
-rm -rf "$T"
-
-# 12 — upgrade record: an older drover in the target is written to
-#      .claude/drover/upgrade.json (from, to, the skills that are new) for onboard.
-T=$(mktemp -d); mkdir -p "$T/.claude/skills/drover" "$T/.claude/skills/drover-build"
-echo "1.8.2" > "$T/.claude/skills/drover/VERSION"
-OUT=$("$INSTALL" --no-hooks "$T" 2>&1)
-jq -e --arg v "$(cat ../VERSION)" '.from == "1.8.2" and .to == $v and (.added_skills | index("drover-collect")) and (.added_skills | index("drover-build") | not)' \
-  "$T/.claude/drover/upgrade.json" >/dev/null || fail "upgrade.json wrong: $(cat "$T/.claude/drover/upgrade.json" 2>&1)"
-echo "$OUT" | grep -q "   upgrade from 1.8.2" || fail "the upgrade should be one grouped line, got: $OUT"
-"$INSTALL" --no-hooks "$T" >/dev/null 2>&1
-jq -e '.from == "1.8.2"' "$T/.claude/drover/upgrade.json" >/dev/null || fail "a second install must keep the original from-version"
-rm -rf "$T"
-T=$(mktemp -d); "$INSTALL" --no-hooks "$T" >/dev/null 2>&1
-[ -e "$T/.claude/drover/upgrade.json" ] && fail "a fresh install is not an upgrade"
-rm -rf "$T"
-T=$(mktemp -d); printf '# AGENTS.md\n- mine\n' > "$T/AGENTS.md"
-"$INSTALL" --no-hooks "$T" >/dev/null 2>&1
-[ "$(cat "$T/AGENTS.md")" = "$(printf '# AGENTS.md\n- mine')" ] || fail "install must not add a block uninvited"
-for s in drover-skills-ready.py drover-host.sh drover-codex-wave.sh drover-codex-lane.sh drover-env-check.sh drover-merge-policy.py drover-settings.py drover-setup.py; do
-  [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed"
-done
-rm -rf "$T"
-
-# 13 — shared layout: the files live once under .agents/; .claude/ reaches them through
-#      links. No .codex/ or .opencode/ unless that host is configured, detected or asked for.
-resolves() { # <target> <host> — host paths reach the .agents/ copy
-  for p in skills/drover/SKILL.md skills/git-sync/SKILL.md bin/drover-host.sh workflows/drover-wave.js; do
-    [ "$1/.$2/$p" -ef "$1/.agents/$p" ] || fail "$2: $p does not resolve to .agents/$p"
-  done
-}
-T=$(mktemp -d)
-OUT=$("$INSTALL" "$T" 2>&1)
-[ -d "$T/.agents/skills/drover" ] && [ ! -L "$T/.agents/skills/drover" ] || fail "fresh: .agents/skills/drover should be a real directory"
-[ -f "$T/.agents/bin/drover-host.sh" ] && [ ! -L "$T/.agents/bin/drover-host.sh" ] || fail "fresh: .agents/bin should hold real files"
-[ -x "$T/.agents/bin/drover-run.sh" ] || fail "fresh: .agents/bin scripts must be executable"
-resolves "$T" claude
-[ -L "$T/.claude/skills/drover" ] || fail "fresh: .claude/skills/drover should be a link"
-[ "$(readlink "$T/.claude/skills/drover")" = "../../.agents/skills/drover" ] || fail "fresh: links must be relative, got $(readlink "$T/.claude/skills/drover")"
-[ "$T/.claude/hooks/guard-secrets.py" -ef "$T/.agents/hooks/guard-secrets.py" ] || fail "fresh: hooks should resolve to .agents/hooks"
-[ ! -e "$T/.codex" ] && [ ! -e "$T/.opencode" ] || fail "fresh: no host was asked for, yet .codex/ or .opencode/ appeared"
-echo "$OUT" | grep -q "✓ skills, scripts and workflows → .agents/ (linked from .claude)" || fail "fresh: grouped line should name .agents/ and the hosts, got: $OUT"
-rm -rf "$T"
-
-# 14 — --hosts adds hosts (claude is always kept); both flag forms; unknown names refused.
-T=$(mktemp -d)
-"$INSTALL" --no-hooks --hosts codex,opencode "$T" >/dev/null 2>&1 || fail "--hosts codex,opencode failed"
-for h in claude codex opencode; do resolves "$T" "$h"; done
-rm -rf "$T"
-T=$(mktemp -d)
-"$INSTALL" --no-hooks --hosts=opencode "$T" >/dev/null 2>&1 || fail "--hosts=opencode failed"
-resolves "$T" opencode; resolves "$T" claude
-[ ! -e "$T/.codex" ] || fail "--hosts=opencode must not create .codex/"
-rm -rf "$T"
-T=$(mktemp -d)
-if OUT=$("$INSTALL" --hosts claude,cursor "$T" 2>&1); then fail "an unknown host should be refused"; fi
-echo "$OUT" | grep -q "unknown host: cursor" || fail "unknown host should be named, got: $OUT"
-[ ! -e "$T/.agents" ] || fail "a refused --hosts must install nothing"
-rm -rf "$T"
-
-# 15 — detection: an existing .codex/ or .opencode/ folder, a config "host" key, or a Codex shell.
-T=$(mktemp -d); mkdir -p "$T/.codex"
-"$INSTALL" --no-hooks "$T" >/dev/null 2>&1; resolves "$T" codex
-[ ! -e "$T/.opencode" ] || fail "detection: .codex/ alone must not add .opencode/"
-rm -rf "$T"
-T=$(mktemp -d); mkdir -p "$T/.claude/drover/configs"
-echo '{"host": "opencode"}' > "$T/.claude/drover/configs/app.json"
-"$INSTALL" --no-hooks "$T" >/dev/null 2>&1; resolves "$T" opencode
-rm -rf "$T"
-T=$(mktemp -d)
-CODEX_THREAD_ID=t1 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1; resolves "$T" codex
-rm -rf "$T"
-
-# 16 — upgrade a real-directory .claude/ install: every path it had still resolves, drover's
-#      own entries become links, anything that is not drover's stays exactly as it was.
-T=$(mktemp -d)
-mkdir -p "$T/.claude/skills/drover" "$T/.claude/skills/drover-qa" "$T/.claude/skills/other-skill" \
-         "$T/.claude/bin" "$T/.claude/workflows" "$T/.claude/hooks"
-echo "1.8.2" > "$T/.claude/skills/drover/VERSION"; echo old > "$T/.claude/skills/drover/SKILL.md"
-echo old > "$T/.claude/skills/drover/stale-file.md"
-echo mine > "$T/.claude/skills/other-skill/SKILL.md"
-echo old > "$T/.claude/bin/drover-run.sh"; echo mine > "$T/.claude/bin/mine.sh"
-echo old > "$T/.claude/workflows/drover-wave.js"; echo mine > "$T/.claude/hooks/my-hook.py"
-echo old > "$T/.claude/hooks/guard-secrets.py"
-"$INSTALL" "$T" >/dev/null 2>&1 || fail "upgrade from a real-directory install failed"
-resolves "$T" claude
-for p in skills/drover skills/drover-qa bin/drover-run.sh workflows/drover-wave.js hooks/guard-secrets.py; do
-  [ -L "$T/.claude/$p" ] || fail "upgrade: .claude/$p should now be a link into .agents/"
-done
-[ ! -e "$T/.agents/skills/drover/stale-file.md" ] || fail "upgrade: stale files must not carry over"
-[ "$(cat "$T/.claude/skills/other-skill/SKILL.md")" = mine ] && [ ! -L "$T/.claude/skills/other-skill" ] || fail "upgrade: other-skill was touched"
-[ "$(cat "$T/.claude/bin/mine.sh")" = mine ] && [ "$(cat "$T/.claude/hooks/my-hook.py")" = mine ] || fail "upgrade: user bin/hooks were touched"
-[ ! -e "$T/.agents/skills/other-skill" ] || fail "upgrade: other-skill must not move into .agents/"
-jq -e '.from == "1.8.2"' "$T/.claude/drover/upgrade.json" >/dev/null || fail "upgrade: upgrade.json not recorded"
-rm -rf "$T"
-
-# 17 — a second run changes nothing (tree, link targets, file contents).
-snapshot() { python3 - "$1" <<'PY'
-import hashlib, os, sys
-root = sys.argv[1]
-for d, dirs, files in sorted(os.walk(root)):
-    for n in sorted(dirs + files):
-        p = os.path.join(d, n); r = os.path.relpath(p, root)
-        if os.path.islink(p): print("L", r, os.readlink(p))
-        elif os.path.isfile(p): print("F", r, hashlib.sha256(open(p, "rb").read()).hexdigest())
-        else: print("D", r)
-PY
-}
-T=$(mktemp -d)
-"$INSTALL" --hosts codex "$T" >/dev/null 2>&1
-BEFORE=$(snapshot "$T")
-"$INSTALL" --hosts codex "$T" >/dev/null 2>&1
-[ "$(snapshot "$T")" = "$BEFORE" ] || fail "a second install changed the tree: $(diff <(echo "$BEFORE") <(snapshot "$T"))"
-rm -rf "$T"
-
-# 18 — a host folder whose skills/ (or bin/) is itself a link into .agents/ is already shared:
-#      nothing is replaced, nothing loops, the neighbours survive.
-T=$(mktemp -d); mkdir -p "$T/.agents/skills" "$T/.agents/bin" "$T/.claude"
-ln -s ../.agents/skills "$T/.claude/skills"; ln -s ../.agents/bin "$T/.claude/bin"
-plant_decoys "$T"
-"$INSTALL" --no-hooks "$T" >/dev/null 2>&1 || fail "whole-folder link layout failed"
-[ -d "$T/.agents/skills/drover" ] && [ ! -L "$T/.agents/skills/drover" ] || fail "whole-folder link: skill turned into a self-link"
-[ -f "$T/.claude/skills/drover/SKILL.md" ] && [ -x "$T/.claude/bin/drover-run.sh" ] || fail "whole-folder link: files missing"
-decoys_intact "$T" || fail "whole-folder link: DECOYS DESTROYED"
-rm -rf "$T"
-
-# 19 — no symlinks (Windows without symlink rights): copy instead, so every path still resolves.
-T=$(mktemp -d); FAKE=$(mktemp -d)
-printf '#!/bin/sh\nexit 1\n' > "$FAKE/ln"; chmod +x "$FAKE/ln"
-for run in 1 2; do
-  OUT=$(PATH="$FAKE:$PATH" "$INSTALL" "$T" 2>&1) || fail "no-symlink install failed: $OUT"
-  [ -f "$T/.claude/skills/drover/SKILL.md" ] && [ -x "$T/.claude/bin/drover-host.sh" ] \
-    && [ -f "$T/.claude/hooks/guard-secrets.py" ] || fail "no-symlink install: .claude paths missing"
-  cmp -s "$T/.claude/skills/drover/SKILL.md" "$T/.agents/skills/drover/SKILL.md" || fail "no-symlink: copy differs"
-done
-echo "$OUT" | grep -q "copied" || fail "no-symlink install should say it copied, got: $OUT"
-rm -rf "$T" "$FAKE"
-
-# 9 — the snippet the installer merges is the one hooks/README.md documents.
-python3 - ../hooks/README.md ../hooks/settings-snippet.json <<'PY' || fail "hooks/README.md snippet and hooks/settings-snippet.json differ"
-import json, re, sys
-doc = re.search(r"```json\n(.*?)```", open(sys.argv[1]).read(), re.S).group(1)
-sys.exit(0 if json.loads(doc) == json.load(open(sys.argv[2])) else 1)
-PY
-
-echo "PASS: test-install.sh (24 scenarios)"
+echo "PASS: test-install.sh (link, no project writes, kept files, skills links, validation, gh-guard budget, edge cases)"

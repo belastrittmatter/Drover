@@ -8,7 +8,7 @@
 # they needed.
 set -euo pipefail
 cd "$(dirname "$0")"
-DEPS="../scripts/drover-deps.sh"
+DEPS="../lib/drover-deps.sh"
 FIX=fixtures/deps-issues.json
 
 fail() { echo "FAIL: $1" >&2; exit 1; }

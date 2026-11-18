@@ -6,7 +6,7 @@ clarifying answers.
 
 **Before worker writes or worktree creation:** follow [skill readiness](../../drover/references/skills-readiness.md).
 Resolve this lane for the actual host, load the report's files/fallbacks, halt
-on missing requirements and recheck each conditional helper before use.
+on missing requirements and check any helper the card did not route with `--require` before use.
 
 
 For existing project verifier coverage relevant to this iteration, follow
@@ -46,7 +46,7 @@ worker memory creep:
 3. **Judgment calls use the decision ladder, not a panel.** Walk
    acceptance criteria → repo precedent → smallest blast radius → human gate
    and stop at the first rung that answers the question:
-   `.claude/skills/drover-build/references/decision-policy.md`. The one
+   `~/.claude/skills/drover-build/references/decision-policy.md`. The one
    technical check that still runs is `mattpocock-skills:code-review` against
    a concrete diff, with the merge-base passed as the fixed point.
 4. **Per-iteration cap: 30 screenshots.** Re-use steps between TCs that share
@@ -317,14 +317,14 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
    ```
 
    PR body = the marker blocks of writing-standard.md § 2
-   (`.claude/bin/drover-pr-body.sh --skeleton`): status card with
+   (`drover pr-body --skeleton`): status card with
    `Closes #${ISSUE_N}`, Problem (the failing assertion / signal type, lettered
    steps, screenshot), Solution (plain bullets), Acceptance criteria with proof
    lines, Iteration history, Risk (**Low**/**Medium**/**High** + Door + Blast radius — subjective
    signals are never Low).
    Forensics excerpts go in the proof lines, not as file lists.
    After opening the PR and after each later push, follow
-   `.claude/skills/drover/references/pr-author-notes.md`: one file-level review
+   `~/.claude/skills/drover/references/pr-author-notes.md`: one file-level review
    comment per changed file and a few critical inline notes, with Purpose, What changed,
    and Why it matters. Confirm them before handing the PR to review.
 
@@ -601,7 +601,7 @@ detection (do NOT batch at end of iter):
 
 1. **Write the issue body** to a temp file, e.g.
    `/tmp/drover-qa-iter-${N}-bug-${slug}.md`, in the ticket format of
-   `.claude/skills/drover/references/writing-standard.md` § 3 — enough
+   `~/.claude/skills/drover/references/writing-standard.md` § 3 — enough
    context for a future headless session to fix it without rediscovery. The
    filer refuses a body that misses a section:
    - `## Problem` — 1–3 sentences: what is wrong and where.
@@ -624,7 +624,7 @@ detection (do NOT batch at end of iter):
 
 2. **File the issue + auto-promote to Ready:**
    ```bash
-   ISSUE_N=$(scripts/drover-qa-file-bug.sh \
+   ISSUE_N=$(drover qa-file-bug \
      --title "<one-line title>" \
      --body-file /tmp/drover-qa-iter-${N}-bug-${slug}.md \
      --kind bug \

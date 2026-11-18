@@ -1,6 +1,6 @@
 # drover stop — full contract
 
-**Where it runs:** interactive orchestrator. Spawns the headless `scripts/drover-stop.sh` synchronously, reports the summary, exits. No background processes.
+**Where it runs:** interactive orchestrator. Spawns the headless `drover stop` synchronously, reports the summary, exits. No background processes.
 
 ## What stop does — the one-line version
 
@@ -22,8 +22,7 @@ Progress: [done] onboard  →  [done] run  →  stop (you are here)
 
 | Check | Action on fail |
 |---|---|
-| Active config exists (arg or `.claude/drover/active`) | Exit 64: usage hint |
-| Config file readable | Exit 66: "config not found" |
+| `.drover/config.json` exists (one per repo) | Exit 64: "no config" hint |
 | `gh auth` valid | Continue anyway — comments may fail, kills still work |
 
 Nothing else. Stop is intentionally tolerant — its job is to bring the system to rest, not to enforce policy.
@@ -44,7 +43,7 @@ Nothing else. Stop is intentionally tolerant — its job is to bring the system 
    - Did: worker PID and timestamp.
    - Done: last commit on the branch (a recovery point; inspect the preserved worktree for later edits).
    - Not done: interrupted work may be uncommitted.
-   - Next: `drover run <slug>`.
+   - Next: `drover run`.
 3. **Release the assignee mutex** on the issue (`gh issue edit --remove-assignee <bot>`).
 4. **Remove descriptive labels** (`loop:in-build`, `loop:in-qa`, `loop:in-review`) — best-effort.
 5. **SIGTERM the worker PID**, sleep 1s, SIGKILL if still alive.
@@ -61,7 +60,7 @@ Nothing else. Stop is intentionally tolerant — its job is to bring the system 
 - **Does not wait for workers to finish.** `claude -p` workers have no SIGTERM handler that flushes a partial commit. Worktree files remain, but unsaved in-memory work may be lost. Inspect uncommitted edits before resuming; restart recovery keeps dirty worktrees for inspection.
 - **Does not touch worktrees** under `.drover/worktrees/` or the legacy `.worktrees/` and `.claude/worktrees/issue-*` locations. A legacy board worktree halts the next run until inspected/moved to the canonical folder; cleanup never force-removes it.
 - **Does not touch branches or PRs.** Both persist. State lives on the GitHub Project board — cards stay in whichever column they were in when stopped.
-- **Does not modify the config.** A stopped run is not a deactivated config; `.claude/drover/active` is preserved.
+- **Does not modify the config.** A stopped run is not a deactivated config; `.drover/config.json` is untouched.
 - **Does not bypass the GitHub assignee mutex.** It releases the mutex, then kills. If the GitHub API is unreachable, release is best-effort and the orphan-scan + reap-on-next-start covers the gap.
 
 ## Resume = run (no separate verb)
@@ -71,7 +70,7 @@ There is **no `drover resume` verb on purpose**. The board is the state:
 - Cards sit in whichever column they were in when stopped.
 - Branches + PRs persist.
 - The wrap-up comment on each in-flight issue documents what was in progress.
-- `drover run <slug>` claims the same cards on its next tick and re-runs the lane from scratch (Builder re-implements, Tester re-runs tests, Reviewer re-reviews — there's no per-lane checkpoint inside a worker).
+- `drover run` claims the same cards on its next tick and re-runs the lane from scratch (Builder re-implements, Tester re-runs tests, Reviewer re-reviews — there's no per-lane checkpoint inside a worker).
 
 Resume cost: **one lane cycle per previously-in-flight card** (Builder ~5min, Tester ~10min, Reviewer ~3min on a typical card), after any required recovery. Inspect and preserve local edits first; dirty or legacy worktrees need attention before automatic recovery continues.
 
@@ -93,8 +92,8 @@ Resume cost: **one lane cycle per previously-in-flight card** (Builder ~5min, Te
 
 Per the cardinal orchestrator/worker rule:
 
-1. Verify `.claude/drover/active` exists OR a slug was provided.
-2. Run `scripts/drover-stop.sh <slug>` synchronously (it's fast — seconds, not minutes).
+1. Verify `.drover/config.json` exists.
+2. Run `drover stop` synchronously (it's fast — seconds, not minutes).
 3. Pass through the script's summary to the user.
 4. **Do not** retry kills, do not chase down zombies the script missed, do not "while you're at it" clean up worktrees or branches. If the script reported failures, surface them and wait for explicit user direction.
 

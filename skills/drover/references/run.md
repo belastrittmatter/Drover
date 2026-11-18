@@ -1,12 +1,12 @@
 # drover run — full contract
 
-**Scope:** the lane lifecycles (Builder, Tester, Reviewer) that both backends use, and the legacy `claude-p` runner (`worker_backend: "claude-p"`). The default in-session wave loop is in `run-workflow.md`.
+**Scope:** the lane lifecycles (Builder, Tester, Reviewer) that both backends use, and the headless runner (`drover run`, or `/drover run --headless`). The default in-session wave loop is in `run-workflow.md`.
 
-**Where the legacy runner runs:** headless. Spawned as a `nohup`-backgrounded process; the current Claude session exits immediately after dispatch. The runner script (`scripts/drover-run.sh`) is a pure shell while-loop that dispatches one `claude -p` worker per lane and never holds Claude session state. Each `claude -p` worker is its own short-lived headless context — load this file at the start of every lane.
+**Where the headless runner runs:** headless. Spawned as a `nohup`-backgrounded process; the current Claude session exits immediately after dispatch. The runner script (`drover run`, lib/drover-run.sh) is a pure shell while-loop that dispatches one worker per lane with the command, model flag and permissions in `harnesses/<harness>.json`, and never holds Claude session state. Each `claude -p` worker is its own short-lived headless context — load this file at the start of every lane.
 
 ## Required GitHub reads can pause a run
 
-Use `.claude/bin/drover-github-read.py` for required API evidence. It retries
+Use `drover github-read` for required API evidence. It retries
 one failed read at most twice (three total attempts); invalid queries or missing
 authority halt immediately. Exit **79** means stop dispatch and pause the current
 run. Never substitute an empty board, OPEN issue, full quota, or empty diff.
@@ -22,7 +22,7 @@ checkpoint limitations: [run-workflow.md](run-workflow.md#required-github-eviden
 **Drover is an autonomous trader. The interactive Claude session that invokes `drover run` is an orchestrator, NOT a worker.** Its only jobs are:
 
 1. Verify preconditions (see table below).
-2. Spawn the headless `nohup ./scripts/drover-run.sh <slug> &` runner.
+2. Spawn the headless `nohup drover run &` runner.
 3. Report runner PID + log path back to the user.
 4. Exit.
 
@@ -52,19 +52,19 @@ Progress: [done] onboard  →  [done] lint  →  run (you are here)
 
 | Check | Action on fail |
 |---|---|
-| Usable verification commands | Run `python3 .claude/bin/drover-verification-ready.py --config <config>`. Exit 9 halts setup before dispatch: configure the owning project's checks, then restart explicitly. |
+| Usable verification commands | Run `drover verification-ready --config <config>`. Exit 9 halts setup before dispatch: configure the owning project's checks, then restart explicitly. |
 | Active config exists | Halt: "Run `drover onboard` first." |
 | Project + required columns exist | Halt: "Project / columns missing. Run `drover onboard` to repair." |
 | `gh auth` valid with required scopes | Halt: "Re-auth: `gh auth refresh -s project,read:project,repo`." |
 | `pre-flight.md` all items `[✓]` | Halt: "Pre-flight incomplete — fix these: [list]." |
-| No issues missing ACs in active columns | Halt: "N issues need clarification. Run `drover lint`." |
+| No issues missing ACs in active columns | Halt: "N issues need clarification. Run `/drover lint`." |
 | Clean git working tree on base branch | Halt: "Working tree dirty. Stash or commit before running." |
 | Legacy worktrees | If `.worktrees/issue-*` or a pre-rename `.claude/worktrees/issue-*` exists, halt before dispatch. Stop its worker, inspect/preserve edits, then `git worktree move` it to the matching `.drover/worktrees/` path. Never delete it as part of an upgrade. |
 | Stale worktree scan | Scan only `.drover/worktrees/issue-<N>` and `issue-<N>-build/qa/review`. If its named branch is gone, use `git worktree remove` without force. Keep detached, dirty, locked, unregistered, or unrelated folders; log failures for inspection. A missing board label alone is not permission to delete work. |
 | Production-merge guard | If `base_branch == "main"` AND `human_approves_merge == false` AND `merge_policy.default != "human"` AND `merge_policy.allow_auto_on_production != true` AND production-detection signals fire (see onboard → base branch), halt with: `Refusing to start: would auto-merge to production main. Set merge_policy.default: "human", switch base_branch to staging, or re-run drover onboard to opt in explicitly.` |
 | Orphan-worker scan (added 2026-05-22 after #381 worker storm) | `pgrep -f 'claude -p .*drover run'` must return zero. If any drover worker is already alive from a prior crashed run, halt with: `${N} drover workers already running. Stop them first: pkill -f 'claude -p .*drover run'`. The dispatcher must never run while orphan workers exist — they will collide on assignee claims and produce duplicate PRs. |
 | Database reach | Run every `migrations.checks[env]` for an env in `allowed_envs` (read-only, e.g. `supabase migration list --db-url …`). On failure halt with its error: "Migrate URL for <env> does not connect — fix it before a wave builds work the gate cannot land." |
-| GraphQL rate-limit guard | Before each tick, `sb_gh_guard_check` (drover-gh-guard.sh — it reads GraphQL's own `rateLimit`, because `gh api rate_limit` misreports the GraphQL bucket). If GraphQL remaining < 200, sleep until reset. Prevents the runner from dying mid-loop when the user has burned quota in another tool. |
+| GraphQL rate-limit guard | Before each tick, `drover gh-guard check 200` (lib/drover-gh-guard.sh — it reads GraphQL's own `rateLimit`, because `gh api rate_limit` misreports the GraphQL bucket). If GraphQL remaining < 200, sleep until reset. Prevents the runner from dying mid-loop when the user has burned quota in another tool. |
 
 ## Lanes and label routing
 
@@ -137,10 +137,10 @@ There is **exactly one branch per issue** and **exactly one PR per issue**. All 
 
 Format: `writing-standard.md` § 2. Title = a subject in the repo's `commit_style`
 (conventional: `feat(chat): stream replies`). The body is marker blocks; each lane rewrites only its own
-with `.claude/bin/drover-pr-body.sh --pr <P> --block <name> --expect-head <sha>
+with `drover pr-body --pr <P> --block <name> --expect-head <sha>
 (--body-file | --append-file) <md>`. The script refuses (exit 6) when the PR head moved since you
 read it — re-read, then redo the edit. Builder opens the PR with every block filled
-(`drover-pr-body.sh --skeleton` prints the empty markers).
+(`drover pr-body --skeleton` prints the empty markers).
 
 | Block | Builder | Tester | Reviewer |
 |---|---|---|---|
@@ -204,7 +204,7 @@ read it — re-read, then redo the edit. Builder opens the PR with every block f
 
 History rows by lane: `builder` · `qa` (`fail v1` / `pass v2`, details = evidence folder) ·
 `reviewer` (`bounced` / `merged`, details = finding ids or `squash <sha>`). Time comes
-from `drover-pr-body.sh --time --config <cfg>` (config `timezone`).
+from `drover pr-body --time --config <cfg>` (config `timezone`).
 
 Status card lines: `> [!NOTE]` + `Building` / `In QA` / `In review · round N` ·
 `> [!TIP]` + `Merged · <sha>` · `> [!WARNING]` + `Blocked · <reason>` (`Blocked · needs owner`
@@ -245,14 +245,14 @@ Threads are resolved via `gh api graphql` `resolveReviewThread` mutation when th
 Two agents must never build the same thing, and nothing already on the base branch gets built
 twice. So before a Builder starts, a **fresh, cheap sub-agent** (no code, no worktree) checks the
 card. Workflow backend: the wave's `Pre-flight` phase does it, one agent per batch of up to 5 Ready
-cards, before `runLane('build')`. Legacy `claude-p` backend: the Builder runs it as step 0 below,
+cards, before `runLane('build')`. Headless runner: the Builder runs it as step 0 below,
 in a sub-agent, before touching a worktree.
 
 ```
-[ ] source .claude/bin/drover-gh-guard.sh; sb_gh_guard_check 200
-[ ] build the in-flight list: .claude/bin/drover-card.sh --config <cfg> items (one call) → [{number,title,status}] for
+[ ] drover gh-guard check 200
+[ ] build the in-flight list: drover card --config <cfg> items (one call) → [{number,title,status}] for
     Building / QA / Review / Ready cards; save it to a temp file
-[ ] bash .claude/bin/drover-preflight.sh --repo <owner/name> --issues <N[,M…]> \
+[ ] drover preflight --repo <owner/name> --issues <N[,M…]> \
          --inflight <file> [--files <paths you expect to touch>]
 [ ] judge each card: the script's verdict, then its `candidates` (near-misses) semantically
 [ ] act on the outcome below, then return one verdict per card
@@ -451,8 +451,8 @@ on the base branch**.
 
 ```
 1. Mark ready      gh pr ready <PR>                     # idempotent; no-op if already ready
-2. Merge through the gate (step 5), pinned to the reviewed head — never a bare
-   `gh pr merge`. The gate applies `merge_policy` (who merges; `default: "human"`
+2. Merge through the gate (step 5), pinned to the reviewed head (never a bare `gh pr merge`).
+   The gate applies `merge_policy` (who merges; `default: "human"`
    keeps a person on every merge) and `migrations` (which databases the robot may
    migrate) itself; the Reviewer does not second-guess either, it routes the exit code.
 3. Confirm the merge LANDED, do not trust the exit code:
@@ -464,13 +464,13 @@ on the base branch**.
 5. Merge through the gate, never with a bare `gh pr merge`. Record the head you
    reviewed when review passes, and hand it to the gate:
      HEAD=$(gh pr view <N> --json headRefOid -q .headRefOid)   # at the moment review passes
-     bash .claude/bin/drover-merge-gate.sh --config <config> --pr <N> --expect-head "$HEAD" \
+     drover gate --config <config> --pr <N> --expect-head "$HEAD" \
        --subject "<PR title>" --body-file <msg.md>
    <msg.md> = the PR's commit bullets, deduplicated, plus `Closes #<issue>` (writing-standard.md § 1).
    The gate takes the merge mutex, checks the PR head is still $HEAD, merges the CURRENT
    base into a scratch worktree at $HEAD, runs `config.verify_commands`, and only then
    squash-merges with `--match-head-commit $HEAD`. After a merge it runs `cleanup-wt --post-merge`
-   when the `.claude/hooks/cleanup-wt.py` hook is installed (local only; a cleanup failure never changes the exit). Route by exit code:
+   from the drover install folder's `hooks/cleanup-wt.py` (local only; a cleanup failure never changes the exit). Route by exit code:
      9 → verification-readiness: halt the run and preserve card, approval, claims, and worktree. Repair `config.verify_commands` with the project's real checks, then restart explicitly. Never bounce to Build, retry a rebase, or bypass the gate.
      0 → merged; continue to step 4
      2 → the branch no longer builds against the base → **rebase pass** (see below)
@@ -639,7 +639,7 @@ The dispatcher MUST also:
 3. **Cap one worker per lane** — track `BUILD_PID` / `QA_PID` / `REVIEW_PID`; do not dispatch to a lane whose prior PID is still alive.
 4. **Reap stale locks each tick** — `reap_finished_locks` removes any lock whose PID no longer exists.
 5. **Orphan-scan on startup** — refuse to start if any `claude -p .*drover run` worker is already running from a prior crashed dispatcher.
-6. **One board read per tick** — `drover-card.sh items` once per tick, not per column lookup (~1 GraphQL point per 100 cards).
+6. **One board read per tick** — `drover card items` once per tick, not per column lookup (~1 GraphQL point per 100 cards).
 
 The three locks (assignee, in-flight file, lane PID) are defense in depth: any one of them alone has a race window; together they make a duplicate dispatch effectively impossible.
 
@@ -764,12 +764,12 @@ Records: config used, columns, target, per-card history (claim → completion �
 
 Workers share the dispatcher's gh-auth token bucket. The dispatcher's `gh_rate_guard` does NOT protect worker traffic. Every worker MUST follow `rate-limit-etiquette.md` (in this directory):
 
-- Move and read cards with `.claude/bin/drover-card.sh --config <cfg> move <issue> <Status>` / `status <issue>` — 1 GraphQL point. Every "move card X → Y" in the lifecycles above means this call. Comments, labels and PR reads go over REST (`rate-limit-etiquette.md` → "Price list").
+- Move and read cards with `drover card --config <cfg> move <issue> <Status>` / `status <issue>` — 1 GraphQL point. Every "move card X → Y" in the lifecycles above means this call. Comments, labels and PR reads go over REST (`rate-limit-etiquette.md` → "Price list").
 
-- Source `scripts/drover-gh-guard.sh` at worker start.
-- Call `sb_gh_guard_check 200` before any burst of gh calls (thread reads, sub-agent spawn, exit verification).
+- Run `drover gh-guard check 200` at worker start.
+- Run `drover gh-guard check 200` before any burst of gh calls (thread reads, sub-agent spawn, exit verification).
 - Adversarial sub-agents are capped at 50 gh calls each — prefer `git blame` (local) over `gh api graphql`.
-- Final PR handoff comment MUST include `gh-quota-on-exit: graphql=<n>/5000 rest=<n>/5000` (use `sb_gh_guard_summary`).
+- Final PR handoff comment MUST include `gh-quota-on-exit: graphql=<n>/5000 rest=<n>/5000` (use `drover gh-guard summary`).
 - On 403 / secondary-rate-limit: sleep 60s, re-check at threshold 500, then resume.
 
 ## Worker self-check (mandatory on exit, every lane)
@@ -777,7 +777,7 @@ Workers share the dispatcher's gh-auth token bucket. The dispatcher's `gh_rate_g
 Before releasing the claim assignee and exiting, every worker MUST verify:
 
 - [ ] Issue comment AND PR comment both written (per "Commenting cadence" above).
-- [ ] Card column move's mutation returned success. **Trust the exit code of `drover-card.sh move`** — a re-read of the board was the per-worker quota tax (`rate-limit-etiquette.md` §3). If the mutation returned non-zero, preserve its unknown outcome, leave the assignee in place, and pause the run locally. Reconcile the remote card state before any repeat; never blindly retry a write or depend on a successful halt comment.
+- [ ] Card column move's mutation returned success. **Trust the exit code of `drover card move`** — a re-read of the board was the per-worker quota tax (`rate-limit-etiquette.md` §3). If the mutation returned non-zero, preserve its unknown outcome, leave the assignee in place, and pause the run locally. Reconcile the remote card state before any repeat; never blindly retry a write or depend on a successful halt comment.
 - [ ] Claim assignee released (`gh issue edit --remove-assignee <bot_identity>`) and the descriptive `loop:in-*` label removed.
 - [ ] On failure handoff: `root-cause-hash:` line is present in the PR handoff comment (per "Root-cause hash" above).
 - [ ] On Block/Skip exit: the full template from `block-template.md` is populated on BOTH the issue and the PR (if a PR exists); the reason tag is one of `drover-reasons.json` (a dropped card takes `[dropped]`).

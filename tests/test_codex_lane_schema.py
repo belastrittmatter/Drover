@@ -14,7 +14,7 @@ KIT = Path(__file__).resolve().parent.parent
 
 
 def lane_schema():
-    text = (KIT / 'scripts/drover-lane.sh').read_text()
+    text = (KIT / 'lib/drover-lane.sh').read_text()
     source = text.split("<<'PY'\n", 1)[1].rsplit('\nPY', 1)[0]
     wanted = {'counts', 'properties', 'schema'}
     nodes = [node for node in ast.parse(source).body if isinstance(node, ast.Assign)

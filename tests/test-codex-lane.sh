@@ -10,16 +10,16 @@ if [ -z "${SB_LANE_ENTRY:-}" ]; then
   # The backend seam: a missing, unknown or not-yet-built backend exits 64 and names the valid ones.
   T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
   for args in "" "--backend gemini" "--backend claude" "--backend=gemini" "--backend"; do
-    RC=0; bash "$KIT/scripts/drover-lane.sh" $args --config x --card '{}' --lane build >/dev/null 2>"$T/err" || RC=$?
+    RC=0; bash "$KIT/lib/drover-lane.sh" $args --config x --card '{}' --lane build >/dev/null 2>"$T/err" || RC=$?
     [ "$RC" -eq 64 ] && grep -q 'valid backends: codex' "$T/err" || { echo "FAIL: '$args' must exit 64 naming the valid backends (rc=$RC)" >&2; cat "$T/err" >&2; exit 1; }
   done
-  grep -q '^exec .*drover-lane.sh" --backend codex "\$@"$' "$KIT/scripts/drover-codex-lane.sh" || { echo 'FAIL: codex-lane must be a one-line shim' >&2; exit 1; }
+  grep -q '^exec .*drover-lane.sh" --backend codex "\$@"$' "$KIT/lib/drover-codex-lane.sh" || { echo 'FAIL: codex-lane must be a one-line shim' >&2; exit 1; }
   echo 'PASS: test-codex-lane.sh (shim + --backend codex; backend refusal)'
   exit 0
 fi
 case "$SB_LANE_ENTRY" in
-  shim) LAUNCHER=("$KIT/scripts/drover-codex-lane.sh") ;;
-  *) LAUNCHER=("$KIT/scripts/drover-lane.sh" --backend codex) ;;
+  shim) LAUNCHER=("$KIT/lib/drover-codex-lane.sh") ;;
+  *) LAUNCHER=("$KIT/lib/drover-lane.sh" --backend codex) ;;
 esac
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/bin" "$T/repo"
@@ -44,7 +44,7 @@ cd "$T/repo"
 echo '{"verify_commands":["git diff --check"]}' > "$T/config.json"
 CARD='{"number":1,"status":"Ready","title":"example"}'
 lane() { bash "${LAUNCHER[@]}" --config "$T/config.json" --card "$CARD" --lane "$@" 2>"$T/stderr"; }
-wave() { bash "$KIT/scripts/drover-codex-wave.sh" --config "$T/config.json" --cards "$CARDS" "$@" 2>"$T/stderr"; }
+wave() { bash "$KIT/lib/drover-codex-wave.sh" --config "$T/config.json" --cards "$CARDS" "$@" 2>"$T/stderr"; }
 fail() { echo "FAIL: $*" >&2; cat "$T/stderr" >&2; exit 1; }
 last_model() { tail -1 "$SB_CODEX_TEST_LOG" | jq -r '.args | if index("-m") then .[index("-m")+1] else "default" end'; }
 
@@ -104,7 +104,7 @@ RC=0; lane build --codex --tier extreme >"$T/out" || RC=$?
 [ "$RC" -ne 0 ] || fail 'unknown tier must refuse'
 
 # Wave: the luna router grades Ready cards only when nothing pins a model.
-echo '{"max_workers":1,"verify_commands":["git diff --check"]}' > "$T/config.json"
+echo '{"roles":{"build":{"max_workers":1}},"verify_commands":["git diff --check"]}' > "$T/config.json"
 CARDS='[{"number":1,"status":"Ready","title":"easy"},{"number":2,"status":"Review"}]'
 : > "$SB_CODEX_TEST_LOG"
 SB_CODEX_TEST_GRADE=low wave --codex --tier low >"$T/out"
@@ -189,7 +189,7 @@ done <<'GOOD'
 GOOD
 
 CARDS='[{"number":1,"status":"Ready"},{"number":2,"status":"Ready","labels":["qa"]},{"number":3,"status":"QA"},{"number":4,"status":"Review"}]'
-echo '{"max_workers":1,"codex":{"model":"config-model"},"verify_commands":["git diff --check"]}' > "$T/config.json"
+echo '{"roles":{"build":{"max_workers":1}},"codex":{"model":"config-model"},"verify_commands":["git diff --check"]}' > "$T/config.json"
 : > "$SB_CODEX_TEST_LOG"
 wave --codex=wave-model --output "$T/wave.json" > "$T/out"
 cmp "$T/out" "$T/wave.json" || fail 'file and stdout wave result differ'
@@ -222,7 +222,7 @@ RC=0; SB_CODEX_TEST_STATUS=halted SB_CODEX_TEST_DETAIL='verification-readiness: 
 rm .claude/drover/inflight/1
 
 # Two card chains run together, but a cap of 1 above was serial.
-echo '{"max_workers":2,"verify_commands":["git diff --check"]}' > "$T/config.json"
+echo '{"roles":{"build":{"max_workers":2}},"verify_commands":["git diff --check"]}' > "$T/config.json"
 CARDS='[{"number":1,"status":"Review"},{"number":2,"status":"Review"}]'
 : > "$SB_CODEX_TEST_LOG"
 SB_CODEX_TEST_DELAY=1 wave --codex >"$T/out"

@@ -6,7 +6,7 @@ description: Reviewer lane of the drover pipeline and standalone PR/branch readi
 
 **For a board worker, before writes or worktree creation:** follow [skill readiness](../drover/references/skills-readiness.md).
 Resolve this lane for the actual host, load the report's files/fallbacks, halt
-on missing requirements and recheck each conditional helper before use.
+on missing requirements and check any helper the card did not route with `--require` before use.
 
 # Drover Review — PR/code readiness reviewer
 
@@ -111,13 +111,13 @@ If the input is ambiguous, default to reviewing the current branch against its u
    - If a blocker is an implementation task, hand it to **Drover Build**.
    - If a blocker is a functional regression, hand it to **Drover QA**.
    - If a blocker is visual/design fidelity, file a UI ticket; a human can run `/ui-refine-loop` (the board never triggers it).
-   - If it is a deepening opportunity, file it with `scripts/drover-review-file-refactor.sh` and carry on to the merge decision. Do not open a PR thread for it; do not bounce the card.
+   - If it is a deepening opportunity, file it with `drover review-file-refactor` and carry on to the merge decision. Do not open a PR thread for it; do not bounce the card.
      `--title` is the bare problem: the filer adds the `[refactor] <scope>:` prefix, so never pass one.
      The `--body-file` uses the ticket format (writing-standard.md § 3): `## Problem`,
      `## Context` (`- **Where:**` the module and files), `## Fix` — the filer refuses a body
      without them. **Write real acceptance criteria too.** A card that carries an
      `## Acceptance Criteria` checklist is filed straight into `Ready` and the next wave builds it;
-     one without lands in the holding column and waits for `drover lint`. That is the whole
+     one without lands in the holding column and waits for `/drover lint`. That is the whole
      difference between a finding that gets fixed this week and a note nobody grades. Two or three
      checkable lines is enough — what must be true when this is done, in terms a test can assert.
      The filer appends `## Risk` and `## Blocked by` for you when you have not written them.
@@ -181,7 +181,7 @@ In a `drover run` the loop runs through the board:
 2. Each actionable finding becomes a prefixed PR thread (`[builder]`, `[qa]`) and the card bounces to the owning lane — Drover Build or Drover QA; for visual polish, file a UI ticket; a human can run `/ui-refine-loop`.
 3. The owning lane fixes and verifies its scope.
 4. Drover Review runs again against the updated branch, with its last report as `prior_report` — round 1 checks those findings before any fresh pass.
-5. Stop only when no blocking review findings remain, or unresolved items are explicitly human-gated. A clean review merges through `scripts/drover-merge-gate.sh`, pinned to the head SHA it reviewed.
+5. Stop only when no blocking review findings remain, or unresolved items are explicitly human-gated. A clean review merges through `drover gate`, pinned to the head SHA it reviewed.
 
 Drover Review should not silently push fixes during the loop unless the user explicitly grants that authority.
 
@@ -294,7 +294,7 @@ When invoked by drover (env `DROVER_RUN=1` or invocation contains "drover run"):
 
 ### State protocol
 - Read from issue + PR comments + PR review threads.
-- **GitHub budget** — every "move card" is `.claude/bin/drover-card.sh --config <cfg> move <N> <Status>` (1 GraphQL point; `gh project item-list` / `field-list` cost ~100–200). Comments, labels and PR reads go over REST; [rate-limit-etiquette.md](../drover/references/rate-limit-etiquette.md) → "Price list" has the calls.
+- **GitHub budget** — every "move card" is `drover card --config <cfg> move <N> <Status>` (1 GraphQL point; `gh project item-list` / `field-list` cost ~100–200). Comments, labels and PR reads go over REST; [rate-limit-etiquette.md](../drover/references/rate-limit-etiquette.md) → "Price list" has the calls.
 - Respect handed-down worktree at `.drover/worktrees/issue-<N>-review/` and branch `issue-<N>-<slug>`.
 
 ### Two card types
@@ -302,7 +302,7 @@ When invoked by drover (env `DROVER_RUN=1` or invocation contains "drover run"):
 - **`qa` card:** review the QA report quality and any test diff; there is no product-code diff.
 
 ### Lifecycle (Reviewer)
-See `.claude/skills/drover/references/run.md` → Reviewer. Summary of the sub-steps:
+See `~/.claude/skills/drover/references/run.md` → Reviewer. Summary of the sub-steps:
 
 1. Worktree from current state of `issue-<N>-<slug>`.
 2. **Gate 1 — thread scan.** Read threads and replies. [PR author notes](../drover/references/pr-author-notes.md)
@@ -315,7 +315,7 @@ See `.claude/skills/drover/references/run.md` → Reviewer. Summary of the sub-s
    - Both open → bounce to whichever is older.
    - Clean up worktree, exit.
 3. Read PR + spot-check Tester evidence + read CLAUDE.md / AGENTS.md.
-   Check the Risk block against the diff: is the Door right (one-way: DROP, rename, data rewrite, public API, sent email) and the Blast radius honest? Fix it with `drover-pr-body.sh --block risk`; a one-way door is never Low.
+   Check the Risk block against the diff: is the Door right (one-way: DROP, rename, data rewrite, public API, sent email) and the Blast radius honest? Fix it with `drover pr-body --block risk`; a one-way door is never Low.
    **3b. Prior-report check** — load `prior_report` (see "Review remembers"); if present, round 1 checks each prior finding; any `not fixed` → re-open its thread, bounce by prefix, post the report, exit.
 4. Review code + tests.
 5. **Reviewer-side test rerun (always — closes Tester self-verification gap):**
@@ -331,7 +331,7 @@ See `.claude/skills/drover/references/run.md` → Reviewer. Summary of the sub-s
 7. Decide per finding. First apply the Over-engineering rule to every finding collected —
    yours, `ponytail:ponytail-review`'s and the truth-check sub-agents': Over-engineering is
    Should fix, never Blocker, and never on its own a reason to bounce or block. Then:
-   - **Deepening opportunity** → `scripts/drover-review-file-refactor.sh`, then keep going. It is not a finding for merge purposes and never bounces a card.
+   - **Deepening opportunity** → `drover review-file-refactor`, then keep going. It is not a finding for merge purposes and never bounces a card.
    - **No findings (Over-engineering aside) + threads clean + truth ≥ threshold + tests green** → run the **merge protocol** (below). Never move a card to Done any other way.
    - **Over-engineering only** (from `ponytail:ponytail-review`, see drover-review step 3) → list it in the report, open no thread, and carry on to the merge decision; it never bounces a card alone. When the card bounces for another finding anyway, open a `[builder]` thread for each Over-engineering finding too, so the rebuild trims it.
    - **Code-side new finding** → new `[builder]`-prefixed thread, move card Review → Ready (`loop:rebuild-N`).

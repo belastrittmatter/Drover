@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-CHECK = ROOT / "scripts/drover-verification-ready.py"
+CHECK = ROOT / "lib/drover-verification-ready.py"
 
 
 class VerificationReadiness(unittest.TestCase):
@@ -23,7 +23,7 @@ class VerificationReadiness(unittest.TestCase):
                 self.assertIn("verify_commands", result.stderr)
                 self.assertIn("verification-readiness", result.stderr)
                 # Planner must reject before it reads the supplied (nonexistent) items.
-                result = subprocess.run(["bash", str(ROOT / "scripts/drover-wave-plan.sh"),
+                result = subprocess.run(["bash", str(ROOT / "lib/drover-wave-plan.sh"),
                                          "--config", str(path), "--items", str(path.parent / "absent")],
                                         capture_output=True, text=True)
                 self.assertEqual(result.returncode, 9, result.stderr)
@@ -54,7 +54,7 @@ class VerificationReadiness(unittest.TestCase):
                         else ["--cards", json.dumps([card])])
                 if launcher == "drover-lane.sh":
                     args = ["--backend", "codex"] + args
-                result = subprocess.run(["bash", str(ROOT / "scripts" / launcher),
+                result = subprocess.run(["bash", str(ROOT / "lib" / launcher),
                                          "--config", str(config), "--codex"] + args,
                                         cwd=root, env=dict(os.environ, PATH=str(binary.parent) + ":" + os.environ["PATH"]),
                                         capture_output=True, text=True)
@@ -68,10 +68,10 @@ class VerificationReadiness(unittest.TestCase):
     def test_setup_reports_configuration_error_without_inventing_checks(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
-            cfg = root / ".claude/drover/configs/app.json"
+            cfg = root / ".drover/config.json"
             cfg.parent.mkdir(parents=True)
             cfg.write_text(json.dumps({"verify_commands": [" "]}))
-            command = ["python3", str(ROOT / "scripts/drover-setup.py"),
+            command = ["python3", str(ROOT / "lib/drover-setup.py"),
                        "check", "--root", str(root), "--pack", str(ROOT)]
             result = subprocess.run(command, capture_output=True, text=True)
             report = json.loads(result.stdout)
@@ -81,13 +81,13 @@ class VerificationReadiness(unittest.TestCase):
             self.assertIn("verification-readiness", text.stdout)
             self.assertEqual(json.loads(cfg.read_text())["verify_commands"], [" "])
 
-    def test_legacy_run_stops_before_creating_run_state(self):
+    def test_run_stops_before_creating_run_state(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
-            cfg = root / ".claude/drover/configs/app.json"
+            cfg = root / ".drover/config.json"
             cfg.parent.mkdir(parents=True)
-            cfg.write_text(json.dumps({"worker_backend": "claude-p", "verify_commands": []}))
-            result = subprocess.run(["bash", str(ROOT / "scripts/drover-run.sh"), "app"],
+            cfg.write_text(json.dumps({"project": {"owner": "o", "number": 1}, "verify_commands": []}))
+            result = subprocess.run(["bash", str(ROOT / "lib/drover-run.sh")],
                                     cwd=root, capture_output=True, text=True)
             self.assertEqual(result.returncode, 9, result.stderr)
             self.assertFalse((root / "docs").exists())

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # drover-build-dispatch.sh — dispatch a single GitHub issue to a headless `claude -p` worker.
 #
-# Contract (per .claude/skills/drover-build/SKILL.md):
+# Contract (per ~/.claude/skills/drover-build/SKILL.md):
 #   - Arg: issue number N
 #   - Env: BASE_BRANCH (required) — the branch the worktree is created from
 #          REPO_DIR    (optional) — defaults to PWD; the working repo root
 #          SKILL_DIR   (optional) — defaults to the dir this script lives in's parent
 #          MAX_TURNS   (optional) — default 250
-#          CONFIG_PATH (optional) — drover config; defaults to the one .claude/drover/active names
+#          CONFIG_PATH (optional) — drover config; defaults to .drover/config.json
 #   - Side effects:
 #       * git worktree add -b loop/issue-N .drover/worktrees/issue-N BASE_BRANCH
 #       * runs `claude -p` inside that worktree with the composed prompt
@@ -47,10 +47,7 @@ if [[ -z "$BASE_BRANCH" ]]; then
 fi
 
 REPO_DIR="${REPO_DIR:-$PWD}"
-CONFIG_PATH="${CONFIG_PATH:-}"
-if [[ -z "$CONFIG_PATH" && -f "$REPO_DIR/.claude/drover/active" ]]; then
-  CONFIG_PATH="$REPO_DIR/.claude/drover/configs/$(tr -d '[:space:]' < "$REPO_DIR/.claude/drover/active").json"
-fi
+CONFIG_PATH="${CONFIG_PATH:-$REPO_DIR/.drover/config.json}"
 [[ -f "$CONFIG_PATH" ]] || CONFIG_PATH=""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="${SKILL_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
@@ -102,7 +99,7 @@ if git rev-parse --verify "$WORKER_BRANCH" >/dev/null 2>&1; then
 fi
 
 # Compose the worker prompt: preamble + issue body + working-dir footer
-SB_BIN="$REPO_DIR/.claude/bin"
+SB_BIN="$(cd -P "$(dirname "$0")/../../.." && pwd)/lib"  # the drover install folder
 ISSUE_JSON=$(python3 "$SB_BIN/drover-github-read.py" --kind issue -- issue view "$N" --json number,title,body 2>&1) || {
   echo "error: gh issue view #$N failed:" >&2
   echo "$ISSUE_JSON" >&2
@@ -119,7 +116,7 @@ ISSUE_TITLE=$(printf '%s' "$ISSUE_JSON" | jq -r '.title')
 ISSUE_BODY=$(printf '%s' "$ISSUE_JSON" | jq -r '.body')
 
 {
-  printf 'First operation: repeat drover-skills-ready.py --root %s --host claude --cards - --lane build with %s as stdin. Halt on exit 10 before any lifecycle writes. Recheck conditional helpers with --require before use.\n' "$REPO_DIR" "$CARD_JSON"
+  printf 'First operation: repeat drover skills-ready --root %s --host claude --cards - --lane build with %s as stdin. Halt on exit 10 before any lifecycle writes. Check a helper the card did not route with --require before use.\n' "$REPO_DIR" "$CARD_JSON"
   cat "$PREAMBLE"
   # FR-CNV-2: the repo's commit style and three real subjects from the base branch.
   printf '\n%s\n' "$(python3 "$SB_BIN/drover-commit-style.py" --root "$REPO_DIR" --base "$BASE_BRANCH" ${CONFIG_PATH:+--config "$CONFIG_PATH"} --prompt 2>/dev/null || true)"

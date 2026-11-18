@@ -1,9 +1,8 @@
 # drover run — workflow backend contract
 
-The DEFAULT backend (v1.6.0+): used when the active config sets
-`"worker_backend": "workflow"` or omits the key. The legacy bash dispatcher
-(`.claude/bin/drover-run.sh`, see `run.md`) runs only on explicit
-`"worker_backend": "claude-p"`; this file ONLY changes who dispatches
+The DEFAULT backend of `/drover run` (v1.6.0+). The headless runner
+(`drover run` in a shell, or `/drover run --headless`, see `run.md`) is the
+other one; this file ONLY changes who dispatches
 workers. Lane lifecycles, branch/PR model, comment cadence, Block
 templates, halt gates, and done conditions are all inherited from `run.md`
 unchanged.
@@ -11,7 +10,7 @@ unchanged.
 ## Codex runs
 
 `/drover run --codex` uses headless Codex for every lane of every wave,
-overriding `worker_backend`. Use it when Claude's remaining usage is low or to try another model.
+overriding the default backend. Use it when Claude's remaining usage is low or to try another model.
 `--codex --low` / `--codex --high` pick the Codex ladder the same way the tier flags
 pick Claude's (flag, else config `model_tier`, else medium); pass it as `--tier`.
 A cheap router (`gpt-6-luna`) grades each Ready card low/medium/high, and the lane
@@ -21,7 +20,7 @@ pins one model for every card and skips the router.
 Keep this run choice in each wave and resume command; skip only the Claude usage guard.
 
 **Inside Codex, plain `run` is `--codex`.** Your tool list has no Workflow tool, or
-`bash .claude/bin/drover-host.sh --config <config-path>` prints `codex` → run as `--codex` (tier flags and
+`drover host --config <config-path>` prints `codex` → run as `--codex` (tier flags and
 `--codex=<model>` still apply); it counts as explicit `--codex`, Review included.
 Say so once, in the first wave report: `codex host — running as --codex`. Never improvise a Claude workflow wave in Codex.
 
@@ -30,10 +29,10 @@ Say so once, in the first wave report: `codex host — running as --codex`. Neve
 `unknown host — set DROVER_HOST=claude|codex and re-run`. Never guess a backend.
 
 After the same plan and claim steps, launch this command as a background task:
-`bash .claude/bin/drover-codex-wave.sh --config <config-path> --cards <claimed-cards.json> --codex[=<model>] --tier <low|medium|high> --output <wave-result.json>`.
+`drover codex-wave --config <config-path> --cards <claimed-cards.json> --codex[=<model>] --tier <low|medium|high> --output <wave-result.json>`.
 The helper starts one `drover-lane.sh --backend codex` per card/lane, cards in parallel,
 each advancing Build → QA → Review only after a successful handoff (QA labels skip Build).
-Concurrency uses positive `max_workers`, otherwise `max(1, min(16, cpus - 2))`.
+Concurrency is `roles.build.max_workers` (default 1); each card runs its lanes in turn.
 Pre-flight/classification and truth-check run inline; there are no Claude sub-agents.
 Each lane emits `{status,column,detail}`; the wave returns the same `cards` summary
 as the workflow, so reconcile, manifest, board/comments and throttle steps stay the same.
@@ -44,7 +43,7 @@ use the lane launcher's sandbox settings, including an external submodule git di
 
 ## Required GitHub evidence and a paused run
 
-Required reads use `.claude/bin/drover-github-read.py --kind <shape> -- <gh args>`.
+Required reads use `drover github-read --kind <shape> -- <gh args>`.
 Three total attempts means the first attempt plus two retries of that same read;
 unrelated successful calls do not reset its failures. Invalid GraphQL queries,
 authentication, and permission errors stop immediately. Do not retry mutations.
@@ -87,7 +86,7 @@ The interactive session that runs this backend is the orchestrator. It:
 
 Run the same preconditions as `run.md` §Preconditions, minus PID checks:
 1. Config exists and validates against `config-schema.json`. Run
-   `python3 .claude/bin/drover-verification-ready.py --config <config>`; exit 9
+   `drover verification-ready --config <config>`; exit 9
    stops before dispatch until the owning project's verification commands are configured.
    Preserve work; repair setup and restart explicitly, never bounce to Build.
 2. Production-merge guard: refuse `base_branch: main` + `human_approves_merge:
@@ -97,9 +96,9 @@ Run the same preconditions as `run.md` §Preconditions, minus PID checks:
    when their named branch is gone use `git worktree remove` without force. Preserve
    detached, dirty, locked, unregistered, and unrelated folders.
 4. For Claude waves, `node --check` passes on a wrapped copy of
-   `.claude/workflows/drover-wave.js` (catches a broken script before
+   `<home>/workflows/drover-wave.js`, `<home>` = `drover config home` (catches a broken script before
    burning tokens):
-   `{ echo '(async function(){'; sed 's/^export const meta/const meta/' .claude/workflows/drover-wave.js; echo '})'; } | node --check --input-type=module`
+   `{ echo '(async function(){'; sed 's/^export const meta/const meta/' "$(drover config home)/workflows/drover-wave.js"; echo '})'; } | node --check --input-type=module`
    With `--codex`, instead require `codex` on PATH and `bash -n` on both Codex launcher scripts.
 5. Wave marker FIRST, then the legacy check (lock-before-look closes the
    TOCTOU window where both backends pass each other's checks at once):
@@ -135,14 +134,14 @@ Run the same preconditions as `run.md` §Preconditions, minus PID checks:
 
 Repeat until a done condition or halt gate fires:
 
-1. **Rate guard** — `sb_gh_guard_check 200` (drover-gh-guard.sh; `gh api rate_limit` misreports GraphQL); if GraphQL remaining < 200, wait for
+1. **Rate guard** — `drover gh-guard check 200` (lib/drover-gh-guard.sh; `gh api rate_limit` misreports GraphQL); if GraphQL remaining < 200, wait for
    reset (same thresholds as run.md). A failing `gh` call outranks the reading:
    right after a reset the REST reading has shown 4999 while calls still failed.
    With GraphQL dry, the orchestrator's own writes go over REST, a separate
    quota: `gh api repos/<o>/<r>/issues/<n>/comments -f body=…` for a comment,
    `gh api -X DELETE repos/<o>/<r>/issues/<n>/assignees -f 'assignees[]=<bot>'`
    to release a claim. Board moves have no REST route; they wait for the reset.
-   **Usage guard** (Claude waves only; skip for `--codex`, explicit or host-switched) — `bash .claude/bin/drover-usage.sh check --config <config-path>`
+   **Usage guard** (Claude waves only; skip for `--codex`, explicit or host-switched) — `drover usage check --config <config-path>`
    (Claude 5-hour and weekly plan usage; threshold `usage_pause_pct`, default 95):
    - exit 0 → launch.
    - exit 10 with `usage_fallback: "codex"` → resolve the selected remaining
@@ -151,7 +150,7 @@ Repeat until a done condition or halt gate fires:
      `drover-codex-lane.sh` WITHOUT `--codex`; Review remains refused.
      Fallback never grants merge ownership; use explicit `run --codex` for all lanes.
      Plan as usual, take the `build` and `qa` cards (`review` cards wait), and for ONE
-     card at a time claim it, run `bash .claude/bin/drover-codex-lane.sh --config
+     card at a time claim it, run `drover codex-lane --config
      <config-path> --card '<card JSON>' --lane <build|qa>`, read its JSON exit like a lane
      result, then reconcile (step 5). Re-run the usage check between cards; on exit 0
      return to normal waves. The report line says `codex fallback`. Without
@@ -159,7 +158,7 @@ Repeat until a done condition or halt gate fires:
    - exit 10 otherwise (pause) → launch nothing new. A wave already running finishes —
      stopping it mid-lane loses work. Then release claims as usual, post the
      resume note (one line to the user and the run manifest:
-     `paused at <window> <used>% — resets <local time>; remaining: <N> cards; resume: /drover run <slug>`),
+     `paused at <window> <used>% — resets <local time>; remaining: <N> cards; resume: /drover run`),
      remove the wave lock, and wait for the reset. If a wake tool is available
      (`ScheduleWakeup`, or a `/loop` re-entry), schedule
      `min(3600, resets_at - now + 60)` seconds and chain until the reset; on
@@ -172,20 +171,20 @@ Repeat until a done condition or halt gate fires:
    the only scriptable source of plan usage (`/usage` is interactive; `ccusage`
    reports tokens and cost, not % of plan). It reaches the script only if the
    user's status-line command records it; add one line after it reads stdin:
-   `printf '%s' "$input" | bash <repo>/.claude/bin/drover-usage.sh record`.
+   `printf '%s' "$input" | drover usage record`.
    Pro/Max only (API-key sessions have no `rate_limits`); it refreshes on this
    session's own turns. Claude Code's built-in pause at 100% remains the
    backstop — the guard exists so a wave does not start that the limit would
-   cut off mid-lane. The legacy `claude-p` dispatcher does not run this guard.
+   cut off mid-lane. The headless runner does not run this guard yet.
 2. **Plan the wave** —
-   `bash .claude/bin/drover-wave-plan.sh --config <config-path>` →
+   `drover wave-plan --config <config-path>` →
    Exit 9 is a verification-readiness halt: preserve work and claims, repair the
    owning project's `verify_commands`, then restart explicitly. No GitHub recovery probe,
    rebase, Build bounce, or automatic retry.
    **Skill readiness before any wave writes.** Hydrate every selected issue body
-   read-only with `.claude/bin/drover-github-read.py --kind issue -- issue
+   read-only with `drover github-read --kind issue -- issue
    view <N> --json number,title,body`. Keep number, status, labels and literal body
-   in a JSON array file. Run `python3 .claude/bin/drover-skills-ready.py
+   in a JSON array file. Run `drover skills-ready
    --root <repo-root> --host <claude|codex> --cards <cards.json>` for the actual
    worker host before sweep/resume/refresh/flag/stranded actions or Claim.
    Exit 10 names missing helpers: halt, preserve all state, repair the exact
@@ -232,8 +231,8 @@ Repeat until a done condition or halt gate fires:
    stays in Ready for the next wave. Sequenced cards carry a `blocked-by:` line, so this same sweep
    frees them when the overlapping PR's issue closes.
    Wave width is every card the dependency graph says is free, in flight
-   first (Review → QA → Ready), cut to `max_workers` when it is set (0 or
-   absent = no cap). `max_workers` is the GitHub-limit valve: step 5 lowers it
+   first (Review → QA → Ready), each lane cut to its `roles.<role>.max_workers`
+   (default 1). `roles.build.max_workers` is the GitHub-limit valve: step 5 lowers it
    after a wave that hit the hourly limit. If `cards` is empty and
    Building/QA/Review counts are 0 → done. If empty but cards sit in Blocked
    only → report and stop.
@@ -249,10 +248,10 @@ Repeat until a done condition or halt gate fires:
 4. **Launch** — With `--codex`, or no Workflow tool, or the host check printing `codex`, use
    "Codex runs" above. The host check printing `claude` uses the Workflow tool; exit 65 or
    `opencode` never reaches Launch (see "Unknown host halts"). Workflow tool with
-   `scriptPath: .claude/workflows/drover-wave.js` and
+   `scriptPath: <home>/workflows/drover-wave.js` (`drover config home`) and
    `args: { configPath, cards, humanApprovesMerge, tier, commitStyle }` (`cards` hydrated after the planner: each
    carries `lane` and `labels`, and a `qa` card skips the Builder). `commitStyle` is the line
-   `python3 .claude/bin/drover-commit-style.py --config <config> --prompt` prints: the repo's
+   `drover commit-style --config <config> --prompt` prints: the repo's
    `commit_style` and three real subjects, which every lane prompt carries. Runs in the background; the
    orchestrator stays responsive. `humanApprovesMerge` comes from the config; when false the workflow serializes Review-lane agents (merge-race guard, execution side).
    `tier` is the run's model ladder: `'low'` when the user invoked
@@ -271,9 +270,9 @@ Repeat until a done condition or halt gate fires:
    `docs/drover/runs/<date>-<slug>.md`:
    `| #N | <lanesRun> | <finalStatus> | <column> | <detail> |`.
    Then the GitHub-limit step-down: save the returned `cards` to a temp file and run
-   `bash .claude/bin/drover-throttle.sh --config <config-path> --results <file>`.
+   `drover throttle --config <config-path> --results <file>`.
    `hit: true` (GraphQL at 0, or a lane failed on the limit) has already written
-   `max_workers` one lower into the config — unlimited → 3 → 2 → 1, floor 1 — so the
+   `roles.build.max_workers` one lower into the config, floor 1, so the
    next wave and the next run start narrower. Raising it again is the owner's call.
 6. **Report** — one short block to the user per wave, in the session. Outcome
    first, one line per card that needs a human, then what happens next:
@@ -284,7 +283,7 @@ Repeat until a done condition or halt gate fires:
      #18 failed: build lane returned no result — retried next wave
    Next: wave 4 (3 cards)   |   paused until 14:05   |   board drained
    ```
-   A throttle hit adds one line: `GitHub hourly limit hit — max_workers 3 → 2 (config saved)`.
+   A throttle hit adds one line: `GitHub hourly limit hit — roles.build.max_workers 3 → 2 (config saved)`.
    Merged and bounced cards are counts, not lines — they need nobody. Every
    `human-gate`/`blocked` card gets its line and its owner: that is the
    human's queue. Never report a card as done that is not on the base branch.
@@ -293,7 +292,7 @@ Repeat until a done condition or halt gate fires:
    `block_rate_alert_pct` of initial Ready; or the user says stop. The halt
    note is four lines: `halted — <gate>` · the evidence (counts, the cards
    that kept bouncing) · what is left in flight or claimed · `Resume:
-   /drover run <slug> [--codex[=<model>]] [--low|--high]` (retain the run's choice) and who must act first.
+   /drover run [--codex[=<model>]] [--low|--high]` (retain the run's choice) and who must act first.
 8. Loop to 1. For unattended cadence, the user may wrap this loop in /loop;
    the orchestrator must still stop at halt gates.
 
@@ -307,7 +306,7 @@ a marker owned by another or uncertain run; preserve it.
 - Stop: `x` on the run in `/workflows` (or TaskStop), then release assignees
   for in-flight cards and post "stopped mid-flight" comments (same protocol
   as `references/stop.md`). Remove `.claude/drover/inflight/workflow-wave.lock`.
-- Codex stop: with GitHub available, run `bash .claude/bin/drover-stop.sh <slug>`; it validates the wave PID and allows SIGTERM to cancel child lanes before releasing claims. Apply the same claim/comment/lock protocol to ALL selected claimed cards, including queued cards. During a GitHub halt, send SIGTERM only to the verified wave PID, wait for child cancellation, and preserve claims without GitHub writes.
+- Codex stop: with GitHub available, run `drover stop`; it validates the wave PID and allows SIGTERM to cancel child lanes before releasing claims. Apply the same claim/comment/lock protocol to ALL selected claimed cards, including queued cards. During a GitHub halt, send SIGTERM only to the verified wave PID, wait for child cancellation, and preserve claims without GitHub writes.
 - Resume: just run again — board state is the only state. A workflow stopped
   mid-wave can also be resumed in-session via `resumeFromRunId` (completed
   lane agents return cached results).
@@ -322,33 +321,19 @@ Lane agents inherit the session allowlist and run in acceptEdits. Add these
 to your project's `.claude/settings.json` → `permissions.allow` so waves
 don't stall on prompts:
 
+    "Bash(drover:*)",
     "Bash(gh issue view:*)", "Bash(gh issue edit:*)", "Bash(gh issue comment:*)",
     "Bash(gh pr view:*)", "Bash(gh pr diff:*)", "Bash(gh pr checks:*)", "Bash(gh pr comment:*)",
-    "Bash(gh pr create:*)", "Bash(gh pr ready:*)", "Bash(gh project item-edit:*)",
+    "Bash(gh pr create:*)", "Bash(gh pr ready:*)", "Bash(gh pr edit:*)", "Bash(gh project item-edit:*)",
     "Bash(gh project item-list:*)", "Bash(gh api:*)", "Bash(git worktree:*)",
-    "Bash(.claude/bin/drover-card.sh:*)",
     "Bash(git checkout:*)", "Bash(git add:*)", "Bash(git commit:*)",
     "Bash(git push:*)", "Bash(git pull:*)", "Bash(git fetch:*)", "Bash(git blame:*)",
     "Bash(mkdir:*)", "Bash(pgrep:*)", "Bash(node --check:*)",
-    "Bash(bash .claude/bin/drover-wave-plan.sh:*)",
-    "Bash(bash .claude/bin/drover-preflight.sh:*)",
-    "Bash(python3 .claude/bin/drover-github-read.py:*)",
-    "Bash(.claude/bin/drover-github-read.py:*)",
-    "Bash(python3 .claude/bin/drover-verification-ready.py:*)",
-    "Bash(python3 .claude/bin/drover-skills-ready.py:*)",
-    "Bash(python3 .claude/bin/drover-commit-style.py:*)",
-    "Bash(bash .claude/bin/drover-usage.sh:*)",
-    "Bash(bash .claude/bin/drover-throttle.sh:*)",
-    "Bash(bash .claude/bin/drover-codex-lane.sh:*)",
-    "Bash(bash .claude/bin/drover-codex-wave.sh:*)",
-    "Bash(bash .claude/bin/drover-host.sh:*)",
-    "Bash(bash .claude/bin/drover-pr-body.sh:*)", "Bash(gh pr edit:*)",
-    "Bash(bash .claude/bin/drover-stop.sh:*)",
     plus your project's test runners (e.g. "Bash(npm test:*)", "Bash(npx playwright:*)").
 
-`tests/test_run_allowlist.py` fails when pre-flight or a lane calls a `.claude/bin`
-script this list does not cover. The read helper is listed in both forms: scripts call
-`python3 .claude/bin/drover-github-read.py`, lane prompts call it directly.
+Every drover script runs as `drover <command>`, so the one `Bash(drover:*)` rule covers
+them all. The headless runner (`drover run`) does not use this list: it starts each worker
+with the permissions in `harnesses/claude.json` (`tests/test_harness_permissions.py`).
 
 **Headless runs (`claude -p "/drover run"`).** Supported only where Claude Code may
 write the project's `.claude/` folder without a prompt. `.claude/` is a protected path:
@@ -367,10 +352,12 @@ Merging is NOT in the base list. On a board whose `merge_policy.default` is
 `"auto"`, `drover onboard` offers the merge lines as a diff to approve
 up front (onboard → Permissions), so the first overnight run does not stall:
 
-    "Bash(bash .claude/bin/drover-merge-gate.sh:*)", "Bash(gh pr merge:*)",
+    "Bash(gh pr merge:*)",
     plus one line per configured migrate command in `migrations.commands`
     for the envs in `migrations.allowed_envs`.
 
+The gate itself (`drover gate`) is covered by `"Bash(drover:*)"`; to approve each merge
+by hand, add `"Bash(drover gate:*)"` to `permissions.ask`.
 Without them every Reviewer merge pauses for one interactive approval, so the
 backend is **attended-only**. With them, the gate still enforces
 `merge_policy` (money / auth / destructive schema / over `auto_max_lines` → human, exit 7) and `migrations`

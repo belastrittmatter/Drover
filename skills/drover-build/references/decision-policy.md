@@ -13,7 +13,7 @@ worker that is forbidden to ask the user anything — and `grilling`'s own
 contract is "put each question to them and wait." A worker either stalled on
 it or answered its own questions, which is inline reasoning wearing a costume.
 Ticket ambiguity is now caught upstream, where a human is actually present:
-`drover lint` routes vague and multi-interpretation issues through
+`/drover lint` routes vague and multi-interpretation issues through
 `mattpocock-skills:grilling` before the loop ever starts. See `../../drover/references/lint.md`.
 
 ## Skill map
@@ -46,9 +46,9 @@ and belong to the `lint` verb, not to a lane:
 
 | Intent | Skill | Runs in |
 | --- | --- | --- |
-| Stress-test a vague or ambiguous ticket | `mattpocock-skills:grilling` | `drover lint` |
-| Feature ticket with undefined UX | `shape` | `drover lint` |
-| Copy / microcopy / error-message wording | `clarify` | `drover lint` |
+| Stress-test a vague or ambiguous ticket | `mattpocock-skills:grilling` | `/drover lint` |
+| Feature ticket with undefined UX | `shape` | `/drover lint` |
+| Copy / microcopy / error-message wording | `clarify` | `/drover lint` |
 
 If a worker reaches for one of these, that is the signal the ticket should have
 been caught by `lint`. Take the human gate instead — see below.
@@ -77,7 +77,7 @@ unchanged.
 
 **Before worker writes or worktree creation:** follow [skill readiness](../../drover/references/skills-readiness.md).
 Resolve this lane for the actual host, load the report's files/fallbacks, halt
-on missing requirements and recheck each conditional helper before use.
+on missing requirements and check any helper the card did not route with `--require` before use.
 
 ## Label routing
 
@@ -170,8 +170,8 @@ For an authorized, unsettled technical rung-3 fork that introduces a new ownersh
 new/changed public interface, or architecture expensive to reverse, follow
 [design preflight](../../drover/references/design-preflight.md). An applicable supplied
 design/spec/ADR answers the question at an earlier rung; follow it. Labels alone, ordinary
-bugs and mechanical refactors do not trigger a comparison. Recheck conditional helper
-readiness before use. Record the choice in the existing decision trailer below.
+bugs and mechanical refactors do not trigger a comparison. Check a helper the card did not
+route with `--require` before use. Record the choice in the existing decision trailer below.
 The comparison does not settle ambiguous product intent or waive any hard human gate.
 
 **One technical check is still mandatory before the final commit:** run

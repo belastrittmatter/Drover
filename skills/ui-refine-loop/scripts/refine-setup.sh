@@ -34,8 +34,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ -z "$CONFIG" ] && [ -f .claude/drover/active ]; then
-  CONFIG=".claude/drover/configs/$(tr -d '[:space:]' < .claude/drover/active).json"
+if [ -z "$CONFIG" ] && [ -f .drover/config.json ]; then
+  CONFIG=".drover/config.json"
 fi
 
 detect() {

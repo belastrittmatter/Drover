@@ -18,4 +18,4 @@ Commits the working tree, pulls and pushes the current branch in one pass, then 
 
 ## Install
 
-Ships in the drover pack as a secondary skill. `install.sh` copies `skills/git-sync/` to `.claude/skills/git-sync/`. Needs `git`; uses `gh` and the Supabase CLI when present.
+Ships in the drover pack as a secondary skill. `drover skills install` links `skills/git-sync/` into `~/.claude/skills/`. Needs `git`; uses `gh` and the Supabase CLI when present.

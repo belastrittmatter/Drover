@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 KIT = Path(__file__).resolve().parents[1]
-CLI = KIT / 'scripts/drover-skills-ready.py'
+CLI = KIT / 'lib/drover-skills-ready.py'
 CORE = ['drover','drover-build','drover-qa','drover-review','drover-collect','visual','git-sync','ui-refine-loop','pr-security-review']
 
 class Readiness(unittest.TestCase):
@@ -47,7 +47,7 @@ class Readiness(unittest.TestCase):
         result = self.run_cli()
         self.assertTrue(result['ready'])
         self.assertEqual(next(e for e in result['entries'] if e['name'] == 'ponytail:ponytail')['status'], 'fallback')
-        self.assertEqual(next(e for e in result['entries'] if e['name'] == 'vitest')['status'], 'skipped')
+        self.assertNotIn('vitest', [e['name'] for e in result['entries']])
         (self.root / '.claude/skills/code-review/SKILL.md').unlink()
         self.assertIn('mattpocock-skills:code-review', [e['name'] for e in self.run_cli(expected=10)['entries'] if e['status'] == 'missing'])
 
@@ -59,11 +59,7 @@ class Readiness(unittest.TestCase):
         self.assertEqual(qa['pr-security-review']['requirement'], 'required')
         self.assertEqual(qa['pr-security-review']['status'], 'resolved')
         self.assertNotIn('pr-security-review', review)
-        self.assertEqual(qa['security-audit']['requirement'], 'optional')
-        self.assertEqual(qa['security-audit']['status'], 'skipped')
-        self.assertNotIn('security-audit', review)
-        self.put('security-audit')
-        self.assertEqual(next(e for e in self.run_cli()['entries'] if e['name'] == 'security-audit')['status'], 'resolved')
+        self.assertNotIn('security-audit', qa)
         (self.root / '.claude/skills/pr-security-review/SKILL.md').unlink()
         missing = [e for e in self.run_cli(expected=10)['entries'] if e['status'] == 'missing']
         self.assertEqual([('qa', 'pr-security-review')], [(e['lane'], e['name']) for e in missing if e['name'] == 'pr-security-review'])
@@ -95,10 +91,13 @@ class Readiness(unittest.TestCase):
     def test_override_keeps_boundaries_and_unknown_namespace_exact(self):
         self.full()
         self.card['body'] = '```\nSkills: ignored\n```\nSkills: `custom`\n'
-        self.put('custom'); self.run_cli()
+        self.put('custom'); result = self.run_cli()
+        names = [e['name'] for e in result['entries'] if e['lane'] == 'build']
+        self.assertIn('custom', names)
+        self.assertIn('mattpocock-skills:implement', names)  # merged with the label routing
         (self.root / '.claude/skills/implement/SKILL.md').unlink()
-        result = self.run_cli()
-        self.assertNotIn('mattpocock-skills:implement', [e['name'] for e in result['entries']])
+        self.run_cli(expected=10)
+        self.put('implement')
         self.card['body'] = 'Skills: vendor:tdd'
         self.run_cli(expected=10)
         catalog = self.root / 'active.json'
@@ -117,7 +116,7 @@ class Readiness(unittest.TestCase):
         result = self.run_cli(extra=['--lane', 'build'])
         names = [e['name'] for e in result['entries']]
         self.assertIn('mattpocock-skills:diagnosing-bugs', names)
-        self.assertNotIn('mattpocock-skills:implement', names)
+        self.assertIn('mattpocock-skills:implement', names)  # every label's routing is merged
 
     def test_empty_selection_conditional_activation_and_no_fallback(self):
         self.run_cli(cards=[])
@@ -239,6 +238,44 @@ class Readiness(unittest.TestCase):
         self.card['labels'] = ['feature']; self.run_cli(expected=10)
         self.card['labels'] = ['docs']; self.run_cli(extra=['--require','verify-example'], expected=10)
         self.put('verify-example'); self.run_cli(extra=['--require','verify-example'])
+
+    def test_config_routing_replaces_the_starting_routing(self):
+        self.full()
+        config = self.root / '.drover/config.json'
+        config.parent.mkdir()
+        config.write_text(json.dumps(dict(project=dict(owner='o', number=1),
+                                          roles=dict(build=dict(skills=['custom-build'])),
+                                          labels=dict(feature=dict(build=['feature-only'], qa=['qa-extra'])))))
+        missing = [(e['lane'], e['name']) for e in self.run_cli(expected=10)['entries'] if e['status'] == 'missing']
+        self.assertEqual(sorted(missing), [('build', 'custom-build'), ('build', 'feature-only'), ('qa', 'qa-extra')])
+        for name in ['custom-build', 'feature-only', 'qa-extra']:
+            self.put(name)
+        result = self.run_cli()
+        build = [e['name'] for e in result['entries'] if e['lane'] == 'build']
+        self.assertEqual(build, ['drover', 'drover-build', 'feature-only', 'custom-build'])
+        # The config's roles key replaces the starting routing as a whole.
+        self.assertNotIn('pr-security-review', [e['name'] for e in result['entries'] if e['lane'] == 'qa'])
+        self.assertTrue(all(e['source'].startswith(('boundary', 'config')) for e in result['entries']))
+
+    def test_missing_skill_halt_names_the_folders_searched(self):
+        self.full()
+        (self.root / '.claude/skills/tdd/SKILL.md').unlink()
+        diagnostic = self.run_cli(extra=['--lane', 'build'], expected=10)['entries']
+        process = subprocess.run([sys.executable, str(CLI), '--root', str(self.root), '--host', 'claude',
+                                  '--home', str(self.home), '--cards', '-'], input=json.dumps([self.card]),
+                                 text=True, capture_output=True)
+        self.assertIn('missing mattpocock-skills:tdd', process.stderr)
+        self.assertIn(str(self.root / '.claude/skills'), process.stderr)
+        self.assertIn(str(self.home / '.claude/skills'), process.stderr)
+        self.assertTrue(diagnostic)
+
+    def test_unknown_harness_halts(self):
+        self.full()
+        process = subprocess.run([sys.executable, str(CLI), '--root', str(self.root), '--host', 'nope',
+                                  '--home', str(self.home), '--cards', '-'], input=json.dumps([self.card]),
+                                 text=True, capture_output=True)
+        self.assertEqual(process.returncode, 66, process.stderr)
+        self.assertIn("no harness entry for 'nope'", process.stderr)
 
     def test_codex_discovery_stops_at_independent_repository_root(self):
         self.full('codex')

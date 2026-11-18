@@ -69,7 +69,7 @@ It is super-board cut down and made harness-independent:
 | Upstream backends | Drop `workflow` and Codex scripts after porting pre-flight, classifier, usage pause, the Blocked sweep (FR-BRD-5), the open-blocker filter (FR-BRD-7) and approval resume (FR-BRD-8) into the runner | Keep three backends |
 | State | GitHub Project board; no state abstraction until a second store exists | Labels only; local SQLite |
 | Concurrency | `max_workers` per role, default 1 | Fixed 1 per role |
-| Structure | `drover` CLI on PATH; skills installed per harness; project holds `.drover/config.json` only | Copy scripts into each project |
+| Structure | `drover` CLI on PATH via `install.sh`, which links `bin/drover` into `~/.local/bin`; skills linked into the harness's user folder (`~/.claude/skills`); hooks in the untracked `.claude/settings.local.json`; project holds one `.drover/config.json` only | Copy scripts into each project; brew tap (later); Claude plugin; several configs per repo with an `active` pointer |
 | Skill routing | Per project config (role, label, issue `Skills:`) | Hardcoded `REGISTRY` |
 | Commit / PR titles | Match the repo's detected style; conventional commits as fallback | Upstream emoji format |
 | QA evidence | Chosen at onboard: orphan branch (default `drover-evidence`) or the PR branch; SHA-pinned raw URLs | One fixed location |

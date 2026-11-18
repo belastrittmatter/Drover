@@ -1,0 +1,17 @@
+{
+  "roles": {
+    "build": {"skills": ["ponytail:ponytail", "verification-before-completion", "mattpocock-skills:code-review"]},
+    "qa": {"skills": ["mattpocock-skills:tdd", "mattpocock-skills:diagnosing-bugs", "verification-before-completion",
+                      "testing-strategy", "mattpocock-skills:code-review", "pr-security-review"]},
+    "review": {"skills": ["mattpocock-skills:code-review", "mattpocock-skills:codebase-design", "ponytail:ponytail-review"]}
+  },
+  "labels": {
+    "bug": {"build": ["mattpocock-skills:diagnosing-bugs", "mattpocock-skills:tdd"]},
+    "feature": {"build": ["mattpocock-skills:implement", "mattpocock-skills:tdd", "mattpocock-skills:codebase-design"]},
+    "ux": {"build": ["mattpocock-skills:implement", "mattpocock-skills:tdd"]},
+    "refactor": {"build": ["mattpocock-skills:codebase-design", "mattpocock-skills:tdd"]},
+    "tech-debt": {"build": ["mattpocock-skills:codebase-design", "mattpocock-skills:tdd"]},
+    "tests": {"build": ["mattpocock-skills:tdd"]},
+    "docs": {"build": []}
+  }
+}

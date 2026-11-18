@@ -1,7 +1,7 @@
 """Shared helpers for the drover-collect fetchers. Stdlib only.
 
-- active_config(): the project's drover config (`.claude/drover/active`
-  -> `configs/<slug>.json`), or the file named by --config.
+- active_config(): the project's drover config (`.drover/config.json`, found walking up
+  from cwd), or the file named by --config.
 - secret(name): an env var, else the nearest `.env` / `.env.local` walking up
   from cwd. Only the named key is read; values are never printed.
 - since(arg, default_days): `--since 30d` / `--since 2026-09-01` -> aware UTC datetime.
@@ -33,12 +33,7 @@ def _find_up(rel):
 def active_config(path=None):
     """Return (config dict, path). Empty dict when no config is found."""
     if not path:
-        ptr = _find_up(os.path.join(".claude", "drover", "active"))
-        if ptr:
-            with open(ptr) as f:
-                slug = f.read().strip()
-            cand = os.path.join(os.path.dirname(ptr), "configs", f"{slug}.json")
-            path = cand if os.path.exists(cand) else None
+        path = _find_up(os.path.join(".drover", "config.json"))
     if not path:
         return {}, None
     with open(path) as f:

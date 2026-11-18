@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_collect_intake_safety as intake  # noqa: E402
 
 ROOT = intake.ROOT
-STATE = ROOT/'scripts/drover-collect-state.py'
+STATE = ROOT/'lib/drover-collect-state.py'
 SHIM = r'''#!/usr/bin/env python3
 import fcntl as _real, os, runpy, sys, types
 # Python 3.12+ stdlib (subprocess) probes `import msvcrt` to decide it is on Windows; load it
@@ -37,7 +37,7 @@ sys.argv[0] = real; runpy.run_path(real, run_name='__main__')
 
 def shim_bin(root):
     bin_dir = root/'bin'; bin_dir.mkdir()
-    for f in (ROOT/'scripts').iterdir():
+    for f in (ROOT/'lib').iterdir():
         if f.name != STATE.name:
             (bin_dir/f.name).symlink_to(f)
     (bin_dir/STATE.name).write_text(SHIM); (bin_dir/STATE.name).chmod(0o755)

@@ -16,12 +16,12 @@ __pycache__/
 *.pyc
 
 # drover runtime state (if anyone runs the loop *inside* this repo)
-.claude/drover/active
 .claude/drover/collect/
 .claude/drover/inflight/
 .claude/drover/migrations/
 .claude/worktrees/
 .drover/worktrees/
+.drover/runs/
 .worktrees/
 
 # QA evidence (heavy artifacts; keep summaries)

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""drover-settings.py — merge into .claude/settings.json without losing anything.
+"""drover-settings.py — merge into a Claude settings file without losing anything.
 
     drover-settings.py hooks <settings.json> <snippet.json> [...] [--dry-run]
     drover-settings.py allow <settings.json> <rule> [<rule> ...]  [--dry-run]
 
-`hooks` adds each hook command from the snippets once per event + matcher
-(install.sh and onboard's protect-main step). `allow` adds permission rules to
+`hooks` adds each hook command from the snippets once per event + matcher, replacing an
+entry that runs the same script file from another place (a moved install, an old copy)
+(`drover onboard`, which writes the harness's .claude/settings.local.json). `allow` adds permission rules to
 `permissions.allow` once each (onboard's Permissions step, after the user
 approved the printed diff). Both keep every existing key, back the file up
 (`settings.json.bak-<ts>`) before writing, write atomically, and leave an
@@ -17,6 +18,7 @@ Exit: 0 ok (including "already present"), 2 settings.json invalid, 64 usage.
 from __future__ import annotations
 
 import json
+import re
 import os
 import shutil
 import sys
@@ -52,6 +54,9 @@ def save(path: str, data: dict) -> None:
     os.replace(tmp, path)
 
 
+SCRIPT = re.compile(r"([\w.-]+\.py)\b")
+
+
 def merge_hooks(settings: dict, snippets: list[dict]) -> list[str]:
     hooks = settings.setdefault("hooks", {})
     added = []
@@ -67,10 +72,19 @@ def merge_hooks(settings: dict, snippets: list[dict]) -> list[str]:
             have = {h.get("command") for e in current if e.get("matcher") == matcher
                     for h in e.get("hooks", [])}
             for h in entry["hooks"]:
-                if h["command"] not in have:
-                    target.setdefault("hooks", []).append(h)
-                    have.add(h["command"])
-                    added.append(f"{event} {matcher or '*'}: {h['command']}")
+                if h["command"] in have:
+                    continue
+                # The same guard from another install folder (or an older copy) is replaced,
+                # not added beside it: entries are matched on the script's file name.
+                script = SCRIPT.search(h["command"])
+                if script:
+                    for e in current:
+                        if e.get("matcher") == matcher:
+                            e["hooks"] = [o for o in e.get("hooks", [])
+                                          if (SCRIPT.search(o.get("command") or "") or [None, None])[1] != script[1]]
+                target.setdefault("hooks", []).append(h)
+                have.add(h["command"])
+                added.append(f"{event} {matcher or '*'}: {h['command']}")
     return added
 
 
@@ -93,7 +107,9 @@ def main(argv: list[str]) -> int:
     verb, path, rest = args[0], args[1], args[2:]
     settings = load(path)
     if verb == "hooks":
-        added = merge_hooks(settings, [json.load(open(p)) for p in rest])
+        # {drover_home} in a snippet is this install folder: hooks run from it, nothing is copied.
+        home = json.dumps(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))[1:-1]
+        added = merge_hooks(settings, [json.loads(open(p).read().replace("{drover_home}", home)) for p in rest])
         noun = "hook command(s)"
     else:
         added = merge_allow(settings, rest)

@@ -40,16 +40,16 @@ jobs:
       # version. Catches typing-syntax, f-string, walrus, etc. regressions
       # without needing any runtime state.
       - name: compile drover-status
-        run: python -m py_compile scripts/drover-status.py
+        run: python -m py_compile lib/drover-status.py
 
-      # Step 2 — exercise the "no config + no active marker + no single
-      # config" path of drover-status.py. Documented to exit 64.
-      # Runs in the repo root, where no `.claude/drover/configs/` exists.
+      # Step 2 — exercise the "no .drover/config.json" path of
+      # drover-status.py. Documented to exit 64.
+      # Runs in the repo root, where no `.drover/config.json` exists.
       - name: status — no-config path exits 64
         shell: bash
         run: |
           set +e
-          python scripts/drover-status.py
+          python lib/drover-status.py
           ec=$?
           set -e
           if [ "$ec" -ne 64 ]; then
@@ -59,7 +59,7 @@ jobs:
           echo "OK: drover-status.py exited 64 as documented"
 
       # Step 3 — unit-test the manifest parser against real dispatcher log
-      # lines from `scripts/drover-run.sh`. Catches the class of
+      # lines from `lib/drover-run.sh`. Catches the class of
       # regression that ships when the parser's regexes drift away from
       # what the dispatcher actually emits.
       - name: status — parser fixture tests

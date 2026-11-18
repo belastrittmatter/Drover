@@ -707,7 +707,7 @@ def cmd_skillmap(a) -> None:
     if hook_ids:
         add_node({"id": "hooks", "label": "Guard hooks", "kind": "hook", "verbs": [],
                   "what": f"{len([h for h in hook_ids if h.startswith('hook:')])} guard scripts wired into settings.json",
-                  "when": "Installed by install.sh unless --no-hooks", "how": "", "source": rel(snip)})
+                  "when": "Wired by drover onboard unless --no-hooks", "how": "", "source": rel(snip)})
         views.append({"id": "hooks", "parent": "overview", "title": "Guard hooks", "nodeIds": hook_ids})
     for name in skills:
         out_ids = [e["to"] for e in edges if e["from"] == name]
