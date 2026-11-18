@@ -10,6 +10,8 @@
     "snippets": ["hooks/settings-snippet.json"]
   },
   "usage_probe": "drover usage check",
+  "product": "claude-code",
+  "version_command": ["claude", "--version"],
   "permissions": {
     "mode_flag": "--permission-mode",
     "mode": "acceptEdits",

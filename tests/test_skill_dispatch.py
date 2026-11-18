@@ -220,7 +220,7 @@ dispatch_lane build 1
         (self.root / '.drover').mkdir(exist_ok=True)
         (self.root / '.drover/config.json').write_text(json.dumps(dict(project=dict(owner='fixture',number=1),
             base_branch='main',notifications=dict(bot_identity='bot'),
-            verify_commands=['git diff --check'],tick_seconds=1)))
+            verify_commands=['git diff --check'],tick_seconds=1,repo=dict(remote='https://github.com/fixture/app'))))
         self.tool('pgrep', 'import sys; sys.exit(1)')
         self.env['ROOT_FIXTURE'] = str(self.root)
         self.tool('claude', """import json,os,signal,time

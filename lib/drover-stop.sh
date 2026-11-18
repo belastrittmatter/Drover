@@ -193,6 +193,8 @@ if [ "${#WORKERS[@]}" -gt 0 ]; then
     pid=$(worker_pid "$handle" || true)
     log "─── #${issue} (lane=${lane}, pid=${pid:-unknown}) ───"
     post_stop_comment "$issue" "$lane" "$pid"
+    # FactoryBench (metrics.md FR-MET-5): the attempt waits; the next claim resumes it.
+    python3 "$HERE/drover-metrics.py" waiting "$issue" stopped || true
     release_claim "$issue"
     stop_handle "$handle" "worker(${lane}/#${issue})"
   done
