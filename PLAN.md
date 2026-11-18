@@ -96,7 +96,7 @@ Spec: every "Preserved" table in specs/ must still pass.
 
 Exit: no reference to a deleted file; tests green.
 
-## Stage 3: rename to drover (0.5 day)
+## Stage 3: rename to drover (done)
 
 - `super-board-*` -> drover names; skills `super-build|qa|review|collect` ->
   `drover-build|qa|review|collect`; `super-board` skill -> `drover`.
@@ -111,7 +111,7 @@ Spec: every "Preserved" table in specs/ must still pass; specs/config.md FR-CFG-
 Exit: `grep -rniE 'super-?board|super-(build|qa|review)|erictech|skool' .`
 hits only LICENSE; tests green.
 
-## Stage 4: conventions (1 day)
+## Stage 4: conventions (done)
 
 - Commit style detection at onboard: read the last ~50 subjects on the base
   branch, classify (conventional / bracket-tag / plain imperative /
@@ -141,16 +141,18 @@ to a shared definition in stage 7.
 
 ## Stage 5: CLI core + harness layer (2 days)
 
-- `bin/drover` entry point; scripts move to `lib/`. Install = put `bin` on
-  PATH (brew tap or `install.sh` that only links the CLI).
+- `bin/drover` entry point; scripts move to `lib/`. `install.sh` only links
+  `bin/drover` into `~/.local/bin` (brew tap later).
+- One config per repo, `.drover/config.json`; drop `configs/<slug>.json`
+  and the `active` pointer (FR-CFG-1).
 - `harnesses/claude.json` (worker command, skill dirs, hook install,
   usage probe). Other harnesses are later entries; a missing entry halts
   with a clear message.
-- `drover skills install` copies or links skills into the harness's folders
-  (`.claude/skills` or plugin).
+- `drover skills install` links drover's skills into `~/.claude/skills`
+  (FR-CFG-7).
 - `drover onboard` writes `.drover/config.json` only, asking for the
   evidence location (branch name, or PR branch and path); hooks are
-  installed through the harness entry.
+  installed through the harness entry into `.claude/settings.local.json`.
 - Skill routing from config: role + label + per-issue `Skills:` merged,
   each checked to exist for the harness before dispatch (reuse the
   readiness check from `super-board-skills-ready.py`, minus `REGISTRY`).

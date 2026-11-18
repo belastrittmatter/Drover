@@ -8,7 +8,13 @@ Part of the [drover spec](README.md). All of this is new or changed.
   scripts shall not be copied into the project. (Upstream copies about 30
   scripts into `.claude/bin`.) `drover onboard` shall add `.drover/runs/`
   and `.drover/worktrees/` to `.git/info/exclude`, not to a tracked
-  `.gitignore`.
+  `.gitignore`. One config per repo: upstream's `configs/<slug>.json` and
+  `active` pointer are dropped; the run slug used in manifest and log names
+  (metrics.md FR-MET-1) is the repo name.
+- **FR-CFG-7** `install.sh` shall link `bin/drover` into `~/.local/bin` and
+  copy nothing into a project; `drover skills install` shall link drover's
+  skills into the harness's user skill folder (`~/.claude/skills` for
+  `claude`). Upgrading is `git pull` in the install folder.
 - **FR-CFG-2** The config shall be validated against a published JSON schema
   at every command start; an invalid config stops the command and names the
   failing field.
@@ -79,7 +85,9 @@ audit: it only fed an outside skill drover does not ship).
 
 - **FR-HRN-1** Each harness shall be described by one file
   `harnesses/<name>.json`: headless worker command, model flag, skill
-  folders, hook install method, optional usage probe.
+  folders, hook install method, optional usage probe. For `claude`, hooks
+  go in the untracked `.claude/settings.local.json`, so onboarding adds no
+  tracked file besides `.drover/config.json`.
 - **FR-HRN-2** Adding a harness shall need a new harness file and no change
   to the runner, gate or roles.
 - **FR-HRN-4** The harness file shall declare the permissions a headless
