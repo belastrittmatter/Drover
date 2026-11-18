@@ -261,7 +261,7 @@ JSON
 CFG="$WORK/books.json"
 echo '{"project":{"owner":"eric","number":2},"repo":{"remote":"https://github.com/eric/books.git"},"_qa_all":true}' > "$CFG"
 OUT=$(PATH="$WORK/bin:$PATH" python3 "$SETUP" board-migrate --root "$WORK/board8" --config "$CFG")
-echo "$OUT" | q '.added_columns == ["Backlog","Building"] and .labels_created == ["qa","feature"]' || fail "columns/labels wrong: $OUT"
+echo "$OUT" | q '.added_columns == ["Backlog","Building"] and .labels_created == ["qa","feature","security","migration","payments","auth"]' || fail "columns/labels wrong: $OUT"
 echo "$OUT" | q '.labels_mapped == 1 and .qa_labelled == 1 and .skipped_moved == 1 and .skipped_removed == true' \
   || fail "mapping / qa-all / Skipped counts wrong: $OUT"
 grep -q -- "issue edit 2 --repo eric/books --add-label feature --remove-label build" "$GH_LOG" || fail "build should map to feature"
@@ -277,7 +277,7 @@ q 'has("_qa_all") | not' "$CFG" || fail "the qa-all marker is dropped once appli
 
 # 9 — a brand-new board: --prune-empty swaps GitHub's default Todo / In Progress for the seven.
 cat > "$GH_STATE" <<'JSON'
-{"projects":[],"labels":["qa","bug","feature"],
+{"projects":[],"labels":["qa","bug","feature","security","migration","payments","auth"],
  "options":{"2":[{"id":"t","name":"Todo","color":"GRAY","description":""},{"id":"p","name":"In Progress","color":"YELLOW","description":""},
                  {"id":"d","name":"Done","color":"GREEN","description":""}]},"items":[]}
 JSON
@@ -421,4 +421,20 @@ echo "$OUT" | q '.green == false and (.schema_errors[".drover/config.json"] | in
 TXT=$(python3 "$SETUP" check --root "$L" --text || true)
 echo "$TXT" | grep -q "✗ .drover/config.json: bogus: unknown key" || fail "text report names the schema error"
 
-echo "PASS: test-setup.sh (16 scenarios)"
+# 17 — check flags the board labels the config's repo lacks (the classifier adds the risk
+#      labels, FR-RUN-7); fix creates them; a repo that cannot be read flags nothing.
+B="$WORK/labels"; mkdir -p "$B/.drover"; git -C "$B" init -q
+echo '{"project":{"owner":"o","number":1},"harness":"claude","repo":{"remote":"https://github.com/o/app.git"}}' > "$B/.drover/config.json"
+echo '{"projects":[],"labels":["qa","bug","feature","security"],"options":{},"items":[]}' > "$GH_STATE"
+OUT=$(PATH="$WORK/bin:$PATH" python3 "$SETUP" check --root "$B" || true)
+echo "$OUT" | q '.labels_missing == ["migration","payments","auth"] and .green == false' || fail "check must flag missing risk labels: $OUT"
+TXT=$(PATH="$WORK/bin:$PATH" python3 "$SETUP" check --root "$B" --text || true)
+echo "$TXT" | grep -q "✗ board labels missing: migration, payments, auth" || fail "text report names the missing labels: $TXT"
+OUT=$(PATH="$WORK/bin:$PATH" python3 "$SETUP" fix --root "$B" --no-helpers || true)
+echo "$OUT" | q '(.fixed | index("labels created: migration, payments, auth")) and .labels_missing == []' || fail "fix must create the labels: $OUT"
+q '.labels == ["qa","bug","feature","security","migration","payments","auth"]' "$GH_STATE" || fail "labels not created: $(cat "$GH_STATE")"
+echo '{"project":{"owner":"o","number":1},"harness":"claude"}' > "$B/.drover/config.json"
+OUT=$(PATH="$WORK/bin:$PATH" python3 "$SETUP" check --root "$B" || true)
+echo "$OUT" | q '.labels_missing == null' || fail "no repo: nothing to flag: $OUT"
+
+echo "PASS: test-setup.sh (17 scenarios)"
