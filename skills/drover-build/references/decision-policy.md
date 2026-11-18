@@ -13,7 +13,7 @@ worker that is forbidden to ask the user anything — and `grilling`'s own
 contract is "put each question to them and wait." A worker either stalled on
 it or answered its own questions, which is inline reasoning wearing a costume.
 Ticket ambiguity is now caught upstream, where a human is actually present:
-`drover lint` routes vague and multi-interpretation issues through
+`/drover lint` routes vague and multi-interpretation issues through
 `mattpocock-skills:grilling` before the loop ever starts. See `../../drover/references/lint.md`.
 
 ## Skill map
@@ -46,9 +46,9 @@ and belong to the `lint` verb, not to a lane:
 
 | Intent | Skill | Runs in |
 | --- | --- | --- |
-| Stress-test a vague or ambiguous ticket | `mattpocock-skills:grilling` | `drover lint` |
-| Feature ticket with undefined UX | `shape` | `drover lint` |
-| Copy / microcopy / error-message wording | `clarify` | `drover lint` |
+| Stress-test a vague or ambiguous ticket | `mattpocock-skills:grilling` | `/drover lint` |
+| Feature ticket with undefined UX | `shape` | `/drover lint` |
+| Copy / microcopy / error-message wording | `clarify` | `/drover lint` |
 
 If a worker reaches for one of these, that is the signal the ticket should have
 been caught by `lint`. Take the human gate instead — see below.

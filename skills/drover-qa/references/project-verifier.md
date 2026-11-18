@@ -22,7 +22,7 @@ This optional helper adds repeatable feature checks inside existing lanes.
    write only with that save authorization. Keep `verify_commands` independent:
    a map does not turn browser work into every PR's required merge check.
 5. Inspect the saved map with the public helper below. Resolve the actual local
-   skill with `drover-skills-ready.py --require verify-<app>` for the active
+   skill with `drover skills-ready --require verify-<app>` for the active
    host before loading it. A folder or valid map alone proves no host readiness.
 
 Templates are unfinished scaffolds: the empty feature array must be replaced.

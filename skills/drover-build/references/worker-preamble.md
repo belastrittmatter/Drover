@@ -19,7 +19,7 @@ on missing requirements and check any helper the card did not route with `--requ
 
    There is no advisor panel and no vote. `mattpocock-skills:grilling` is
    **forbidden inside a worker** — its contract is to ask the user and wait, which
-   this run cannot do. Ambiguous tickets are `drover lint`'s job, upstream of
+   this run cannot do. Ambiguous tickets are `/drover lint`'s job, upstream of
    this loop; if you want to grill the ticket, that is a rule-3 human gate.
 
 2. **NEVER call `AskUserQuestion`. NEVER block waiting for the user.**

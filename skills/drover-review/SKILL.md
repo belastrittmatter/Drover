@@ -117,7 +117,7 @@ If the input is ambiguous, default to reviewing the current branch against its u
      `## Context` (`- **Where:**` the module and files), `## Fix` — the filer refuses a body
      without them. **Write real acceptance criteria too.** A card that carries an
      `## Acceptance Criteria` checklist is filed straight into `Ready` and the next wave builds it;
-     one without lands in the holding column and waits for `drover lint`. That is the whole
+     one without lands in the holding column and waits for `/drover lint`. That is the whole
      difference between a finding that gets fixed this week and a note nobody grades. Two or three
      checkable lines is enough — what must be true when this is done, in terms a test can assert.
      The filer appends `## Risk` and `## Blocked by` for you when you have not written them.
@@ -315,7 +315,7 @@ See `~/.claude/skills/drover/references/run.md` → Reviewer. Summary of the sub
    - Both open → bounce to whichever is older.
    - Clean up worktree, exit.
 3. Read PR + spot-check Tester evidence + read CLAUDE.md / AGENTS.md.
-   Check the Risk block against the diff: is the Door right (one-way: DROP, rename, data rewrite, public API, sent email) and the Blast radius honest? Fix it with `drover-pr-body.sh --block risk`; a one-way door is never Low.
+   Check the Risk block against the diff: is the Door right (one-way: DROP, rename, data rewrite, public API, sent email) and the Blast radius honest? Fix it with `drover pr-body --block risk`; a one-way door is never Low.
    **3b. Prior-report check** — load `prior_report` (see "Review remembers"); if present, round 1 checks each prior finding; any `not fixed` → re-open its thread, bounce by prefix, post the report, exit.
 4. Review code + tests.
 5. **Reviewer-side test rerun (always — closes Tester self-verification gap):**

@@ -37,7 +37,7 @@ The bootstrap is **non-interactive**. If the curl returns an existing-user error
 
 ## QA loop state board — GitHub Project as the state store
 
-State for the QA↔Build loop lives in a GitHub Project named **`drover QA`** (auto-discovered by title at the user/org level). It has six Status columns:
+State for the QA↔Build loop lives in a GitHub Project named **`"drover QA"`** (auto-discovered by title at the user/org level). It has six Status columns:
 
 | Column   | Meaning                                              |
 |----------|------------------------------------------------------|
@@ -55,7 +55,7 @@ This board is the durable, machine-readable state for the loop. `docs/drover-qa/
 Resolution order (used by `drover qa-file-bug` and the orchestrator):
 
 1. If `DROVER_QA_PROJECT_TITLE` is set, query `gh project list --owner $DROVER_QA_PROJECT_OWNER --format json` and pick the project whose title matches (case-insensitive).
-2. Otherwise default to title `drover QA`.
+2. Otherwise default to title `"drover QA"`.
 3. Owner defaults to `$(gh repo view --json owner -q .owner.login)` or `DROVER_QA_PROJECT_OWNER` if set.
 
 If no matching project exists, the loop halts with a one-line error and instructs the operator to create one. Do not silently fall back to the repo's primary project — column semantics differ.
@@ -181,7 +181,7 @@ The filer builds it from `--kind`, `--area` (else the route) and the bare `--tit
 - QA category when relevant: `qa:functional`, `qa:visual`, `qa:network`, `qa:console`, `qa:i18n`, `qa:a11y`, `qa:data`, `qa:testability`.
 - Suggested skill owner when helpful: `skill:drover-build`, `skill:drover-qa`, `skill:ui-refine-loop`, or `skill:drover-review`. `skill:ui-refine-loop` marks a UI ticket for a human to run `/ui-refine-loop` on; the board never triggers it.
 
-The script adds the issue to the resolved `drover QA` project and moves it into the `Bug` column (override with `DROVER_QA_TARGET_OPTION_NAME`) so a human (or `/drover-build` with `BUILD_LOOP_SOURCE_COLUMN=Bug`) can pick it up immediately. The repo's standalone feature project is not touched by this flow.
+The script adds the issue to the resolved `"drover QA"` project and moves it into the `Bug` column (override with `DROVER_QA_TARGET_OPTION_NAME`) so a human (or `/drover-build` with `BUILD_LOOP_SOURCE_COLUMN=Bug`) can pick it up immediately. The repo's standalone feature project is not touched by this flow.
 
 The `iteration-N.md` Section 3 is the per-iter audit (with `gh_issue: <N>` back-references); the GH issue is the durable tracker. The fix-commit message includes `(closes #<N>)` so the issue auto-closes on merge.
 

@@ -18,8 +18,8 @@ wave spent ~2,850 of 5,000 points (~950 a card) and the board stalled an hour:
 | `gh project view` | 2 |
 | `gh issue view` · `gh pr view` · `gh pr list` · review-thread query | 1 |
 | `gh issue comment` · `gh pr comment` · `gh issue edit` · `gh pr ready` | ~2 (lookup + mutation) |
-| `drover-card.sh move` | 1 (3 the first time an issue is seen) |
-| `drover-card.sh status` · `items` | 1 · ~1 per 100 cards |
+| `drover card move` | 1 (3 the first time an issue is seen) |
+| `drover card status` · `items` | 1 · ~1 per 100 cards |
 | `gh api repos/...` (REST) | 0 — the separate 5,000/hr core bucket |
 
 The rules that follow from it:
@@ -71,7 +71,7 @@ It's a no-op if quota is healthy. It sleeps to reset only if remaining is below 
 
 The Worker self-check item "Card column move re-read and verified" previously required `gh project item-list --limit 500` on every worker exit — ~200 points per worker per lane transition, for very little signal. **Rule:**
 
-- Trust the exit code of `drover-card.sh move` (it already re-reads stale ids and retries once).
+- Trust the exit code of `drover card move` (it already re-reads stale ids and retries once).
 - If it returned non-zero, re-try once with `drover gh-guard check 200` first.
 - If still non-zero, write the halt comment and exit. Do not re-query the whole board.
 

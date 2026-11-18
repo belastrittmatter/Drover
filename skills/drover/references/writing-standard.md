@@ -105,7 +105,7 @@ Closes #790
 
 **Body** = marker blocks, in this order. A lane rewrites only its own blocks, with
 `drover pr-body` (it refuses when the PR head moved since you read it).
-`drover-pr-body.sh --skeleton` prints an empty body with every marker.
+`drover pr-body --skeleton` prints an empty body with every marker.
 
 | Block | Marker | Written by | When | Required |
 |---|---|---|---|---|
@@ -185,7 +185,7 @@ goes in Before | After.
 
 **Iteration history** — folded in `<details>`, so the reader sees Problem to Risk first.
 Local time from config `timezone` (onboard sets it to the machine's zone). Get the stamp with
-`drover-pr-body.sh --time --config <cfg>`. `--append-file` keeps a new row inside the
+`drover pr-body --time --config <cfg>`. `--append-file` keeps a new row inside the
 fold, above the blank line and `</details>`; an older unfolded history still appends at its end.
 
 ```

@@ -57,7 +57,7 @@ Progress: [done] onboard  →  [done] lint  →  run (you are here)
 | Project + required columns exist | Halt: "Project / columns missing. Run `drover onboard` to repair." |
 | `gh auth` valid with required scopes | Halt: "Re-auth: `gh auth refresh -s project,read:project,repo`." |
 | `pre-flight.md` all items `[✓]` | Halt: "Pre-flight incomplete — fix these: [list]." |
-| No issues missing ACs in active columns | Halt: "N issues need clarification. Run `drover lint`." |
+| No issues missing ACs in active columns | Halt: "N issues need clarification. Run `/drover lint`." |
 | Clean git working tree on base branch | Halt: "Working tree dirty. Stash or commit before running." |
 | Legacy worktrees | If `.worktrees/issue-*` or a pre-rename `.claude/worktrees/issue-*` exists, halt before dispatch. Stop its worker, inspect/preserve edits, then `git worktree move` it to the matching `.drover/worktrees/` path. Never delete it as part of an upgrade. |
 | Stale worktree scan | Scan only `.drover/worktrees/issue-<N>` and `issue-<N>-build/qa/review`. If its named branch is gone, use `git worktree remove` without force. Keep detached, dirty, locked, unregistered, or unrelated folders; log failures for inspection. A missing board label alone is not permission to delete work. |
@@ -140,7 +140,7 @@ Format: `writing-standard.md` § 2. Title = a subject in the repo's `commit_styl
 with `drover pr-body --pr <P> --block <name> --expect-head <sha>
 (--body-file | --append-file) <md>`. The script refuses (exit 6) when the PR head moved since you
 read it — re-read, then redo the edit. Builder opens the PR with every block filled
-(`drover-pr-body.sh --skeleton` prints the empty markers).
+(`drover pr-body --skeleton` prints the empty markers).
 
 | Block | Builder | Tester | Reviewer |
 |---|---|---|---|
@@ -204,7 +204,7 @@ read it — re-read, then redo the edit. Builder opens the PR with every block f
 
 History rows by lane: `builder` · `qa` (`fail v1` / `pass v2`, details = evidence folder) ·
 `reviewer` (`bounced` / `merged`, details = finding ids or `squash <sha>`). Time comes
-from `drover-pr-body.sh --time --config <cfg>` (config `timezone`).
+from `drover pr-body --time --config <cfg>` (config `timezone`).
 
 Status card lines: `> [!NOTE]` + `Building` / `In QA` / `In review · round N` ·
 `> [!TIP]` + `Merged · <sha>` · `> [!WARNING]` + `Blocked · <reason>` (`Blocked · needs owner`
@@ -639,7 +639,7 @@ The dispatcher MUST also:
 3. **Cap one worker per lane** — track `BUILD_PID` / `QA_PID` / `REVIEW_PID`; do not dispatch to a lane whose prior PID is still alive.
 4. **Reap stale locks each tick** — `reap_finished_locks` removes any lock whose PID no longer exists.
 5. **Orphan-scan on startup** — refuse to start if any `claude -p .*drover run` worker is already running from a prior crashed dispatcher.
-6. **One board read per tick** — `drover-card.sh items` once per tick, not per column lookup (~1 GraphQL point per 100 cards).
+6. **One board read per tick** — `drover card items` once per tick, not per column lookup (~1 GraphQL point per 100 cards).
 
 The three locks (assignee, in-flight file, lane PID) are defense in depth: any one of them alone has a race window; together they make a duplicate dispatch effectively impossible.
 
@@ -777,7 +777,7 @@ Workers share the dispatcher's gh-auth token bucket. The dispatcher's `gh_rate_g
 Before releasing the claim assignee and exiting, every worker MUST verify:
 
 - [ ] Issue comment AND PR comment both written (per "Commenting cadence" above).
-- [ ] Card column move's mutation returned success. **Trust the exit code of `drover-card.sh move`** — a re-read of the board was the per-worker quota tax (`rate-limit-etiquette.md` §3). If the mutation returned non-zero, preserve its unknown outcome, leave the assignee in place, and pause the run locally. Reconcile the remote card state before any repeat; never blindly retry a write or depend on a successful halt comment.
+- [ ] Card column move's mutation returned success. **Trust the exit code of `drover card move`** — a re-read of the board was the per-worker quota tax (`rate-limit-etiquette.md` §3). If the mutation returned non-zero, preserve its unknown outcome, leave the assignee in place, and pause the run locally. Reconcile the remote card state before any repeat; never blindly retry a write or depend on a successful halt comment.
 - [ ] Claim assignee released (`gh issue edit --remove-assignee <bot_identity>`) and the descriptive `loop:in-*` label removed.
 - [ ] On failure handoff: `root-cause-hash:` line is present in the PR handoff comment (per "Root-cause hash" above).
 - [ ] On Block/Skip exit: the full template from `block-template.md` is populated on BOTH the issue and the PR (if a PR exists); the reason tag is one of `drover-reasons.json` (a dropped card takes `[dropped]`).

@@ -36,24 +36,44 @@ ROLE_FILES = sorted(
     + [ROOT / "skills/pr-security-review/SKILL.md"]
     + [ROOT / f"skills/drover/references/{n}.md" for n in
        ("writing-standard", "rate-limit-etiquette", "block-template", "pr-author-notes")])
-# CLI names a rules file may tell a worker to run. Anything here that the harness does not
-# allow fails the test; add the command to harnesses/claude.json or change the rules.
-# Harness CLIs (claude, codex, hc) are left out: rules name them, the runner starts them.
-KNOWN = {
-    "drover", "gh", "git", "jq", "python3", "python", "node", "npm", "npx", "pnpm", "yarn", "bun", "deno",
-    "bash", "sh", "zsh", "source", "eval", "exec", "export", "set", "unset", "cd", "pwd", "ls", "cat",
-    "head", "tail", "wc", "sort", "uniq", "cut", "tr", "grep", "rg", "sed", "awk", "find", "diff", "echo",
-    "printf", "test", "[", "true", "false", "mkdir", "mktemp", "touch", "cp", "mv", "rm", "ln", "chmod",
-    "date", "sleep", "env", "basename", "dirname", "realpath", "tee", "xargs", "which", "command", "curl",
-    "wget", "make", "cargo", "go", "pytest", "vitest", "playwright", "docker", "supabase", "psql", "sqlite3",
-    "open", "xdg-open", "brew", "apt-get", "pip", "pip3",
-    "uv", "tsc", "eslint", "prettier", "kill", "pkill", "pgrep", "ps", "nohup", "timeout", "lsof", "ssh",
-    "scp", "rsync", "tar", "unzip", "zip", "base64", "shasum", "sha256sum", "openssl", "nc", "lsof",
+# A first word is command-shaped when it is a lower-case word or a script path; capitalised
+# words, placeholders (`<test command>`, `$VAR`), flags and numbers are prose. Every
+# command-shaped first word must be allowed by the harness or be in NON_COMMANDS: words
+# the rules put in backticks or fences that no worker runs (labels, statuses, file names,
+# template fields). A new word fails the test until it lands in one of the two.
+NON_COMMANDS = {
+    # harness CLIs the rules name; the runner starts them, a worker never does
+    "claude",
+    # functions of lib/drover-gh-guard.sh for scripts that source it
+    "sb_gh_budget_init",
+    # the project verifier's own runner arguments (`run --feature <id>`)
+    "run",
+    # commit subject types and scopes, comment roles and labels, statuses, template words
+    "feat", "fix", "wip", "ui", "receipts", "qa", "builder", "reviewer", "orchestrator", "blocker", "nit",
+    "praise", "question", "suggestion", "report", "issue", "check", "collect", "needs", "moved", "free",
+    "human-gated", "skipped", "squash", "reviewed", "migrate", "migrated", "re-picked", "re-tried",
+    "reconciled", "tracked", "unverified", "unknown", "status", "schema", "policy", "pass", "fail",
+    "select", "save", "omit", "zombie", "killing", "fresh", "new", "last", "link", "size", "steady",
+    "cosmetic", "comprehensive", "confidence", "async", "atomic", "auth", "blast", "block", "blocks",
+    "bot", "branch", "browse", "build", "chat", "claims", "comment", "continue", "default", "drains",
+    "expected", "filed", "fixes", "form", "grid", "hamburger", "horizontal", "level", "lined", "look",
+    "move", "next_n", "no-staging-env", "one-line", "orders", "owner", "page", "parallel", "prefer",
+    "prior", "pull_number", "read", "repo", "thread", "worktree", "slug", "existing", "max", "should",
+    # prose words and file names in backticks
+    "a", "add", "against", "all", "ambiguous", "and", "ask.", "cannot", "citing", "claims.", "closes",
+    "contains", "exists", "for", "from", "in", "it", "itself", "list-page", "detail-page", "public-page",
+    "settings-tab", "no", "one", "or", "see", "the", "this", "too", "verifies", "want", "with",
+    "page.on", "drover-qa", "cleanup-wt", "pr-author-notes.md", "writing-standard.md",
 }
 SCRIPT = re.compile(r"^(?:\./|~/|/|\.\./|[\w.-]+/)[\w./-]*\.(?:sh|py|js|mjs)$")
+COMMAND_SHAPED = re.compile(r"^(?:[a-z][a-z0-9._+-]*|\[)$")
 FENCE = re.compile(r"^\s*(```|~~~)\s*([\w-]*)")
-SHELL_LANGS = {"", "bash", "sh", "shell", "console", "zsh"}
+# Fences that hold data or code, not commands. Every other fence (bash, text, none) is read.
+DATA_LANGS = {"json", "jsonc", "js", "javascript", "ts", "typescript", "python", "py", "yaml", "yml",
+              "toml", "html", "css", "diff", "mermaid", "sql", "markdown", "md"}
 NEGATION = re.compile(r"\b(never|not|don't|do not|no longer|instead of|forbidden|refuse)\b", re.I)
+SUBCOMMANDS = ({p.stem[len("drover-"):] for p in (ROOT / "lib").glob("drover-*") if p.suffix in (".sh", ".py")}
+               | {"gate", "onboard", "skills", "config", "version", "help"})
 
 
 def segments(command):
@@ -70,8 +90,15 @@ def segments(command):
     return out
 
 
+def sentence_of(line, start):
+    """The sentence of `line` around position `start`: negation counts only there."""
+    begin = max(line.rfind(". ", 0, start), line.rfind("; ", 0, start))
+    end = min([i for i in (line.find(". ", start), line.find("; ", start)) if i >= 0] or [len(line)])
+    return line[begin + 1:end]
+
+
 def commands(path):
-    """(line number, first word, command text) for each command the file instructs."""
+    """(line number, first word, command text) for each command-shaped thing the file names."""
     found, fence, lang = [], None, ""
     lines = path.read_text(encoding="utf-8").splitlines()
     joined, skip = "", False
@@ -84,24 +111,27 @@ def commands(path):
         if m:
             fence, lang = (None, "") if fence else (m.group(1), m.group(2).lower())
             continue
+        if fence and lang in DATA_LANGS:
+            continue
         # Fenced prose (tables, trees, templates with `code` in them) is read like a line of text.
         prose = not fence or "`" in line or line.lstrip().startswith("|") or re.search("[←├└│]", line)
-        if fence and lang in SHELL_LANGS and not prose:
+        if fence and not prose:
             text = (joined + " " + line.strip()) if joined else line.strip()
             if text.endswith("\\"):
                 joined = text[:-1]
                 continue
             joined = ""
-            if text.startswith("#") or NEGATION.search(text):
+            if text.startswith("#"):
                 continue
-            for first, cmd in segments(re.sub(r"\s+#.*$", "", text)):
-                found.append((n, first, cmd))
-        elif prose and not NEGATION.search(line):
-            # An inline span is a command when it has arguments; one word is a name.
-            for span in re.findall(r"`([^`]+)`", line):
-                if len(span.split()) > 1 and re.match(r"[\w$./~]", span):
+            found += [(n, first, cmd) for first, cmd in segments(re.sub(r"\s+#.*$", "", text))]
+        elif prose:
+            # An inline span is a command when it has arguments; one word is a name. A span
+            # in a sentence that says never / not / instead of is what a worker must not run.
+            for m2 in re.finditer(r"`([^`]+)`", line):
+                span = m2.group(1)
+                if len(span.split()) > 1 and not NEGATION.search(sentence_of(line, m2.start())):
                     found += [(n, first, cmd) for first, cmd in segments(span)]
-    return [(n, f, c) for n, f, c in found if f in KNOWN or SCRIPT.match(f)]
+    return [(n, f, c) for n, f, c in found if COMMAND_SHAPED.match(f) or SCRIPT.match(f)]
 
 
 def worker_prompt():
@@ -124,6 +154,11 @@ def check(cond, msg):
 def covered(first, cmd):
     if any(cmd == d or cmd.startswith(d + " ") for d in DENIED):
         return False
+    if first == "drover":
+        words = cmd.split()
+        sub = words[1] if len(words) > 1 else ""
+        if sub not in SUBCOMMANDS or (sub == "skills" and words[2:3] != ["install"]):
+            return False
     return first in ALLOWED
 
 
@@ -132,11 +167,12 @@ def covered(first, cmd):
 import tempfile
 with tempfile.TemporaryDirectory() as tmp:
     sample = Path(tmp) / "run.md"
-    sample.write_text("Run `kill -9 1234` now. The `vitest` runner.\nNever run `gh pr merge 3`.\n"
-                      "```bash\nprintf '%s' \"$card\" | .claude/bin/drover-skills-ready.py --root .\n```\n")
+    sample.write_text("Run `kill -9 1234` now. The `vitest` runner. Never run `gh pr merge 3`. Then `gh pr ready 3`.\n"
+                      "```bash\nprintf '%s' \"$card\" | .claude/bin/drover-skills-ready.py --root .\n```\n"
+                      "```text\ndrover card move 3 QA\ndrover cards move 3\n```\n```json\nrm -rf x\n```\n")
     got = [(f, covered(f, c)) for _, f, c in commands(sample)]
-    check(got == [("kill", False), ("printf", True), (".claude/bin/drover-skills-ready.py", False)],
-          f"extractor self-check: {got}")
+    check(got == [("kill", False), ("gh", True), ("printf", True), (".claude/bin/drover-skills-ready.py", False),
+                  ("drover", True), ("drover", False)], f"extractor self-check: {got}")
 
 # 1 — the worker prompt itself asks for no command, and points only at files that exist.
 body, prompts, reads = worker_prompt()
@@ -153,6 +189,8 @@ for path in scanned:
     for n, first, cmd in commands(path):
         seen.setdefault(first, 0)
         seen[first] += 1
+        if first in NON_COMMANDS:
+            continue
         if SCRIPT.match(first):
             failures.append(f"{path.relative_to(ROOT)}:{n}: runs a script by path ({first}); "
                             f"call it through an allowed command (drover <name>, python3, bash)")
