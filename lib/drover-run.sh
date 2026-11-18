@@ -191,13 +191,18 @@ issue_is_open() {
   [ "$state" != "CLOSED" ]
 }
 
+# A closed issue's reason and its comments not written by drover: drover's comments open
+# with a `[<role>] ` header (writing-standard.md section 4).
+CLOSED_INFO_JQ='{reason: (.stateReason // ""), comments: ([.comments[] | select(.body | test("^\\[(builder|qa|reviewer|orchestrator|collect)\\] ") | not)] | length)}'
+CLOSED_TARGETS=" "   # "<issue>:<Done|Blocked>" decided this run, so a failed move re-reads nothing
 closed_card_column() {
   # $1 = a CLOSED issue. Prints where its card belongs (FR-BRD-3): Done when a PR from its
-  # issue-<N>-* branch is merged into the base, or it was closed as not planned with a comment;
+  # issue-<N>-* branch is merged into the base, or it was closed as not planned with a comment
+  # from a person (drover's own role, orchestrator and stop comments do not count);
   # Blocked otherwise. Exit 79 when GitHub cannot be read.
   local info heads
   info=$(python3 "$SB_GITHUB_READ" --kind object -- issue view "$1" --json stateReason,comments \
-    --jq '{reason: (.stateReason // ""), comments: (.comments | length)}') || return 79
+    --jq "$CLOSED_INFO_JQ") || return 79
   if [ "$(echo "$info" | jq -r '.reason == "NOT_PLANNED" and .comments > 0')" = true ]; then
     echo Done; return 0
   fi
@@ -263,11 +268,15 @@ top_card_in_column() {
     [ -n "$issue" ] || continue
     case "$TICK_SEEN" in *" $issue "*) continue ;; esac
     issue_locked "$issue" && continue
-    local issue_rc=0 target
-    issue_is_open "$issue" || issue_rc=$?
+    local issue_rc=0 target=""
+    case "$CLOSED_TARGETS" in *" $issue:"*) target="${CLOSED_TARGETS#* $issue:}"; target="${target%% *}"; issue_rc=1 ;; esac
+    [ -n "$target" ] || issue_is_open "$issue" || issue_rc=$?
     [ "$issue_rc" -le 1 ] || exit "$issue_rc"
     if [ "$issue_rc" -ne 0 ]; then
-      target=$(closed_card_column "$issue") || exit $?
+      if [ -z "$target" ]; then
+        target=$(closed_card_column "$issue") || exit $?
+        CLOSED_TARGETS="${CLOSED_TARGETS}${issue}:${target} "
+      fi
       if [ "$target" = Done ]; then
         log "reconciled closed #${issue} -> Done (was '${col}') — dispatching 0 workers for it"
         set_card_status "$item_id" "Done" || { gh_checkpoint; log "  ↳ reconcile of #${issue} could not be written to the board"; return 1; }

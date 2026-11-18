@@ -20,7 +20,7 @@ NAMES = ['drover', 'drover-build', 'drover-qa', 'drover-review', 'drover-collect
          'diagnosing-bugs', 'verification-before-completion', 'testing-strategy']
 
 FAKE_GH = r'''
-import glob, json, os, re, sys
+import glob, json, os, re, subprocess, sys, time
 args = sys.argv[1:]
 manifest = ''.join(open(p).read() for p in glob.glob('.drover/runs/*.md'))
 phase = 'round' if 'initial Ready count' in manifest else 'startup'
@@ -47,8 +47,10 @@ elif args[:2] == ['issue', 'view']:
     fields = args[args.index('--json') + 1] if '--json' in args else ''
     if fields == 'state':
         print(c.get('state', 'OPEN'))
-    elif fields == 'stateReason,comments':  # the runner's --jq shape
-        print(json.dumps({'reason': c.get('reason', 'COMPLETED'), 'comments': c.get('comments', 0)}))
+    elif fields == 'stateReason,comments':  # run the runner's own --jq over gh's shape
+        issue = {'stateReason': c.get('reason', 'COMPLETED'), 'comments': [{'body': b} for b in c.get('comments', [])]}
+        sys.stdout.write(subprocess.run(['jq', '-c', args[args.index('--jq') + 1]], input=json.dumps(issue),
+                                        capture_output=True, text=True, check=True).stdout)
     elif fields == 'labels':
         print(json.dumps({'labels': [{'name': l} for l in c.get('labels', [])]}))
     else:
@@ -59,7 +61,13 @@ elif args[:2] == ['project', 'field-list']:
 elif args[:2] == ['project', 'view']:
     print('{"id":"P"}')
 elif args[:2] == ['pr', 'list'] and 'merged' in args:
-    print(json.dumps([{'headRefName': c['merged']} for c in board if c.get('merged')]))
+    base = args[args.index('--base') + 1]
+    print(json.dumps([{'headRefName': c['merged']} for c in board
+                      if c.get('merged') and c.get('merged_base', 'main') == base]))
+elif args[0] == 'api' and re.fullmatch(r'repos/\{owner\}/\{repo\}/issues/\d+/comments', args[1]):
+    now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+    print(json.dumps([[{'id': i + 1, 'body': b, 'user': {'login': 'bot'}, 'created_at': now, 'updated_at': now}
+                       for i, b in enumerate(card(int(args[1].split('/')[4])).get('reports', []))]]))
 elif args[:2] == ['pr', 'list']:
     m = re.search(r'issue-(\d+)-', ' '.join(args))
     print(os.environ.get('PR_FOR_' + m.group(1), '') if m else '')
@@ -229,20 +237,27 @@ class RunnerRounds(unittest.TestCase):
     # FR-BRD-3: the runner never moves an open card to Done; the merge gate
     # (test-merge-gate.sh) is what proves a merge before the reviewer moves it.
     # A closed card reaches Done only with a merged issue-<N>-* PR into the base, or a
-    # not-planned close with a comment; any other close goes to Blocked [needs-you].
+    # not-planned close with a comment from a person; any other close goes to Blocked [needs-you].
     def test_done_only_after_merge(self):
         self.env['FAKE_CLAUDE'] = 'exit'  # the reviewer ends without merging
         self.board({'number': 6, 'status': 'Review', 'state': 'CLOSED'},
                    {'number': 9, 'status': 'Review', 'state': 'CLOSED', 'merged': 'issue-9-fix'},
-                   {'number': 10, 'status': 'Review', 'state': 'CLOSED', 'reason': 'NOT_PLANNED', 'comments': 1},
+                   {'number': 1, 'status': 'Review', 'state': 'CLOSED'},  # issue-12- is not issue-1-
+                   {'number': 12, 'status': 'Done', 'state': 'CLOSED', 'merged': 'issue-12-fix'},
+                   {'number': 13, 'status': 'Review', 'state': 'CLOSED', 'merged': 'issue-13-fix',
+                    'merged_base': 'dev'},  # merged, but not into the base
+                   {'number': 10, 'status': 'Review', 'state': 'CLOSED', 'reason': 'NOT_PLANNED',
+                    'comments': ['[orchestrator] [report] stopped', 'duplicate of #3']},
                    {'number': 11, 'status': 'QA', 'state': 'CLOSED', 'reason': 'NOT_PLANNED'},
+                   {'number': 14, 'status': 'Review', 'state': 'CLOSED', 'reason': 'NOT_PLANNED',
+                    'comments': ['[orchestrator] [report] stopped · build lane', '[reviewer] [report] bounced']},
                    {'number': 5, 'status': 'Review'})
-        self.run_board(cycles=2)
+        self.run_board(cycles=1)
         self.assertNotIn('item5', self.done_moves(), 'an unmerged open card reached Done')
         self.assertEqual(sorted(self.done_moves()), ['item10', 'item9'])
-        self.assertEqual(sorted(self.moves('Blocked')), ['item11', 'item6'])
+        self.assertEqual(sorted(self.moves('Blocked')), ['item1', 'item11', 'item13', 'item14', 'item6'])
         notes = {c[2]: c[c.index('--body') + 1] for c in self.calls() if c[:2] == ['issue', 'comment']}
-        self.assertEqual(sorted(notes), ['11', '6'])
+        self.assertEqual(sorted(notes), ['1', '11', '13', '14', '6'])
         self.assertTrue(notes['6'].startswith('[orchestrator] [blocker] blocked [needs-you] '), notes['6'])
         self.assertIn('\nblocked-by:  -', notes['6'])
         self.assertTrue(self.worker_pids(expect=1), 'the open card got a reviewer')
