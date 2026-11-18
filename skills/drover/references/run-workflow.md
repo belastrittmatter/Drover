@@ -32,7 +32,7 @@ After the same plan and claim steps, launch this command as a background task:
 `drover codex-wave --config <config-path> --cards <claimed-cards.json> --codex[=<model>] --tier <low|medium|high> --output <wave-result.json>`.
 The helper starts one `drover-lane.sh --backend codex` per card/lane, cards in parallel,
 each advancing Build → QA → Review only after a successful handoff (QA labels skip Build).
-Concurrency uses positive `max_workers`, otherwise `max(1, min(16, cpus - 2))`.
+Concurrency is `roles.build.max_workers` (default 1); each card runs its lanes in turn.
 Pre-flight/classification and truth-check run inline; there are no Claude sub-agents.
 Each lane emits `{status,column,detail}`; the wave returns the same `cards` summary
 as the workflow, so reconcile, manifest, board/comments and throttle steps stay the same.
@@ -231,8 +231,8 @@ Repeat until a done condition or halt gate fires:
    stays in Ready for the next wave. Sequenced cards carry a `blocked-by:` line, so this same sweep
    frees them when the overlapping PR's issue closes.
    Wave width is every card the dependency graph says is free, in flight
-   first (Review → QA → Ready), cut to `max_workers` when it is set (0 or
-   absent = no cap). `max_workers` is the GitHub-limit valve: step 5 lowers it
+   first (Review → QA → Ready), each lane cut to its `roles.<role>.max_workers`
+   (default 1). `roles.build.max_workers` is the GitHub-limit valve: step 5 lowers it
    after a wave that hit the hourly limit. If `cards` is empty and
    Building/QA/Review counts are 0 → done. If empty but cards sit in Blocked
    only → report and stop.
@@ -272,7 +272,7 @@ Repeat until a done condition or halt gate fires:
    Then the GitHub-limit step-down: save the returned `cards` to a temp file and run
    `drover throttle --config <config-path> --results <file>`.
    `hit: true` (GraphQL at 0, or a lane failed on the limit) has already written
-   `max_workers` one lower into the config — unlimited → 3 → 2 → 1, floor 1 — so the
+   `roles.build.max_workers` one lower into the config, floor 1, so the
    next wave and the next run start narrower. Raising it again is the owner's call.
 6. **Report** — one short block to the user per wave, in the session. Outcome
    first, one line per card that needs a human, then what happens next:
@@ -283,7 +283,7 @@ Repeat until a done condition or halt gate fires:
      #18 failed: build lane returned no result — retried next wave
    Next: wave 4 (3 cards)   |   paused until 14:05   |   board drained
    ```
-   A throttle hit adds one line: `GitHub hourly limit hit — max_workers 3 → 2 (config saved)`.
+   A throttle hit adds one line: `GitHub hourly limit hit — roles.build.max_workers 3 → 2 (config saved)`.
    Merged and bounced cards are counts, not lines — they need nobody. Every
    `human-gate`/`blocked` card gets its line and its owner: that is the
    human's queue. Never report a card as done that is not on the base branch.

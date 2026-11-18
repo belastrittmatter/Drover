@@ -3,8 +3,8 @@
 #
 # WHY. On 2026-10-03 one 14-card wave spent the whole 5000/hr GraphQL bucket in about 40
 # minutes; every later `gh issue/pr/project` call failed until the reset. The owner's rule:
-# a wave that hits the hourly limit makes the next wave narrower — `max_workers` 3 → 2 → 1,
-# floor 1 — and the step is written into the config so the next run starts narrow too.
+# a wave that hits the hourly limit makes the next wave narrower — `roles.build.max_workers`
+# one lower, floor 1 — and the step is written into the config so the next run starts narrow too.
 #
 # WHAT COUNTS AS A HIT. Either signal is enough:
 #   - GraphQL remaining is 0, or
@@ -20,7 +20,7 @@
 #
 # Stdout, one JSON line:
 #   {"hit":true,"why":"graphql remaining 0","from":3,"to":2,"wrote":true}
-# `from` 0 means unlimited; a hit on an unlimited config starts the ladder at 3.
+# `from` is roles.build.max_workers (default 1).
 # Exit 0 whether or not it hit (read `hit`) · 64 usage · 66 config missing.
 set -euo pipefail
 
@@ -52,17 +52,17 @@ if [ -z "$WHY" ] && [ -n "$RESULTS" ] && [ -f "$RESULTS" ] \
   WHY="a lane result reports a GitHub rate-limit failure"
 fi
 
-FROM=$(jq -r '.max_workers // 0' "$CONFIG")
+FROM=$(jq -r '.roles.build.max_workers // 1' "$CONFIG")
 if [ -z "$WHY" ]; then
   jq -nc --argjson f "$FROM" '{hit:false,why:null,from:$f,to:$f,wrote:false}'
   exit 0
 fi
 
-if [ "$FROM" -le 0 ]; then TO=3; elif [ "$FROM" -gt 1 ]; then TO=$((FROM - 1)); else TO=1; fi
+if [ "$FROM" -gt 1 ]; then TO=$((FROM - 1)); else TO=1; fi
 WROTE=false
 if [ "$DRY" -eq 0 ] && [ "$TO" -ne "$FROM" ]; then
   TMP=$(mktemp "${CONFIG}.XXXXXX")
-  jq --argjson n "$TO" '.max_workers = $n' "$CONFIG" > "$TMP" && mv "$TMP" "$CONFIG"
+  jq --argjson n "$TO" '.roles.build.max_workers = $n' "$CONFIG" > "$TMP" && mv "$TMP" "$CONFIG"
   WROTE=true
 fi
 jq -nc --arg w "$WHY" --argjson f "$FROM" --argjson t "$TO" --argjson wr "$WROTE" \

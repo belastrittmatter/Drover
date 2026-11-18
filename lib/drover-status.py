@@ -640,7 +640,7 @@ def main() -> int:
         or cfg.get("claim", {}).get("assignee_login")
         or "?"
     )
-    max_workers = cfg.get("max_workers", 3)
+    max_workers = sum(((cfg.get("roles") or {}).get(r) or {}).get("max_workers", 1) for r in ("build", "qa", "review"))
 
     print(f"drover · {proj['title']} (#{proj['number']})")
     print("─" * 80)

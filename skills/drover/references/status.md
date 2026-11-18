@@ -372,7 +372,7 @@ the script is missing.
   - `Run started` — most recent `drover run started` line in today's
     manifest. If absent or followed by `exiting cleanly`, see §H.
   - `Active worker count` — derived from in-flight scan above, capped at
-    `config.max_workers` (top-level, defaults to 3).
+    `roles.<role>.max_workers` summed (each defaults to 1).
 
 ---
 

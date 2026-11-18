@@ -104,7 +104,7 @@ RC=0; lane build --codex --tier extreme >"$T/out" || RC=$?
 [ "$RC" -ne 0 ] || fail 'unknown tier must refuse'
 
 # Wave: the luna router grades Ready cards only when nothing pins a model.
-echo '{"max_workers":1,"verify_commands":["git diff --check"]}' > "$T/config.json"
+echo '{"roles":{"build":{"max_workers":1}},"verify_commands":["git diff --check"]}' > "$T/config.json"
 CARDS='[{"number":1,"status":"Ready","title":"easy"},{"number":2,"status":"Review"}]'
 : > "$SB_CODEX_TEST_LOG"
 SB_CODEX_TEST_GRADE=low wave --codex --tier low >"$T/out"
@@ -189,7 +189,7 @@ done <<'GOOD'
 GOOD
 
 CARDS='[{"number":1,"status":"Ready"},{"number":2,"status":"Ready","labels":["qa"]},{"number":3,"status":"QA"},{"number":4,"status":"Review"}]'
-echo '{"max_workers":1,"codex":{"model":"config-model"},"verify_commands":["git diff --check"]}' > "$T/config.json"
+echo '{"roles":{"build":{"max_workers":1}},"codex":{"model":"config-model"},"verify_commands":["git diff --check"]}' > "$T/config.json"
 : > "$SB_CODEX_TEST_LOG"
 wave --codex=wave-model --output "$T/wave.json" > "$T/out"
 cmp "$T/out" "$T/wave.json" || fail 'file and stdout wave result differ'
@@ -222,7 +222,7 @@ RC=0; SB_CODEX_TEST_STATUS=halted SB_CODEX_TEST_DETAIL='verification-readiness: 
 rm .claude/drover/inflight/1
 
 # Two card chains run together, but a cap of 1 above was serial.
-echo '{"max_workers":2,"verify_commands":["git diff --check"]}' > "$T/config.json"
+echo '{"roles":{"build":{"max_workers":2}},"verify_commands":["git diff --check"]}' > "$T/config.json"
 CARDS='[{"number":1,"status":"Review"},{"number":2,"status":"Review"}]'
 : > "$SB_CODEX_TEST_LOG"
 SB_CODEX_TEST_DELAY=1 wave --codex >"$T/out"

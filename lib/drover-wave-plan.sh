@@ -23,8 +23,8 @@
 # nothing about the blocked ones. Filtering first and then not capping is
 # strictly better: fewer wasted dispatches AND more real work per wave.
 #
-# `max_workers` is kept as a safety valve. Absent or 0 means unlimited, which is
-# the default. Set it only to deliberately throttle a machine.
+# Each lane is capped by its role's `roles.<role>.max_workers` (default 1); raise it
+# per role for wider waves.
 #
 # THE BLOCKED SWEEP. `Blocked` used to be terminal: a card parked naming the
 # issue it waited on, that issue later closed, and nothing ever read the note
@@ -93,8 +93,10 @@ printf '%s\n' "$CONFIG_JSON" | python3 "$HERE/drover-verification-ready.py" --co
 export SB_REPO_PATH=$(echo "$CONFIG_JSON" | jq -r '.repo.path // "."')
 python3 "$HERE/drover-github-read.py" --check
 VARIANT=$(echo "$CONFIG_JSON" | jq -r '.variant // ""')
-# 0 or absent = unlimited. A wave is sized by the dependency graph, not a knob.
-MAX_WORKERS=$(echo "$CONFIG_JSON" | jq -r '.max_workers // 0')
+# Per-lane caps from roles.<role>.max_workers (default 1, specs/config.md); within them the
+# dependency graph sizes the wave.
+CAPS=$(echo "$CONFIG_JSON" | jq -c '{build: (.roles.build.max_workers // 1), qa: (.roles.qa.max_workers // 1),
+                                       review: (.roles.review.max_workers // 1)}')
 OWNER=$(echo "$CONFIG_JSON" | jq -r '.project.owner')
 NUMBER=$(echo "$CONFIG_JSON" | jq -r '.project.number')
 
@@ -132,7 +134,7 @@ fi
 # auto-merges into one base branch race. That guard now lives where the race
 # actually is — the merge step takes a lock inside the wave workflow and the
 # freshness gate re-verifies under it — so reviews may run in parallel here.
-echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argjson deps "$DEPS" '
+echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson caps "$CAPS" --argjson deps "$DEPS" '
   def dep($n): $deps[($n | tostring)];
   # gh project item-list puts label names on the item (`labels`); some shapes put
   # them on the content, as strings or {name}. Lower-cased, names only.
@@ -163,7 +165,10 @@ echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argj
 
   # Downstream-first, so work already begun finishes before new work starts.
   | ($flight + $ready) as $picked
-  | { cards: (if $cap > 0 then ($picked | .[:$cap]) else $picked end),
+  # Each lane takes at most roles.<role>.max_workers cards, in that order.
+  | { cards: (reduce $picked[] as $c ({out: [], n: {}};
+               if (.n[$c.lane] // 0) < $caps[$c.lane] then .out += [$c] | .n[$c.lane] += 1 else . end)
+             | .out),
 
       # Blocked cards whose blockers have all closed. The orchestrator moves
       # these to Ready before launching, so they join this very wave.
