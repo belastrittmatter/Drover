@@ -28,6 +28,12 @@
 #      was dispatched from failed; two failures in a row on one card halt the run with its log tail.
 #
 # Workers per role: roles.<role>.max_workers (default 1, FR-RUN-2), counted from the live locks.
+#
+# Exit codes: 0 finished or a runaway/ceiling halt · 9/10 verification or skills readiness ·
+#   64 usage or no config · 65 old config · 66 no worker command · 73 leftover runner, worker
+#   or legacy worktree · 74 workflow wave in flight · 75 would auto-merge to production main ·
+#   76 failed-dispatch halt (FR-RUN-13; other workers keep running) · 79 GitHub read halt ·
+#   143 stopped by TERM/INT.
 
 set -euo pipefail
 SB_GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/drover-github-read.py"
@@ -285,7 +291,6 @@ top_card_in_column() {
       fi
       gh_checkpoint
       [ -n "$BOT_LOGIN" ] && gh_write_once issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
-      rm -f "$INFLIGHT_DIR/$issue"
       continue
     fi
     TOP_ISSUE="$issue"; TOP_ITEM_ID="$item_id"
@@ -420,19 +425,33 @@ dispatch_lane() {
     printf 'prompt: %s\n\n' "$prompt"
   } >> "$worker_log"
   gh_checkpoint
+  local started column
+  started=$(date -u +%FT%TZ); column=$(issue_status "$issue")
+  # A TERM or INT between the worker start and its lock would leave an untracked worker:
+  # hold the signal until the lock is written, then act on it.
+  local held=""
+  trap 'held=TERM' TERM; trap 'held=INT' INT
   # The harness's worker command with the role's model and the headless permissions
   # (FR-HRN-4): a worker never waits on an approval prompt.
-  worker_start "$lane" "$issue" "$prompt" "$worker_log" || { log "worker command: no argv from harness ${HARNESS:-claude}"; exit 66; }
+  worker_start "$lane" "$issue" "$prompt" "$worker_log" || { trap - TERM INT; log "worker command: no argv from harness ${HARNESS:-claude}"; exit 66; }
+  # Lock format: HANDLE / LANE / STARTED for `drover stop`, COLUMN (the card's column at
+  # dispatch) for the failed-dispatch check. Readers still accept the older PID= line.
+  write_lock "$INFLIGHT_DIR/$issue" "$(printf 'HANDLE=%s\nLANE=%s\nSTARTED=%s\nCOLUMN=%s' \
+    "$WORKER_HANDLE" "$lane" "$started" "$column")
+"
   MY_HANDLES="${MY_HANDLES}${WORKER_HANDLE} "
+  trap - TERM INT
+  [ -z "$held" ] || exit 143
   DISPATCH_COUNT=$((DISPATCH_COUNT + 1))
   DISPATCH_LOG="${DISPATCH_LOG}${issue}
 "
-  # Lock format: HANDLE / LANE / STARTED for `drover stop`, COLUMN (the card's column at
-  # dispatch) for the failed-dispatch check. Readers still accept the older PID= line.
-  printf 'HANDLE=%s\nLANE=%s\nSTARTED=%s\nCOLUMN=%s\n' "$WORKER_HANDLE" "$lane" "$(date -u +%FT%TZ)" \
-    "$(issue_status "$issue")" > "$INFLIGHT_DIR/$issue"
-  # pid= stays a number (metrics.md FR-MET-2): the process backend's id.
-  log "dispatch lane=${lane} issue=#${issue} pid=${WORKER_HANDLE#*:} claim=${BOT_LOGIN:-local-only}"
+  # pid= stays a bare number (metrics.md FR-MET-2): the process backend's id.
+  log "dispatch lane=${lane} issue=#${issue} pid=$(worker_pid "$WORKER_HANDLE" || echo 0) claim=${BOT_LOGIN:-local-only}"
+}
+
+forget_handle() {
+  # A reaped or stopped worker leaves the set a halt stops.
+  MY_HANDLES="${MY_HANDLES/ $1 / }"
 }
 
 issue_status() {
@@ -455,7 +474,9 @@ LEFT_LANE=" "   # "<issue>:<tick>" for each live worker whose card was first see
 sweep_lane_zombies() {
   # A live worker whose card left its lane's columns (and the column it was dispatched
   # from) has done its logical work. It gets one more tick to finish its handoff (FR-WRK-10),
-  # then it is stopped and its lane freed. Uses cached project items only (no extra API calls).
+  # then it is stopped and its lane freed. Runs only right after a fresh board read, so both
+  # the mark and the stop rest on fresh data; a mark survives the cap-reached ticks between.
+  # A card back in its lane drops its mark.
   local issue cur seen pid marks=" "
   for issue in $(issue_locks); do
     worker_lock "$INFLIGHT_DIR/$issue" || continue
@@ -465,9 +486,10 @@ sweep_lane_zombies() {
     case " $(lane_columns "$LANE") ${COLUMN} " in *" $cur "*) continue ;; esac
     seen=""
     case "$LEFT_LANE" in *" $issue:"*) seen="${LEFT_LANE#* $issue:}"; seen="${seen%% *}" ;; esac
-    pid="${HANDLE#*:}"
+    pid=$(worker_pid "$HANDLE" || echo 0)
     if [ -z "$seen" ]; then
-      log "${LANE} worker on #${issue} (pid=${pid}) — card moved to '${cur}'; one more tick to finish its handoff"
+      # Not "card moved to": FR-MET-1 readers take that phrase as the worker's outcome.
+      log "${LANE} worker on #${issue} (pid=${pid}) left its lane (now '${cur}'); one more tick to finish its handoff"
       marks="${marks}${issue}:${TICK} "
       continue
     fi
@@ -486,6 +508,7 @@ sweep_lane_zombies() {
     [ -n "$BOT_LOGIN" ] && gh_write_once issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
     gh_checkpoint
     rm -f "$INFLIGHT_DIR/$issue"
+    forget_handle "$HANDLE"
   done
   LEFT_LANE="$marks"
 }
@@ -534,7 +557,7 @@ runaway_summary() {
   log "   → inspect worker logs in ${WORKER_LOG_DIR}/"
 }
 
-JUDGE_QUEUE=""   # "<issue>|<lane>|<column at dispatch>" per worker that exited this run
+JUDGE_QUEUE=""   # "<issue>|<lane>|<column at dispatch>|<started>" per worker that exited this run
 FAILS=" "        # "<issue>:<failed dispatches in a row>"
 reap_finished_locks() {
   # Sweep inflight/ for dead workers; remove locks AND sweep stale assignees so the
@@ -548,7 +571,7 @@ reap_finished_locks() {
     gh_checkpoint
     worker_lock "$INFLIGHT_DIR/$issue" || continue
     worker_alive "$HANDLE" && continue
-    pid="${HANDLE#*:}"
+    pid=$(worker_pid "$HANDLE" || true)
     gh_checkpoint
     if [ -n "$BOT_LOGIN" ]; then
       gh_checkpoint
@@ -557,30 +580,46 @@ reap_finished_locks() {
     else
       log "reaped stale lock for #${issue} (pid=${pid:-empty})"
     fi
-    [ "${1:-}" = judge ] && [ -n "$COLUMN" ] && JUDGE_QUEUE="${JUDGE_QUEUE} ${issue}|${LANE}|${COLUMN}"
+    [ "${1:-}" = judge ] && [ -n "$COLUMN" ] && JUDGE_QUEUE="${JUDGE_QUEUE} ${issue}|${LANE}|${COLUMN}|${STARTED}"
     gh_checkpoint
     rm -f "$INFLIGHT_DIR/$issue"
+    forget_handle "$HANDLE"
     REAP_COUNT=$((REAP_COUNT + 1))
   done
 }
 
+role_reported() {
+  # $1 = issue, $2 = lane, $3 = the worker's STARTED time. 0 when the lane's role posted a
+  # `[<role>] [report]` or `[<role>] [blocker]` comment on the issue since then (FR-RUN-13).
+  local role pages
+  case "$2" in build) role=builder ;; review) role=reviewer ;; *) role="$2" ;; esac
+  pages=$(python3 "$SB_GITHUB_READ" --kind comments -- api "repos/{owner}/{repo}/issues/$1/comments" \
+    --paginate --slurp) || exit 79
+  [ "$(printf '%s' "$pages" | jq --arg s "$3" --arg re "^\\[${role}\\] \\[(report|blocker)\\]" \
+    '[.[][] | select(.created_at >= $s and (.body | test($re)))] | length')" -gt 0 ]
+}
+
 judge_finished_workers() {
   # FR-RUN-13, on a fresh board read: a worker that exited with its card still in the
-  # column it was dispatched from is a failed dispatch (the board decides, FR-WRK-6).
-  # Returns 1 (halt) after two failed dispatches in a row on one card, with its log tail.
-  local entry issue lane col cur n worker_log
+  # column it was dispatched from, or in Building (no lane picks a card up there; the next
+  # reclaim moves it back to Ready), and that posted no report of its role since it started,
+  # is a failed dispatch (the board decides, FR-WRK-6; the report read is one GitHub call per
+  # such worker). Returns 1 (halt) after two failed dispatches in a row on one card, with
+  # the tail of its worker log.
+  local entry issue lane col started cur n worker_log
   for entry in $JUDGE_QUEUE; do
-    IFS='|' read -r issue lane col <<EOF
+    IFS='|' read -r issue lane col started <<EOF
 $entry
 EOF
     n=0
     case "$FAILS" in *" $issue:"*) n="${FAILS#* $issue:}"; n="${n%% *}" ;; esac
     FAILS=$(printf '%s' "$FAILS" | sed "s/ $issue:[0-9]* / /")
     cur=$(issue_status "$issue")
-    [ -n "$cur" ] && [ "$cur" = "$col" ] || continue
+    [ -n "$cur" ] && { [ "$cur" = "$col" ] || [ "$cur" = Building ]; } || continue
+    role_reported "$issue" "$lane" "$started" && continue
     n=$((n + 1))
     FAILS="${FAILS}${issue}:${n} "
-    log "failed dispatch lane=${lane} issue=#${issue} — worker exited, card still in '${col}' (${n} in a row)"
+    log "failed dispatch lane=${lane} issue=#${issue} — worker exited, card in '${cur}', no report (${n} in a row)"
     if [ "$n" -ge 2 ]; then
       JUDGE_QUEUE=""
       worker_log="${WORKER_LOG_DIR}/worker-${lane}-${issue}.log"
@@ -628,9 +667,9 @@ cleanup_stale_worktrees() {
 }
 
 reclaim_stranded_building() {
-  # Run start only (no worker of ours is alive yet — the orphan guard proved it).
-  # A card in Building with no live in-flight lock and no assignee but ours was
-  # stranded by a run that stopped mid-build. No lane selects from Building, so
+  # At run start and after every fresh board read. A card in Building with no in-flight
+  # lock and no assignee but ours was stranded by a run that stopped mid-build, or by a
+  # builder that exited mid-build (FR-RUN-13 counts that). No lane selects from Building, so
   # left alone it sits there forever and the run can never reach "all columns
   # empty". Move it back to Ready and say so; the issue branch is kept, so the
   # next Builder continues on it instead of starting over.
@@ -638,7 +677,8 @@ reclaim_stranded_building() {
   while IFS=$'\t' read -r issue item_id; do
     [ -n "$issue" ] || continue
     issue_locked "$issue" && continue
-    branch=$(git ls-remote --heads origin "issue-${issue}-*" 2>/dev/null | head -1 | sed 's#.*refs/heads/##')
+    # No origin (or no network) is "no branch found", not a halt.
+    branch=$(git ls-remote --heads origin "issue-${issue}-*" 2>/dev/null | head -1 | sed 's#.*refs/heads/##' || true)
     wt=".drover/worktrees/issue-${issue}-build"
     if [ -d "$wt" ]; then
       wt_branch=$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
@@ -656,7 +696,7 @@ reclaim_stranded_building() {
     # Comment format: writing-standard.md § 4.
     gh_checkpoint
     gh_write_once issue comment "$issue" --body "[orchestrator] [report] moved back to Ready · stranded in Building
-Did: found no live worker; the last run stopped mid-build
+Did: found no live worker; the last builder stopped mid-build
 Done: card moved to Ready · branch ${branch:-none found}${branch:+ kept}
 Next: builder (next tick${branch:+, continues on the branch})" >/dev/null 2>&1 || true
     log "stranded #${issue}: Building → Ready (branch ${branch:-none})"
@@ -707,7 +747,11 @@ if worker_lock "$RUNNER_LOCK" && worker_alive "$HANDLE"; then
 fi
 ORPHANS=0
 for issue in $(issue_locks); do
-  worker_lock "$INFLIGHT_DIR/$issue" && worker_alive "$HANDLE" && ORPHANS=$((ORPHANS + 1))
+  worker_lock "$INFLIGHT_DIR/$issue" && worker_alive "$HANDLE" || continue
+  ORPHANS=$((ORPHANS + 1))
+  if worker_legacy "$HANDLE"; then
+    log "    lock #${issue} is an older PID= lock (pid $(worker_pid "$HANDLE")): drover never signals it; check that process by hand"
+  fi
 done
 if [ "$ORPHANS" -gt 0 ]; then
   log "refusing to start: ${ORPHANS} drover workers already running (live locks in $INFLIGHT_DIR)."
@@ -715,7 +759,9 @@ if [ "$ORPHANS" -gt 0 ]; then
   log "    Then re-run: drover run"
   exit 73
 fi
-printf 'HANDLE=process:%s\nSTARTED=%s\n' "$$" "$(date -u +%FT%TZ)" > "$RUNNER_LOCK"
+write_lock "$RUNNER_LOCK" "HANDLE=$(process_handle "$$")
+STARTED=$(date -u +%FT%TZ)
+"
 RUNNER_LOCK_OWNED=1
 
 # Workflow-backend mutual exclusion (see references/run-workflow.md §Preconditions).
@@ -785,18 +831,14 @@ while true; do
 
   reap_finished_locks judge  # cheap local sweep; runs every tick
 
-  # ── Zombie sweep against the LAST cached project state (no extra API).
-  #    Catches workers whose card already moved out of the lane's source column
-  #    but whose claude -p process didn't exit. Runs every tick, even cheap ones,
-  #    so a cap-reached pipeline can still self-heal when one lane is a zombie.
-  sweep_lane_zombies
-
   # ── Free pre-check: count live workers from the locks (no API calls).
   lane_states
 
   # ── Cheap-tick path: workers at cap → skip GraphQL fetch entirely.
   #    The board can't change in a way that helps us until a lane frees up.
-  if [ "$ACTIVE_WORKERS" -ge "$MAX_WORKERS" ]; then
+  #    A worker in its grace tick (LEFT_LANE) needs a fresh read to be stopped, so it
+  #    forces the fetch.
+  if [ "$ACTIVE_WORKERS" -ge "$MAX_WORKERS" ] && [ "$LEFT_LANE" = " " ]; then
     log "tick — cap reached (${ACTIVE_WORKERS}/${MAX_WORKERS} busy) — skipping GraphQL fetch, sleeping ${TICK_SECONDS}s"
     sleep "$TICK_SECONDS"
     continue
@@ -806,10 +848,14 @@ while true; do
   gh_rate_guard
   fetch_project_items
 
-  # FR-RUN-13: judge the workers that exited, against the fresh board.
-  judge_finished_workers || break
+  # FR-RUN-13: judge the workers that exited, against the fresh board. Exit 76: other
+  # lanes' workers keep running with their locks.
+  judge_finished_workers || exit 76
+  # A builder that exited mid-build left its card in Building, where no lane looks.
+  reclaim_stranded_building
 
-  # Re-sweep zombies against fresh cache; the previous sweep used stale data.
+  # Zombie sweep (FR-WRK-10), on fresh data only: catches workers whose card already
+  # moved out of the lane's source column but whose process didn't exit.
   sweep_lane_zombies
   lane_states
 

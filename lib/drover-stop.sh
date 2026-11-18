@@ -2,10 +2,11 @@
 # drover-stop.sh — graceful shutdown of an in-flight drover run.
 #
 # What it does:
-#   1. Find every in-flight worker (lock files under .claude/drover/inflight/) and this
-#      repo's runner (.claude/drover/runner.lock). Only these are touched (FR-WRK-8):
-#      no process search, so another repo's runner and workers are never signalled.
-#      Stop the runner first, then any Codex wave and its lane process groups.
+#   1. Stop this repo's runner (.claude/drover/runner.lock) first, then any Codex wave and
+#      its lane process groups, then find every in-flight worker (lock files under
+#      .claude/drover/inflight/). Only these are touched (FR-WRK-8): no process search, so
+#      another repo's runner and workers are never signalled, and a pid whose start time no
+#      longer matches its handle (recycled) is never signalled either.
 #   2. For each worker, post a "stopped mid-flight" comment on the issue AND its PR
 #      (with last commit, lane, and resume hint) — so context survives the kill.
 #   3. Release the GitHub assignee mutex on each claimed issue.
@@ -112,10 +113,12 @@ release_claim() {
 }
 
 stop_handle() {
-  local handle="$1" name="${2:-process}" grace="${3:-1}" pid="${1#*:}"
+  local handle="$1" name="${2:-process}" grace="${3:-1}" pid
+  pid=$(worker_pid "$handle" || true)
   worker_stop "$handle" "$grace"
   case "$WORKER_STOPPED_BY" in
-    none) log "  ${name} pid=${pid:-empty} already dead" ;;
+    none) log "  ${name} pid=${pid:-empty} already dead (or the pid now names another process)" ;;
+    refused) log "  ${name} pid=${pid} not signalled: an older PID= lock has no start time to prove it is drover's; check it by hand" ;;
     KILL) log "  ${name} pid=${pid} SIGKILLed (didn't respond to SIGTERM)" ;;
     *)    log "  ${name} pid=${pid} SIGTERMed" ;;
   esac
@@ -126,23 +129,11 @@ echo "════════════════════════�
 echo "  drover stop · ${CONFIG_SLUG}"
 echo "════════════════════════════════════════════════════════"
 
-# 1. Inventory in-flight workers BEFORE killing anything.
-WORKERS=()
-if [ -d "$INFLIGHT_DIR" ]; then
-  for lock in "$INFLIGHT_DIR"/*; do
-    [ -f "$lock" ] || continue
-    issue=$(basename "$lock")
-    # Wave/merge control markers are not GitHub issue numbers.
-    case "$issue" in ''|*[!0-9]*) continue ;; esac
-    worker_lock "$lock"
-    WORKERS+=("${issue}|${LANE:-unknown}|${HANDLE}")
-  done
-fi
-
 DISPATCHER=""
 if worker_lock "$RUNNER_LOCK" && worker_alive "$HANDLE"; then DISPATCHER="$HANDLE"; fi
 CODEX_WAVE_MARKER=".claude/drover/codex-wave.pid"
 CODEX_WAVE_PID=""
+CODEX_WAVE_HANDLE=""
 if [ -f "$CODEX_WAVE_MARKER" ]; then
   CODEX_WAVE_PID=$(cat "$CODEX_WAVE_MARKER")
   case "$CODEX_WAVE_PID" in ''|*[!0-9]*)
@@ -156,7 +147,35 @@ if [ -f "$CODEX_WAVE_MARKER" ]; then
       log "cannot identify Codex wave PID $CODEX_WAVE_PID; preserve claims and inspect $CODEX_WAVE_MARKER"
       exit 1
     fi
+    CODEX_WAVE_HANDLE=$(process_handle "$CODEX_WAVE_PID")
   fi
+fi
+
+# 1. The runner first, so it cannot start a new worker while the others are wrapped up;
+#    the worker inventory comes after, so a worker it started meanwhile is not missed.
+if [ -n "$DISPATCHER" ]; then
+  log "stopping dispatcher loop"
+  stop_handle "$DISPATCHER" "dispatcher"
+  worker_alive "$DISPATCHER" || rm -f "$RUNNER_LOCK"
+fi
+
+# Stop new Codex dispatch next. Its TERM handler cancels lane process groups
+# and reaps them (up to five seconds), before any claim can be released.
+if [ -n "$CODEX_WAVE_HANDLE" ]; then
+  log "stopping Codex wave and its lane workers"
+  stop_handle "$CODEX_WAVE_HANDLE" "codex-wave" 7
+fi
+
+WORKERS=()
+if [ -d "$INFLIGHT_DIR" ]; then
+  for lock in "$INFLIGHT_DIR"/*; do
+    [ -f "$lock" ] || continue
+    issue=$(basename "$lock")
+    # Wave/merge control markers are not GitHub issue numbers.
+    case "$issue" in ''|*[!0-9]*) continue ;; esac
+    worker_lock "$lock"
+    WORKERS+=("${issue}|${LANE:-unknown}|${HANDLE}")
+  done
 fi
 
 if [ "${#WORKERS[@]}" -eq 0 ] && [ -z "$DISPATCHER" ] && [ -z "$CODEX_WAVE_PID" ]; then
@@ -165,28 +184,15 @@ if [ "${#WORKERS[@]}" -eq 0 ] && [ -z "$DISPATCHER" ] && [ -z "$CODEX_WAVE_PID" 
   exit 0
 fi
 
-# The runner first, so it cannot start a new worker while the others are wrapped up.
-if [ -n "$DISPATCHER" ]; then
-  log "stopping dispatcher loop"
-  stop_handle "$DISPATCHER" "dispatcher"
-  worker_alive "$DISPATCHER" || rm -f "$RUNNER_LOCK"
-fi
-
-# Stop new Codex dispatch first. Its TERM handler cancels lane process groups
-# and reaps them (up to five seconds), before any claim can be released.
-if [ -n "$CODEX_WAVE_PID" ]; then
-  log "stopping Codex wave and its lane workers"
-  stop_handle "process:$CODEX_WAVE_PID" "codex-wave" 7
-fi
-
 # 2. Per-worker wrap-up: comment, release claim, kill.
 if [ "${#WORKERS[@]}" -gt 0 ]; then
   log "${#WORKERS[@]} in-flight worker(s) to wrap up"
   for entry in "${WORKERS[@]}"; do
     IFS='|' read -r issue lane handle <<< "$entry"
     log ""
-    log "─── #${issue} (lane=${lane}, pid=${handle#*:}) ───"
-    post_stop_comment "$issue" "$lane" "${handle#*:}"
+    pid=$(worker_pid "$handle" || true)
+    log "─── #${issue} (lane=${lane}, pid=${pid:-unknown}) ───"
+    post_stop_comment "$issue" "$lane" "$pid"
     release_claim "$issue"
     stop_handle "$handle" "worker(${lane}/#${issue})"
   done

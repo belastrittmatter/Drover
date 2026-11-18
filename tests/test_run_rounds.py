@@ -85,7 +85,8 @@ else:
 
 # A live worker: records its pid, then runs until signalled (60 s cap).
 # FAKE_CLAUDE=exit makes it a worker that ends at once without touching the board;
-# FAKE_CLAUDE=handoff moves its card to Blocked, then keeps running.
+# FAKE_CLAUDE=handoff moves its card to Blocked, then keeps running; FAKE_CLAUDE=strand
+# moves its card to Building, then ends.
 FAKE_CLAUDE = r'''
 import json, os, signal, sys, time
 from pathlib import Path
@@ -96,12 +97,14 @@ d = Path(os.environ['WORKER_DIR']); d.mkdir(exist_ok=True)
 (d / str(os.getpid())).write_text(' '.join(sys.argv[1:]))
 if os.environ.get('FAKE_CLAUDE') == 'exit':
     sys.exit(0)
-if os.environ.get('FAKE_CLAUDE') == 'handoff':
+if os.environ.get('FAKE_CLAUDE') in ('handoff', 'strand'):
     board = json.load(open(os.environ['BOARD']))
     for c in board:
         if c['number'] == int(os.environ['DROVER_ISSUE']):
-            c['status'] = 'Blocked'
+            c['status'] = 'Blocked' if os.environ['FAKE_CLAUDE'] == 'handoff' else 'Building'
     json.dump(board, open(os.environ['BOARD'], 'w'))
+    if os.environ['FAKE_CLAUDE'] == 'strand':
+        sys.exit(0)
 signal.signal(signal.SIGTERM, lambda *a: sys.exit(0))
 end = time.time() + 60
 while time.time() < end:
@@ -135,7 +138,11 @@ class RunnerRounds(unittest.TestCase):
                         BOARD=str(self.board_path), WORKER_DIR=str(self.workers),
                         GIT_AUTHOR_NAME='f', GIT_AUTHOR_EMAIL='f@example.com',
                         GIT_COMMITTER_NAME='f', GIT_COMMITTER_EMAIL='f@example.com')
-        for name, source in [('gh', FAKE_GH), ('claude', FAKE_CLAUDE), ('pgrep', 'import sys; sys.exit(1)')]:
+        # No drover code may search the process table: a pgrep call fails the test.
+        pgrep = "import os, sys; open(os.environ['PGREP_CALLED'], 'w').write(' '.join(sys.argv)); sys.exit(1)"
+        self.env['PGREP_CALLED'] = str(self.base / 'pgrep-called')
+        self.addCleanup(lambda: self.assertFalse((self.base / 'pgrep-called').exists(), 'pgrep was called'))
+        for name, source in [('gh', FAKE_GH), ('claude', FAKE_CLAUDE), ('pgrep', pgrep)]:
             path = self.bin / name
             path.write_text('#!/usr/bin/env python3\n' + source)
             path.chmod(0o755)
@@ -156,7 +163,7 @@ class RunnerRounds(unittest.TestCase):
     def board(self, *cards):
         self.board_path.write_text(json.dumps(list(cards)))
 
-    def run_board(self, cycles, **extra):
+    def run_board(self, cycles, rc=0, **extra):
         # no_progress_cycles=N stops the run after N rounds with no new Done card.
         (self.root / '.drover/config.json').write_text(json.dumps(dict(
             project=dict(owner='o', number=1), base_branch='main', notifications=dict(bot_identity='bot'),
@@ -164,7 +171,7 @@ class RunnerRounds(unittest.TestCase):
             **extra)))
         result = subprocess.run(['bash', str(KIT / 'lib/drover-run.sh')], cwd=self.root,
                                 env=self.env, text=True, capture_output=True, timeout=60)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.returncode, rc, result.stdout + result.stderr)
         return result.stdout
 
     def stop(self):
@@ -210,7 +217,7 @@ class RunnerRounds(unittest.TestCase):
         self.run_board(cycles=2)  # round 1 dispatches, round 2 sees the lock
         [pid] = self.worker_pids(expect=1)
         self.assertTrue(alive(pid), 'the fake worker should still be running')
-        self.assertIn('HANDLE=process:%d\n' % pid, self.lock(7) or '', 'live worker lost its lock')
+        self.assertRegex(self.lock(7) or '', r'^HANDLE=process:%d:\S+\n' % pid, 'live worker lost its lock')
         manifest = self.manifest()
         self.assertNotIn('reaped stale lock', manifest)
         self.assertEqual(manifest.count('dispatch lane=build issue=#7'), 1, manifest)
@@ -274,7 +281,7 @@ class RunnerRounds(unittest.TestCase):
         issues = sorted((self.workers / ('env-%d' % p)).read_text() for p in pids)
         self.assertEqual(issues, ['DROVER_ROLE=build DROVER_ISSUE=7', 'DROVER_ROLE=build DROVER_ISSUE=8'])
         for issue in (7, 8):
-            self.assertRegex(self.lock(issue) or '', r'^HANDLE=process:\d+\nLANE=build\nSTARTED=\S+\nCOLUMN=Ready\n$')
+            self.assertRegex(self.lock(issue) or '', r'^HANDLE=process:\d+:\S+\nLANE=build\nSTARTED=\S+\nCOLUMN=Ready\n$')
         self.assertIsNone(self.lock(9), 'a third builder started past max_workers 2')
         self.assertIn('max_workers=4 (build=2 qa=1 review=1)', self.manifest())
 
@@ -282,13 +289,71 @@ class RunnerRounds(unittest.TestCase):
     def test_two_failed_dispatches_halt(self):
         self.env['FAKE_CLAUDE'] = 'exit'  # ends without moving its card or reporting
         self.board({'number': 5, 'status': 'Review'})
-        out = self.run_board(cycles=30)
+        out = self.run_board(cycles=30, rc=76)
         manifest = self.manifest()
         self.assertEqual(manifest.count('dispatch lane=review issue=#5 pid='), 2, manifest)
         self.assertIn('failed dispatch lane=review issue=#5', manifest)
         self.assertIn('halt — failed dispatch: #5 failed 2 dispatches in a row', out)
         self.assertIn('| === dispatch lane=review issue=#5 at ', out)  # the log tail
         self.assertNotIn('RUNAWAY', manifest)
+
+    # FR-RUN-13: a worker that posted its role's report did its job, even with the card
+    # where it was (here: a reviewer waiting on the owner's merge approval).
+    def test_report_without_a_move_is_not_a_failed_dispatch(self):
+        self.env['FAKE_CLAUDE'] = 'exit'
+        self.board({'number': 5, 'status': 'Review',
+                    'reports': ['[reviewer] [report] awaiting owner · merge needs approval']})
+        self.run_board(cycles=4)
+        manifest = self.manifest()
+        self.assertGreaterEqual(manifest.count('dispatch lane=review issue=#5 pid='), 2, manifest)
+        self.assertNotIn('failed dispatch', manifest)
+
+    # FR-RUN-13: a builder that moves its card to Building and dies strands it where no lane
+    # looks. It counts as failed, the card goes back to Ready, and a second time halts.
+    def test_builder_dying_in_building_is_a_failed_dispatch(self):
+        self.env['FAKE_CLAUDE'] = 'strand'
+        self.board({'number': 7, 'status': 'Ready'})
+        self.run_board(cycles=30, rc=76)
+        manifest = self.manifest()
+        self.assertEqual(manifest.count("failed dispatch lane=build issue=#7 — worker exited, card in 'Building'"), 2, manifest)
+        self.assertIn('stranded #7: Building → Ready', manifest)
+        self.assertEqual(manifest.count('dispatch lane=build issue=#7 pid='), 2, manifest)
+
+    def fake_lock(self, path, handle, lane='build'):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('HANDLE=%s\nLANE=%s\nSTARTED=2026-01-01T00:00:00Z\n' % (handle, lane))
+
+    # A pid the OS gave to another process since the lock was written reads as dead and is
+    # never signalled: worker locks and runner.lock alike.
+    def test_recycled_pid_is_dead_and_never_signalled(self):
+        other = subprocess.Popen(['sleep', '60'])
+        self.addCleanup(lambda: (other.kill(), other.wait()))
+        recycled = 'process:%d:Mon_Jan_1_00:00:00_2001' % other.pid
+        self.fake_lock(self.state / 'inflight/7', recycled)
+        self.fake_lock(self.state / 'runner.lock', recycled)
+        self.board({'number': 1, 'status': 'Backlog'})
+        out = self.run_board(cycles=1)  # neither lock stops the run from starting
+        self.assertIn('reaped stale lock + swept assignee on #7 (pid=%d)' % other.pid, out)
+        self.assertIsNone(self.lock(7))
+        self.fake_lock(self.state / 'inflight/8', recycled)
+        self.fake_lock(self.state / 'runner.lock', recycled)
+        self.stop()
+        time.sleep(.2)
+        self.assertIsNone(other.poll(), 'a recycled pid was signalled')
+
+    # An older PID= lock has no start time: it blocks a run start but is never signalled.
+    def test_old_pid_lock_refuses_start_and_is_not_signalled(self):
+        other = subprocess.Popen(['sleep', '60'])
+        self.addCleanup(lambda: (other.kill(), other.wait()))
+        (self.state / 'inflight').mkdir(parents=True)
+        (self.state / 'inflight/7').write_text('PID=%d\nLANE=build\n' % other.pid)
+        self.board({'number': 1, 'status': 'Backlog'})
+        out = self.run_board(cycles=1, rc=73)
+        self.assertIn('older PID= lock (pid %d)' % other.pid, out)
+        self.assertIn('not signalled', self.stop())
+        time.sleep(.2)
+        self.assertIsNone(other.poll(), 'an old PID= lock was signalled')
+        self.assertTrue((self.state / 'inflight/7').exists())
 
     # FR-WRK-10: a worker whose card left its lane runs one more tick, then is stopped.
     def test_worker_gets_one_tick_after_its_card_leaves(self):
@@ -298,7 +363,8 @@ class RunnerRounds(unittest.TestCase):
         [pid] = self.worker_pids(expect=1)
         self.wait_dead(pid)
         lines = self.manifest().splitlines()
-        marked = next(i for i, l in enumerate(lines) if 'one more tick to finish its handoff' in l)
+        marked = next(i for i, l in enumerate(lines) if "left its lane (now 'Blocked'); one more tick" in l)
+        self.assertNotIn('card moved to', lines[marked])  # FR-MET-1: not an outcome line
         stopped = next(i for i, l in enumerate(lines) if 'zombie build worker on #7 (pid=%d)' % pid in l)
         self.assertEqual(sum('] tick — Ready=' in l for l in lines[marked:stopped]), 1, '\n'.join(lines))
         self.assertIsNone(self.lock(7))

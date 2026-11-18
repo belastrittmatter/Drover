@@ -6,15 +6,27 @@
 #   drover worker stop HANDLE [GRACE]           TERM, wait up to GRACE s (default 1), then KILL
 #   drover worker lock FILE                     print the handle an in-flight lock records
 #
-# The runner and `drover stop` source this file for the same functions. No other code
-# starts, signals or detects worker processes.
+# The headless runner and `drover stop` source this file for the same functions; in them
+# no other code starts, signals or detects worker processes.
 #
-# A handle is "<backend>:<id>". Only the `process` backend exists: <id> is the pid of the
-# harness's headless worker command (harnesses/<name>.json), with output appended to LOG.
-# Lock files hold HANDLE=<handle>, LANE=, STARTED= (and the runner's COLUMN=); the older
-# PID=<pid> and bare-pid formats still read.
+# A handle is "process:<pid>:<start>" — the `process` backend is the only one. <pid> is the
+# harness's headless worker command (harnesses/<name>.json), output appended to LOG; <start>
+# is its start time from `ps -o lstart=`, so a pid the OS has since given to another process
+# reads as dead and is never signalled. Lock files hold HANDLE=, LANE=, STARTED= (and the
+# runner's COLUMN=). Older PID=<pid> and bare-pid locks still read as "process:<pid>": alive
+# while that pid exists (so a run refuses to start), but never signalled.
 
 WORKER_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Start time of pid $1 as one word, empty when the pid does not exist.
+process_start() {
+  LC_ALL=C ps -o lstart= -p "$1" 2>/dev/null | awk '{$1=$1; gsub(" ", "_"); print}'
+}
+
+# The handle of an already running pid $1 (the runner's own lock).
+process_handle() {
+  echo "process:$1:$(process_start "$1")"
+}
 
 # worker_start ROLE ISSUE PROMPT LOG: sets WORKER_HANDLE. Nonzero (66) when the harness
 # gives no command.
@@ -29,25 +41,44 @@ worker_start() {
   # claude otherwise waits 3 s for input. DROVER_ROLE / DROVER_ISSUE: guard-merge lets only the
   # review lane run the gate, and drover gh-guard keys the worker's call budget on them.
   DROVER_ROLE="$role" DROVER_ISSUE="$issue" nohup "${argv[@]}" </dev/null >>"$log" 2>&1 &
-  WORKER_HANDLE="process:$!"
+  # A worker that already exited gets an empty start: its handle reads as dead.
+  WORKER_HANDLE=$(process_handle "$!")
+}
+
+# worker_pid HANDLE: prints the pid when it is a real process id (>= 2; kill 0 would hit
+# the process group).
+worker_pid() {
+  local rest pid
+  case "${1:-}" in process:*) rest="${1#process:}" ;; *) return 1 ;; esac
+  pid="${rest%%:*}"
+  case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$pid" -ge 2 ] || return 1
+  echo "$pid"
+}
+
+# worker_legacy HANDLE: 0 for a handle without a start time (an older PID= lock).
+worker_legacy() {
+  case "${1#process:}" in *:*) return 1 ;; esac
+  return 0
 }
 
 worker_alive() {
   local pid
-  case "${1:-}" in
-    process:*) pid="${1#process:}" ;;
-    *) return 1 ;;
-  esac
-  case "$pid" in ''|*[!0-9]*) return 1 ;; esac
-  kill -0 "$pid" 2>/dev/null
+  pid=$(worker_pid "${1:-}") || return 1
+  kill -0 "$pid" 2>/dev/null || return 1
+  worker_legacy "$1" && return 0
+  local want="${1#process:*:}"
+  [ -n "$want" ] && [ "$(process_start "$pid")" = "$want" ]
 }
 
-# worker_stop HANDLE [GRACE]: sets WORKER_STOPPED_BY to none (was not alive), TERM or KILL.
+# worker_stop HANDLE [GRACE]: sets WORKER_STOPPED_BY to none (not alive), TERM, KILL, or
+# refused (an older handle with no start time: never signalled). Returns 0.
 worker_stop() {
   local handle="$1" grace="${2:-1}" waited=0 pid
   WORKER_STOPPED_BY=none
   worker_alive "$handle" || return 0
-  pid="${handle#process:}"
+  if worker_legacy "$handle"; then WORKER_STOPPED_BY=refused; return 0; fi
+  pid=$(worker_pid "$handle")
   kill -TERM "$pid" 2>/dev/null || true
   WORKER_STOPPED_BY=TERM
   while worker_alive "$handle" && [ "$waited" -lt "$grace" ]; do
@@ -80,6 +111,11 @@ worker_lock() {
     HANDLE="process:$(tr -d '[:space:]' < "$1")"
   fi
   return 0
+}
+
+# write_lock FILE CONTENT: tmp file then mv, so a reader never sees half a lock.
+write_lock() {
+  printf '%s' "$2" > "$1.tmp.$$" && mv -f "$1.tmp.$$" "$1"
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
