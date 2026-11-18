@@ -53,6 +53,9 @@ git -C "$T" init -q
 echo "1.8.2" > "$T/.claude/skills/drover/VERSION"
 for d in super-refine cleanup-wt arch-loop; do mkdir -p "$T/.claude/skills/$d"; echo x > "$T/.claude/skills/$d/SKILL.md"; done
 echo old > "$T/.claude/bin/drover-run.sh"; echo mine > "$T/.claude/bin/mine.sh"; echo old > "$T/.claude/hooks/guard-secrets.py"
+mkdir -p "$T/.claude/skills/drover-build" "$T/.claude/skills/drover-qa"
+cp "$PACK/skills/drover-build/SKILL.md" "$T/.claude/skills/drover-build/"   # a byte-identical copy: drover's
+echo "my own drover-qa" > "$T/.claude/skills/drover-qa/SKILL.md"            # not provably drover's: kept
 cat > "$T/.claude/settings.json" <<'JSON'
 {"model":"x","hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[
  {"type":"command","command":"python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-secrets.py"},
@@ -72,13 +75,20 @@ OUT=$(python3 "$SETUP" check --root "$T" || true)
 echo "$OUT" | q '.upgrade == true and .from == "1.8.2" and .old_dirs == ["super-refine","cleanup-wt","arch-loop"]' \
   || fail "older install should be detected: $OUT"
 echo "$OUT" | q '.old_copies | index(".claude/bin/drover-run.sh")' || fail "copied scripts should be listed: $OUT"
+echo "$OUT" | q '(.old_copies | index(".claude/skills/drover-build")) and (.old_copies | index(".claude/skills/drover") )' \
+  || fail "provable drover skill copies are listed for removal: $OUT"
+echo "$OUT" | q '.kept_copies == [".claude/skills/drover-qa"] and (.old_copies | index(".claude/skills/drover-qa") | not)' \
+  || fail "a skill folder that is not provably drover's is kept: $OUT"
 OUT=$(python3 "$SETUP" fix --root "$T" --no-helpers || true)
 echo "$OUT" | q '.upgraded == true and .from == "1.8.2"' || fail "fix should report the upgrade: $OUT"
 echo "$OUT" | q '.fixed[0] == "skills updated"' || fail "upgrade should lead with the skills line: $OUT"
 echo "$OUT" | q '.fixed | index("removed old folders: super-refine, cleanup-wt, arch-loop")' || fail "old folders line missing: $OUT"
 echo "$OUT" | q '.fixed | any(test("^config moved to .drover/config.json"))' || fail "config line missing: $OUT"
 echo "$OUT" | q '.fixed | any(test("^removed 1 old hook entry"))' || fail "old hook entry line missing: $OUT"
-for d in super-refine cleanup-wt arch-loop drover; do [ ! -e "$T/.claude/skills/$d" ] || fail "$d should be removed"; done
+for d in super-refine cleanup-wt arch-loop drover drover-build; do [ ! -e "$T/.claude/skills/$d" ] || fail "$d should be removed"; done
+[ "$(cat "$T/.claude/skills/drover-qa/SKILL.md")" = "my own drover-qa" ] || fail "an unproven skill folder must stay"
+echo "$OUT" | q '.green == false and .kept_copies == [".claude/skills/drover-qa"]' || fail "a kept copy stays red: $OUT"
+rm -rf "$T/.claude/skills/drover-qa"
 [ ! -e "$T/.claude/bin/drover-run.sh" ] && [ ! -e "$T/.claude/hooks/guard-secrets.py" ] || fail "copied drover files should be removed"
 [ "$(cat "$T/.claude/bin/mine.sh")" = mine ] || fail "a user's own bin file must stay"
 q '.model == "x" and ([.hooks[][].hooks[].command] == ["my-own-hook"])' "$T/.claude/settings.json" \

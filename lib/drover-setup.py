@@ -241,15 +241,41 @@ def settings_commands(path):
 OLD_HOOK = re.compile(r"\.claude/hooks/(guard-[a-z-]+|cleanup-wt)\.py")
 
 
-def old_copies(root):
-    """drover files an older install copied into the project (now run from the install folder)."""
+def drover_skill_copy(path, skill, root, pack):
+    """True only when an in-project skill folder is provably drover's: a link into this
+    project's .agents/skills or into a drover install, a SKILL.md identical to the
+    install's, or the old pack's VERSION marker in the drover skill."""
+    if os.path.islink(path):
+        target = os.path.realpath(path)
+        if not os.path.exists(target):
+            return False
+        home = os.path.dirname(os.path.dirname(target))
+        return (target == os.path.realpath(os.path.join(root, ".agents", "skills", skill))
+                or os.path.isfile(os.path.join(home, "bin", "drover"))
+                or os.path.isfile(os.path.join(home, "install.sh")) and os.path.isdir(os.path.join(home, "skills", "drover")))
+    mine = os.path.join(path, "SKILL.md")
+    theirs = os.path.join(pack, "skills", skill, "SKILL.md") if pack else ""
+    if os.path.isfile(mine) and os.path.isfile(theirs):
+        with open(mine, "rb") as a, open(theirs, "rb") as b:
+            if a.read() == b.read():
+                return True
+    return skill == "drover" and os.path.isfile(os.path.join(path, "VERSION"))
+
+
+def old_copies(root, pack=None):
+    """(drover files an older install copied into the project, in-project skill folders with a
+    drover skill name that are not provably drover's). The first are removed by fix; the
+    second are listed and left alone."""
     claude, agents = os.path.join(root, ".claude"), os.path.join(root, ".agents")
-    found = [os.path.join(d, "skills", s) for d in (claude, agents) for s in SKILLS]
+    skills = [(os.path.join(d, "skills", s), s) for d in (claude, agents) for s in SKILLS]
+    skills = [(p, s) for p, s in skills if os.path.lexists(p)]
+    found = [p for p, s in skills if drover_skill_copy(p, s, root, pack)]
+    kept = sorted(p for p, s in skills if p not in found)
     found += glob.glob(os.path.join(claude, "bin", "drover-*")) + glob.glob(os.path.join(agents, "bin", "drover-*"))
     found += [os.path.join(d, "workflows", w) for d in (claude, agents) for w in WORKFLOWS]
     found += [p for d in (claude, agents) for p in glob.glob(os.path.join(d, "hooks", "*.py"))
               if re.fullmatch(r"(guard-[a-z-]+|cleanup-wt)\.py", os.path.basename(p))]
-    return sorted(p for p in found if os.path.lexists(p))
+    return sorted(p for p in found if os.path.lexists(p)), kept
 
 
 def legacy_config(root):
@@ -429,7 +455,7 @@ def check(root, pack, host="claude", home=None, catalog=None):
     if unwired:
         missing.append(f"{entry['hooks']['file']}: {len(unwired)} guard entr{'y' if len(unwired) == 1 else 'ies'}")
     old_dirs = [d for d in OLD_SKILL_DIRS if os.path.isdir(os.path.join(claude, "skills", d))]
-    copies = old_copies(root)
+    copies, kept_copies = old_copies(root, pack)
     old_hooks = [c for c in settings_commands(os.path.join(claude, "settings.json")) if c and OLD_HOOK.search(c)]
     legacy, legacy_all = legacy_config(root)
     configs, verification, host_errors, schema = config_problems(root, cfg_path, host)
@@ -466,13 +492,14 @@ def check(root, pack, host="claude", home=None, catalog=None):
         ok.append("required worker skills resolved for " + host)
     if security_audit:
         ok.append("security-audit skill installed (optional, run on demand)")
-    red = bool(missing or old_dirs or copies or old_hooks or configs or verification or host_errors or schema
+    red = bool(missing or old_dirs or copies or kept_copies or old_hooks or configs or verification or host_errors or schema
                or not git or needs or not helpers)
     return {
         "root": root, "pack": pack, "pack_version": pack_version, "installed_version": have_v,
         "upgrade": older, "from": from_v or ("older" if older else None),
         "added_skills": upgrade_rec.get("added_skills", []),
         "missing": missing, "old_dirs": old_dirs, "old_copies": [os.path.relpath(p, root) for p in copies],
+        "kept_copies": [os.path.relpath(p, root) for p in kept_copies],
         "old_hooks": old_hooks, "configs": configs, "verification": verification,
         "host_errors": host_errors, "schema_errors": schema, "git": git, "skills_dir": skills_dir,
         "helper_skills": helpers, "security_audit": security_audit, "helper_readiness": readiness, "needs": needs, "os": fam, "ok": ok, "green": not red,
@@ -768,6 +795,8 @@ def text_report(res):
     elif "fixed" not in res:
         red = res.get("missing", [])[:3] + [f"old folder {d}" for d in res.get("old_dirs", [])] + \
             ([f"{len(res['old_copies'])} files an older drover copied into the project"] if res.get("old_copies") else []) + \
+            [f"{p} has a drover skill name but is not provably drover's copy; it shadows the linked skill, remove it by hand if it is old"
+             for p in res.get("kept_copies", [])] + \
             ([".claude/settings.json has old drover hook entries"] if res.get("old_hooks") else []) + \
             [f"config {c} uses old keys" for c in res.get("configs", {})] + ([] if res.get("git") else ["not a git repo"])
         lines += [f"  ✗ {r}" for r in red]
