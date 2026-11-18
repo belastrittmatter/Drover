@@ -25,4 +25,13 @@ printf '{ nope' > "$F"; RC=0; python3 "$S" allow "$F" 'X' >/dev/null 2>&1 || RC=
 [ "$RC" -eq 2 ] && [ "$(cat "$F")" = "{ nope" ] || fail "invalid settings must be untouched (rc $RC)"
 python3 "$S" allow "$T/new/settings.json" 'X' >/dev/null && jq -e '.permissions.allow == ["X"]' "$T/new/settings.json" >/dev/null || fail "a missing file should be created"
 
-echo "PASS: test-settings.sh (3 scenarios)"
+# 4 — hooks: a re-run adds nothing; a moved install replaces its entries instead of adding.
+L="$T/.claude/settings.local.json"
+printf '{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"python3 \\"/old/drover/hooks/guard-merge.py\\""},{"type":"command","command":"my-own-hook"}]}]}}' > "$L"
+python3 "$S" hooks "$L" "$PWD/../hooks/settings-snippet.json" >/dev/null
+python3 "$S" hooks "$L" "$PWD/../hooks/settings-snippet.json" | grep -q "already present" || fail "a second hooks run should change nothing"
+jq -e '[.hooks.PreToolUse[].hooks[].command | select(contains("guard-merge.py"))] | length == 1 and (.[0] | contains("/old/") | not)' "$L" >/dev/null \
+  || fail "a moved install replaces the entry: $(cat "$L")"
+jq -e '[.hooks.PreToolUse[].hooks[].command] | index("my-own-hook") != null' "$L" >/dev/null || fail "a user's own hook stays"
+
+echo "PASS: test-settings.sh (4 scenarios)"
