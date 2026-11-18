@@ -158,6 +158,11 @@ def allowed(entry, cfg):
     return list(perms.get("tools", [])) + [f"Bash({w}:*)" for w in words] + read_only(entry)[0]
 
 
+def agent_allowed(agent):
+    """The read-only agent profile's rules: its tools, one Bash rule per read command."""
+    return list(agent.get("tools", [])) + [f"Bash({c}:*)" for c in agent.get("commands", [])]
+
+
 def worker_argv(role, prompt, cwd=None, model=None):
     """argv for one headless worker of `role`: the harness command, the prompt, the role's
     model (else `model`, the runner's pick by card complexity) and the permissions. The runner
@@ -171,6 +176,17 @@ def worker_argv(role, prompt, cwd=None, model=None):
     if model and entry.get("model_flag"):
         argv += [entry["model_flag"], model]
     perms = entry.get("permissions", {})
+    agent = entry.get("agent") or {}
+    if role in agent.get("roles", []):
+        # The runner's short read-only agents (pre-flight, classifier): JSON output, read tools and
+        # read commands only, nothing else is approved; the runner does every write.
+        argv += list(agent.get("output_flags", []))
+        if agent.get("mode"):
+            argv += [perms["mode_flag"], agent["mode"]]
+        argv += [perms["allow_flag"], ",".join(agent_allowed(agent))]
+        if agent.get("deny"):
+            argv += [perms["deny_flag"], ",".join(agent["deny"])]
+        return argv
     if perms.get("mode"):
         argv += [perms["mode_flag"], perms["mode"]]
     argv += [perms["allow_flag"], ",".join(allowed(entry, cfg))]

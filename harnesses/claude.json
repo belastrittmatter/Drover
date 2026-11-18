@@ -11,6 +11,19 @@
   },
   "usage_probe": "drover usage check",
   "product": "claude-code",
+  "agent": {
+    "roles": ["preflight", "classify"],
+    "output_flags": ["--output-format", "json"],
+    "result_key": "result",
+    "mode": "dontAsk",
+    "tools": ["Read", "Grep", "Glob", "LS"],
+    "commands": ["drover preflight", "drover github-read", "gh issue view", "gh issue list", "gh pr view",
+                 "gh pr list", "gh pr diff", "git log", "git show", "git diff", "jq", "cat", "head", "tail",
+                 "grep", "ls", "wc"],
+    "deny": ["Edit", "Write", "MultiEdit", "NotebookEdit", "Bash(gh issue edit:*)", "Bash(gh issue comment:*)",
+             "Bash(gh pr edit:*)", "Bash(gh pr comment:*)", "Bash(gh pr merge:*)", "Bash(gh api:*)",
+             "Bash(gh project:*)", "Bash(git push:*)", "Bash(git commit:*)"]
+  },
   "version_command": ["claude", "--version"],
   "permissions": {
     "mode_flag": "--permission-mode",

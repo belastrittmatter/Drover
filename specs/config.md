@@ -86,7 +86,8 @@ audit: it only fed an outside skill drover does not ship).
 
 - **FR-HRN-1** Each harness shall be described by one file
   `harnesses/<name>.json`: headless worker command, model flag, skill
-  folders, hook install method, optional usage probe. For `claude`, hooks
+  folders, hook install method, optional usage probe, and the read-only `agent` profile
+  (permissions and JSON output flags) for the runner's pre-flight and classifier agents. For `claude`, hooks
   go in the untracked `.claude/settings.local.json`, so onboarding adds no
   tracked file besides `.drover/config.json`.
 - **FR-HRN-2** Adding a harness shall need a new harness file and no change

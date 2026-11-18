@@ -208,6 +208,41 @@ check("{drover_home}" in PERMS["read_only_dirs"] and PERMS["read_only_deny"] == 
       "workers read the drover install folder (skills, run.md) and never edit it (one Edit(path) rule)")
 check("add_dir_flag" not in PERMS, "no --add-dir: the install folder is read-only for workers")
 
+# 4 — the runner's short agents (pre-flight, classifier) start with the read-only `agent`
+#     profile: every command their prompts name is one of its read commands, it grants no edit
+#     tool and no GitHub or git write, and worker-argv gives them that profile, not the lanes'.
+AGENT = HARNESS.get("agent") or {}
+src = RUNNER.read_text()
+texts = (re.findall(r'prompt="(Builder pre-flight.*?)"\n\s+run_agent preflight', src, re.S)
+         + re.findall(r'run_agent classify "\$issue" "(Classify GitHub.*?)" \\\n', src, re.S))
+check(len(texts) == 2, f"expected the pre-flight and classifier prompts, found {len(texts)}")
+named = sorted(set(re.findall(r"\b(?:drover [a-z-]+|gh (?:issue|pr|api|project|label|repo) [a-z-]+|git [a-z-]+)\b",
+                              " ".join(texts))))
+check(set(AGENT.get("roles", [])) == {"preflight", "classify"}, f"agent profile roles: {AGENT.get('roles')}")
+for cmd in named:
+    check(any(cmd == c or cmd.startswith(c + " ") for c in AGENT.get("commands", [])),
+          f"agent prompt names `{cmd}`, not in harnesses/claude.json agent.commands")
+check("drover preflight" in named and "drover github-read" in named, f"agent prompt commands not found: {named}")
+WRITE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit", "Task", "Bash"}
+check(not WRITE_TOOLS & set(AGENT.get("tools", [])), f"agent tools must be read-only: {AGENT.get('tools')}")
+WRITE_WORDS = re.compile(r"\b(edit|comment|create|close|merge|push|commit|move|delete|api|project|label|rm|mv|cp)\b")
+check(not [c for c in AGENT.get("commands", []) if WRITE_WORDS.search(c) or c.split()[0] in ("bash", "sh", "python3", "node")],
+      f"agent commands must be read commands: {AGENT.get('commands')}")
+check(AGENT.get("mode") not in (None, "acceptEdits", "bypassPermissions"), f"agent mode must approve nothing else: {AGENT.get('mode')}")
+check(AGENT.get("output_flags") and AGENT.get("result_key"), "agent output flags and result key are set")
+import subprocess as _sp
+for role in ("preflight", "classify", "build"):
+    argv = _sp.run([sys.executable, str(ROOT / "lib/drover-config.py"), "worker-argv", role, "p"],
+                   capture_output=True, text=True, cwd=tempfile.gettempdir()).stdout.split("\0")
+    allow = argv[argv.index(PERMS["allow_flag"]) + 1].split(",")
+    if role == "build":
+        check("Bash(drover:*)" in allow and "Edit" in allow, "lane workers keep the lane profile")
+    else:
+        check("Bash(drover:*)" not in allow and "Edit" not in allow and "Bash(gh:*)" not in allow
+              and all(a.startswith(("Read", "Grep", "Glob", "LS", "Bash(")) for a in allow),
+              f"{role} must get the read-only agent profile, got {allow}")
+        check(AGENT["output_flags"][0] in argv, f"{role} must get the JSON output flags")
+
 if failures:
     print("\n".join("FAIL: " + f for f in failures), file=sys.stderr)
     sys.exit(1)
