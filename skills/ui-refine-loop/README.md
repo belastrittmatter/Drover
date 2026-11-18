@@ -36,7 +36,7 @@ Standalone only: you start it. The drover lanes never run it.
 
 ## Install
 
-Ships in the drover pack. Copy `skills/ui-refine-loop/` to `.claude/skills/ui-refine-loop/` and `workflows/ui-refine-loop.js` to `.claude/workflows/`. You need `git`, `node`, `gh`, and Playwright resolvable from your repo (`npx playwright install chromium`).
+Ships in the drover pack. `drover skills install` links `skills/ui-refine-loop/` into `~/.claude/skills/`; the Workflow tool runs `workflows/ui-refine-loop.js` from the install folder (`drover config home`). You need `git`, `node`, `gh`, and Playwright resolvable from your repo (`npx playwright install chromium`).
 
 **Impeccable** is strongly recommended. Both layouts are detected: v4.4+ (`scripts/impeccable` launcher) and v4.0.x (`node scripts/detect.mjs`). Detection looks in `.claude/skills` and `.agents/skills` of the repo and its parents, then `~`. Without Impeccable the loop warns loudly and falls back to a built-in rubric. If your app needs a sign-in, data states or an unusual dev command, add a `refine` block to your drover config (`references/config.md`).
 

@@ -41,8 +41,8 @@ read-only. Secrets stay in `.env`: `SENTRY_AUTH_TOKEN` (scopes `event:read proje
 
 ## Install
 
-Ships in the drover pack under `skills/drover-collect/`; `install.sh` copies it to
-`.claude/skills/drover-collect/`. Needs a drover config, `gh`, `jq` and Python 3 (stdlib only).
+Ships in the drover pack under `skills/drover-collect/`; `drover skills install` links it into
+`~/.claude/skills/`. Needs a drover config, `gh`, `jq` and Python 3 (stdlib only).
 
 Tests: `python3 tests/test_collect_handoff.py` · `bash tests/test-collect-file.sh` · `bash tests/test-collect-fetchers.sh` ·
 `bash tests/test-collect-baseline.sh` · `python3 tests/test_collect_baseline.py` (offline, all in

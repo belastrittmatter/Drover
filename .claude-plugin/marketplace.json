@@ -6,7 +6,7 @@
     {
       "name": "drover",
       "source": "./",
-      "description": "Autonomous GitHub Project board runner: drover, drover-build, drover-qa, drover-review, drover-collect, visual, git-sync, ui-refine-loop, pr-security-review (security pass on every PR; onboard adds Cloudflare's on-demand security-audit). After install, run /drover onboard to add the guard hooks, .claude/bin scripts and workflows a plugin cannot ship.",
+      "description": "Autonomous GitHub Project board runner: drover, drover-build, drover-qa, drover-review, drover-collect, visual, git-sync, ui-refine-loop, pr-security-review (security pass on every PR; onboard adds Cloudflare's on-demand security-audit). Install with install.sh and drover skills install; drover onboard writes the project's .drover/config.json.",
       "category": "development",
       "homepage": "https://github.com/belastrittmatter/drover"
     }

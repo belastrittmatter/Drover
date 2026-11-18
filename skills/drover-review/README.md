@@ -29,4 +29,4 @@ One report per PR, edited in place each round. Findings keep stable ids (`R1`, `
 
 ## Install
 
-Part of the drover pack: `./install.sh /path/to/project`. Set `human_approves_merge: true` in the config to keep a person on every merge. Lane details: `skills/drover/references/run.md` → Reviewer.
+Part of the drover pack: `drover skills install` links it into `~/.claude/skills`. Set `human_approves_merge: true` in the config to keep a person on every merge. Lane details: `skills/drover/references/run.md` → Reviewer.

@@ -7,7 +7,7 @@
 
 ## Fast path — prefer this
 
-If `.claude/bin/drover-status.py` exists:
+If `drover status` exists:
 
 1. **Run it.**
 2. **Print its stdout verbatim, inside a single fenced code block.**
@@ -17,8 +17,7 @@ Skip everything below in this file — the script implements the locked
 template defined here.
 
 ```bash
-python .claude/bin/drover-status.py                # sole-config or active marker
-python .claude/bin/drover-status.py <config-slug>  # multi-project repo
+drover status                # reads .drover/config.json (one config per repo)
 ```
 
 ### Do NOT, under any circumstances:
@@ -62,7 +61,7 @@ Exit codes the orchestrator should respect:
 
 The script enforces the same read-only contract as the rest of this file
 (no `gh ... edit/create/delete`, no GraphQL mutations). If you want to verify
-that for a given invocation: `grep -E 'gh ?\.api\.(issue|pr|project) (edit|create|delete)|mutation {|gh.*(edit|create|delete)' .claude/bin/drover-status.py` — should return nothing.
+that for a given invocation: `grep -E 'gh ?\.api\.(issue|pr|project) (edit|create|delete)|mutation {|gh.*(edit|create|delete)' drover status` — should return nothing.
 
 The rest of this document is the format spec the script implements. Read it
 only when (a) the script is missing and you need to hand-render, or (b) you're
@@ -260,7 +259,7 @@ sorted by count desc (ties in the order of `drover-reasons.json`):
 
 The tag comes from the `Reason tag:` line of the newest comment on each issue
 (else the first known tag anywhere in it). The short name drops the brackets and
-the `blocked:` prefix. The tags are the ones in `.claude/bin/drover-reasons.json`
+the `blocked:` prefix. The tags are the ones in `lib/drover-reasons.json`
 (see block-template.md) — never improvise. A comment with no known tag counts as
 `other`.
 
@@ -340,8 +339,8 @@ These notes describe the data flow that `drover-status.py` implements.
 They also apply if you need to hand-render via the model-render fallback when
 the script is missing.
 
-- **Active config resolution:** load
-  `.claude/drover/configs/<slug>.json` for the resolved project slug.
+- **Config resolution:** load `.drover/config.json`; the run slug in manifest names is
+  the repo name.
   Header fields come straight from the JSON.
 - **Claim assignee resolution:** the in-flight worker scan must match the
   identity recorded in the config under `notifications.bot_identity`. This may

@@ -19,7 +19,7 @@ trigger this step. Ordinary bugs and mechanical refactors keep the normal path.
 
 Use `mattpocock-skills:codebase-design` for module depth and interfaces. Reach
 `mattpocock-skills:domain-modeling` only when terminology or an ADR needs work. Workers
-recheck [conditional skill readiness](skills-readiness.md) before activating either helper.
+check [skill readiness](skills-readiness.md) with `--require` before activating either helper.
 
 Sketch two genuinely different arrangements of callers and modules. For each, record:
 

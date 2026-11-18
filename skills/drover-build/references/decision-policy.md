@@ -77,7 +77,7 @@ unchanged.
 
 **Before worker writes or worktree creation:** follow [skill readiness](../../drover/references/skills-readiness.md).
 Resolve this lane for the actual host, load the report's files/fallbacks, halt
-on missing requirements and recheck each conditional helper before use.
+on missing requirements and check any helper the card did not route with `--require` before use.
 
 ## Label routing
 
@@ -170,8 +170,8 @@ For an authorized, unsettled technical rung-3 fork that introduces a new ownersh
 new/changed public interface, or architecture expensive to reverse, follow
 [design preflight](../../drover/references/design-preflight.md). An applicable supplied
 design/spec/ADR answers the question at an earlier rung; follow it. Labels alone, ordinary
-bugs and mechanical refactors do not trigger a comparison. Recheck conditional helper
-readiness before use. Record the choice in the existing decision trailer below.
+bugs and mechanical refactors do not trigger a comparison. Check a helper the card did not
+route with `--require` before use. Record the choice in the existing decision trailer below.
 The comparison does not settle ambiguous product intent or waive any hard human gate.
 
 **One technical check is still mandatory before the final commit:** run

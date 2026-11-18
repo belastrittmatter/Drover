@@ -104,7 +104,7 @@ Closes #790
 **Title** = a subject in `commit_style`: `fix(receipts): show a size error over 10 MB`.
 
 **Body** = marker blocks, in this order. A lane rewrites only its own blocks, with
-`.claude/bin/drover-pr-body.sh` (it refuses when the PR head moved since you read it).
+`drover pr-body` (it refuses when the PR head moved since you read it).
 `drover-pr-body.sh --skeleton` prints an empty body with every marker.
 
 | Block | Marker | Written by | When | Required |

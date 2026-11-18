@@ -13,7 +13,7 @@ description: >-
 
 **For a board worker, before writes or worktree creation:** follow [skill readiness](../drover/references/skills-readiness.md).
 Resolve this lane for the actual host, load the report's files/fallbacks, halt
-on missing requirements and recheck each conditional helper before use.
+on missing requirements and check any helper the card did not route with `--require` before use.
 
 # drover-qa — BFS Route-Crawler that Builds the Spec Suite
 
@@ -52,7 +52,7 @@ This board is the durable, machine-readable state for the loop. `docs/drover-qa/
 
 ### Project resolution
 
-Resolution order (used by `scripts/drover-qa-file-bug.sh` and the orchestrator):
+Resolution order (used by `drover qa-file-bug` and the orchestrator):
 
 1. If `DROVER_QA_PROJECT_TITLE` is set, query `gh project list --owner $DROVER_QA_PROJECT_OWNER --format json` and pick the project whose title matches (case-insensitive).
 2. Otherwise default to title `drover QA`.
@@ -62,7 +62,7 @@ If no matching project exists, the loop halts with a one-line error and instruct
 
 ### Filing semantics
 
-When the worker finds a red spec, it calls `scripts/drover-qa-file-bug.sh`. The script:
+When the worker finds a red spec, it calls `drover qa-file-bug`. The script:
 
 - Creates the issue with `source:qa` label and full evidence body.
 - Adds the issue to the resolved **drover QA** project.
@@ -146,7 +146,7 @@ entry under "Level 0".
 
 ## Findings land in clear GitHub Issues, NOT in markdown
 
-Every `[b]` cell triggers the worker to call `scripts/drover-qa-file-bug.sh`.
+Every `[b]` cell triggers the worker to call `drover qa-file-bug`.
 The resulting Project card must be readable from the board without opening it.
 Do **not** use legacy `[VFL]`, `verify-fix`, or `severity:P*` wording in new issue titles.
 
@@ -581,12 +581,12 @@ Safety rails (enforced by the iteration preamble):
 ## Files involved
 
 ```
-.claude/skills/drover-qa/
+~/.claude/skills/drover-qa/
 ├─ SKILL.md                            ← orchestrator instructions (this file)
 └─ references/
    └─ iteration-preamble.md            ← worker contract (verbatim prompt)
 
-scripts/drover-qa-file-bug.sh           ← files a red spec onto the QA board (installed to .claude/bin/)
+drover qa-file-bug                     ← files a red spec onto the QA board (lib/drover-qa-file-bug.sh)
 
 docs/drover-qa/
 ├─ README.md                           ← operator's guide
@@ -643,7 +643,7 @@ shipped code.
 
 When invoked by drover (env `DROVER_RUN=1` or invocation contains "drover run"):
 
-- **GitHub budget** — every "move card" is `.claude/bin/drover-card.sh --config <cfg> move <N> <Status>` (1 GraphQL point; `gh project item-list` / `field-list` cost ~100–200). Comments, labels and PR reads go over REST; [rate-limit-etiquette.md](../drover/references/rate-limit-etiquette.md) → "Price list" has the calls.
+- **GitHub budget** — every "move card" is `drover card --config <cfg> move <N> <Status>` (1 GraphQL point; `gh project item-list` / `field-list` cost ~100–200). Comments, labels and PR reads go over REST; [rate-limit-etiquette.md](../drover/references/rate-limit-etiquette.md) → "Price list" has the calls.
 
 ### State protocol (same as drover-build)
 - Read from issue + PR comments + PR review threads.
@@ -656,7 +656,7 @@ When invoked by drover (env `DROVER_RUN=1` or invocation contains "drover run"):
 - **A live URL with no repo** is not a board card: `/drover-qa <url>` runs standalone.
 
 ### Lifecycle (Tester, first pass)
-See `.claude/skills/drover/references/run.md` → Tester (first pass — repo-backed). Summary:
+See `~/.claude/skills/drover/references/run.md` → Tester (first pass — repo-backed). Summary:
 1. Pull latest of base; checkout `issue-<N>-<slug>` into worktree (a `qa` card: create it from the base).
 2. Read issue + PR + Builder's handoff.
 3. Build issue-scoped test plan: ONE observable test per AC.
@@ -698,7 +698,7 @@ This is non-optional. Reviewer re-runs this command; red → bounce back to QA.
 
 The Tester's issue comment is the user's primary visibility into "is this actually fixed." A bare directory path is not sufficient — the user wants to *see* the proof on the issue page.
 
-**The canonical template lives in `.claude/skills/drover/references/run.md` → "Screenshot embed format" (right after Tester first pass).** Do not duplicate it here; both lanes (drover Tester + standalone drover-qa) follow that exact format. Summary of rules workers must obey:
+**The canonical template lives in `~/.claude/skills/drover/references/run.md` → "Screenshot embed format" (right after Tester first pass).** Do not duplicate it here; both lanes (drover Tester + standalone drover-qa) follow that exact format. Summary of rules workers must obey:
 
 - Capture screenshots at the standard viewports for UI ACs: **desktop 1920×1080, tablet 1024×768, mobile 375×667**.
 - Commit the screenshots to the issue branch and push *before* writing the comment — inline image URLs won't render unless the file is on GitHub.

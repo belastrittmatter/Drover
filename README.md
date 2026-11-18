@@ -26,21 +26,16 @@ Before you start:
 - [ ] Dynamic workflows on in `/config` ([backends](docs/drover/README.md#backends))
 - [ ] `verify_commands` set in your config, so the merge gate can prove the build ([setup notes](docs/drover/README.md#setup-notes))
 
-In your project folder:
-
 ```bash
-./install.sh /path/to/your-project   # from a checkout of this repo
+git clone <this repo> ~/drover && ~/drover/install.sh   # links drover into ~/.local/bin
+drover skills install                                    # links the skills into ~/.claude/skills
 ```
 
-Or as a Claude Code plugin:
-
-```
-/plugin marketplace add belastrittmatter/drover
-/plugin install drover@drover
-```
+Nothing is copied into your project. `drover onboard` (or `/drover onboard`) writes the one
+file a project needs, `.drover/config.json`. Upgrade with `git pull` in the install folder.
 
 > [!NOTE]
-> The plugin ships the skills only. Run `/drover:drover onboard` and its Checks step adds the guard hooks, scripts and workflows. Needs Claude Code, `gh`, `jq`, bash 3.2+ and Python 3.9+; the installer checks.
+> Needs Claude Code, `gh`, `jq`, git, bash 3.2+ and Python 3.9+; `drover setup check` checks.
 
 ### Security
 
@@ -61,8 +56,12 @@ Running from Codex or OpenCode? See [supported hosts](docs/hosts.md) for tested 
 ### 1. Install
 
 ```bash
-./install.sh /path/to/your-project   # from a checkout of this repo
+git clone <this repo> ~/drover && ~/drover/install.sh   # links drover into ~/.local/bin
+drover skills install                                    # links the skills into ~/.claude/skills
 ```
+
+Nothing is copied into your project. `drover onboard` (or `/drover onboard`) writes the one
+file a project needs, `.drover/config.json`. Upgrade with `git pull` in the install folder.
 
 ### 2. Onboard
 
@@ -117,7 +116,7 @@ Each name links to that skill's README. Adding a skill? Write its `SKILL.md` and
 /drover onboard          # 7-step setup, resumes
 /drover lint             # vague ACs?
 /drover status           # read-only snapshot
-/drover run <slug>       # drain the board
+/drover run              # drain the board
 /drover stop             # stop workers
 /drover-collect [source]       # find problems → findings doc → /to-spec
 /ui-refine-loop <route>       # polish one page
@@ -137,9 +136,9 @@ Run automatically once installed. Python stdlib, JSON in, JSON out.
 | [guard-secrets](hooks/guard-secrets.py) | Blocks reading or piping dotenv files, SSH keys and credential files; key names via `drover-env-check.sh` |
 | [guard-key-literals](hooks/guard-key-literals.py) | Blocks a live-looking API key written into a file; flags one already there |
 | [guard-delete-outside](hooks/guard-delete-outside.py) | Blocks `rm`, `find -delete` and `git clean` aimed outside the project, `~` or `/` |
-| [guard-protected-push](hooks/guard-protected-push.py) | Opt-in (`onboard` asks, or `install.sh --protect-main`): blocks direct and force pushes to main/master/base |
+| [guard-protected-push](hooks/guard-protected-push.py) | Opt-in (`onboard` asks, or `drover onboard --protect-main`): blocks direct and force pushes to main/master/base |
 | [cleanup-wt](hooks/cleanup-wt.py) | Removes merged worktrees and branches after each merge and at session start, with a recovery file |
-| [merge gate](scripts/drover-merge-gate.sh) | Merges only after the current base plus your non-empty project `verify_commands` pass (missing checks halt setup), pinned to the reviewed commit; applies `merge_policy` and runs allowed DB migrations |
+| [merge gate](lib/drover-merge-gate.sh) | Merges only after the current base plus your non-empty project `verify_commands` pass (missing checks halt setup), pinned to the reviewed commit; applies `merge_policy` and runs allowed DB migrations |
 
 ## Models
 
@@ -158,7 +157,7 @@ A cheap router grades each card easy, medium or hard first; the run flag picks t
 
 Run inside Codex? plain `/drover run` switches to the Codex ladder by itself. Codex has no
 `/drover` command: it finds skills in `.agents/skills/` (symlinks followed), so link
-`.claude/skills/drover` there and type `$drover run`.
+the skills there (`drover skills install --dest .agents/skills`) and type `$drover run`.
 
 ## Writing standard
 
@@ -182,7 +181,7 @@ MIT © Eric Tech (upstream) and belastrittmatter ([LICENSE](LICENSE)). Built on 
 Setup and dispatch resolve real, nonempty `SKILL.md` files for the actual
 Claude or Codex host. Missing required skills halt before claims or workers;
 lockfiles and arbitrary plugin caches do not count. The shared registry in
-`scripts/drover-skills-ready.py` owns lane dependencies, overrides and the
+`lib/drover-skills-ready.py` owns lane dependencies, overrides and the
 two declared ponytail fallbacks. The QA lane requires the bundled
 `pr-security-review`; Cloudflare's `security-audit` is an optional QA entry,
 so a missing copy never halts a run. Setup's full helper union may be red while a

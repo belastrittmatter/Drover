@@ -1,7 +1,7 @@
 {
   "name": "drover",
   "version": "3.3.0",
-  "description": "Autonomous GitHub Project board runner. Primary skills: drover, drover-build, drover-qa, drover-review, drover-collect. Secondary skills: visual, git-sync, ui-refine-loop, pr-security-review (Anthropic's PR security review, run by drover-qa on every PR). onboard also adds Cloudflare's standalone security-audit skill. Installed as a plugin it ships the skills only; run /drover onboard to add the guard hooks, .claude/bin scripts and workflows (install.sh installs all of it in one go).",
+  "description": "Autonomous GitHub Project board runner. Primary skills: drover, drover-build, drover-qa, drover-review, drover-collect. Secondary skills: visual, git-sync, ui-refine-loop, pr-security-review (Anthropic's PR security review, run by drover-qa on every PR). onboard also adds Cloudflare's standalone security-audit skill. Install with install.sh (links the drover command) and drover skills install; drover onboard writes the project's .drover/config.json.",
   "author": {
     "name": "belastrittmatter"
   },

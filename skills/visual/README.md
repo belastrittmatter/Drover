@@ -31,4 +31,4 @@ Adapted from BuilderIO/skills (MIT, visual-recap and visual-plan); diagram style
 
 ## Install
 
-Ships in the drover pack as a secondary skill. `install.sh` copies `skills/visual/` to `.claude/skills/visual/`. Needs `git` and Python 3 (stdlib only); the self-check screenshot uses headless Chrome when present.
+Ships in the drover pack as a secondary skill. `drover skills install` links `skills/visual/` into `~/.claude/skills/`. Needs `git` and Python 3 (stdlib only); the self-check screenshot uses headless Chrome when present.

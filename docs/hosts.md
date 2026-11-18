@@ -1,7 +1,7 @@
 # Agent hosts
 
 drover runs inside an agent host: the CLI whose session types `/drover run`.
-`scripts/drover-host.sh` (installed as `.claude/bin/drover-host.sh`) names it.
+`lib/drover-host.sh` (installed as `drover host`) names it.
 
 | Host value | Tested version | Start a run | Sign-in | Gaps |
 |---|---|---|---|---|
@@ -20,14 +20,14 @@ Every host also needs `gh`, `jq`, bash 3.2+ and Python 3.9+.
 3. `OPENCODE=1` → `opencode`. Checked before `CLAUDECODE`, which leaks into an OpenCode
    session started from Claude Code. `AGENT=1` is ignored: other tools set it too.
 4. `CLAUDECODE` → `claude`.
-5. The board config's top-level `host` key, when `--config` is given.
+5. The config's `harness` key (older configs: `host`), when `--config` is given.
 6. Nothing matched: empty stdout, a hint on stderr, exit 65. The run halts and asks for a
    host. It never guesses Claude.
 
 A live env sign beats the saved config, so a Codex lane started from a Claude-configured
 board still answers `codex`.
 
-Onboard always writes `host` into `.claude/drover/configs/<slug>.json`.
+Onboard always writes `harness` into `.drover/config.json`; v1 ships the `claude` harness entry only (`harnesses/claude.json`).
 `drover-setup.py fix` adds a missing one from `--host`; `check` flags any other value.
 
 ## Evidence

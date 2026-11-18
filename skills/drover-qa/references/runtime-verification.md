@@ -110,7 +110,7 @@ an inconclusive report. Custom adapters must not daemonize into detached session
 ## QA and Review handoff
 
 ```bash
-python3 .claude/skills/drover-qa/scripts/runtime_compare.py \
+python3 ~/.claude/skills/drover-qa/scripts/runtime_compare.py \
   --config docs/runtime/search.json --output docs/drover/runs/issue-N-qa-v1/runtime
 ```
 

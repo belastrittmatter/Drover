@@ -31,9 +31,9 @@ Onboard reports `starter, not run` until actual scenarios run with proof.
 ## Map inspection and selection
 
 ```bash
-python3 .claude/bin/drover-project-verifier.py inspect \
+drover project-verifier inspect \
   --root . --map .agents/skills/verify-app/references/feature-map.json
-python3 .claude/bin/drover-project-verifier.py select \
+drover project-verifier select \
   --root . --map .agents/skills/verify-app/references/feature-map.json \
   --changed - --feature cart.checkout
 ```
@@ -72,7 +72,7 @@ verifier cannot run, keep its ACs unverified until another valid check proves
 them. Resolve its skill for the current host before loading it, for example:
 
 ```bash
-python3 .claude/bin/drover-skills-ready.py --root . --host codex \
+drover skills-ready --root . --host codex \
   --cards cards.json --lane qa --require verify-app
 ```
 

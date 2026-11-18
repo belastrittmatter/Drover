@@ -21,4 +21,4 @@ Ported from [anthropics/claude-code-security-review](https://github.com/anthropi
 
 ## Install
 
-Part of the drover pack: `./install.sh /path/to/project`, or the plugin. Not the same as Claude Code's built-in `/security-review`, which it leaves alone.
+Part of the drover pack: `drover skills install` links it into `~/.claude/skills`. Not the same as Claude Code's built-in `/security-review`, which it leaves alone.

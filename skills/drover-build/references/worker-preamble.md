@@ -4,7 +4,7 @@ You are running UNATTENDED inside **Drover Build**, dispatched to work on a sing
 
 **Before worker writes or worktree creation:** follow [skill readiness](../../drover/references/skills-readiness.md).
 Resolve this lane for the actual host, load the report's files/fallbacks, halt
-on missing requirements and recheck each conditional helper before use.
+on missing requirements and check any helper the card did not route with `--require` before use.
 
 
 1. **For ANY decision point, AskUserQuestion-style prompt, or "should I X or Y?" branch:**

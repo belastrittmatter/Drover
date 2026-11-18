@@ -26,4 +26,4 @@ The Tester: proves a card's acceptance criteria with tests and evidence, or send
 
 ## Install
 
-Part of the drover pack: `./install.sh /path/to/project`. Run it against staging, not production. Lane details: `skills/drover/references/run.md` → Tester.
+Part of the drover pack: `drover skills install` links it into `~/.claude/skills`. Run it against staging, not production. Lane details: `skills/drover/references/run.md` → Tester.

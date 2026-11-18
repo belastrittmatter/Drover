@@ -11,16 +11,16 @@ Worktree cleanup (`hooks/cleanup-wt.py`) is a hook, not a skill.
 **`drover` is an autonomous trader. The interactive Claude session that invokes `/drover run` is an *orchestrator*, NOT a worker.** Its only jobs are:
 
 1. Verify preconditions (clean git, no orphan workers, GraphQL quota, etc.).
-2. Dispatch per the config's `worker_backend`:
-   - `"workflow"` (default) — stay in-session and run the wave loop in `skills/drover/references/run-workflow.md`: plan a wave, claim assignees, launch the `drover-wave` dynamic workflow, reconcile, repeat. Lane agents inside the workflow do all product work.
-   - `"claude-p"` (legacy, explicit opt-in only) — spawn the headless runner `nohup .claude/bin/drover-run.sh <slug> &`, report PID + log path, exit. The runner refuses to start (exit 78) unless the config sets this value.
+2. Dispatch:
+   - default: stay in-session and run the wave loop in `skills/drover/references/run-workflow.md`: plan a wave, claim assignees, launch the `drover-wave` dynamic workflow, reconcile, repeat. Lane agents inside the workflow do all product work.
+   - `--headless`: spawn the headless runner `nohup drover run &`, report PID + log path, exit. Workers start with the command, model flag and permissions in `harnesses/<harness>.json`.
 3. Report back to the user (dispatch confirmation, or one status line per wave).
 
 The orchestrator MUST NOT:
 
-- Build, test, review, or fix issues itself. All product work is delegated to workflow lane agents (or `claude -p` workers on the legacy backend).
+- Build, test, review, or fix issues itself. All product work is delegated to workflow lane agents (or headless workers from `drover run`).
 - Patch the dispatcher script or skill files mid-run, even if it sees a problem. Capture the symptom and tell the user; wait for explicit approval.
-- Wait on individual workers or relay their work. They write their evidence back to the GitHub issue + PR. The orchestrator's user-facing output is the dispatch confirmation (claude-p) or one short report per wave (workflow), not the run result.
+- Wait on individual workers or relay their work. They write their evidence back to the GitHub issue + PR. The orchestrator's user-facing output is the dispatch confirmation (headless) or one short report per wave (workflow), not the run result.
 - Hold context for multi-card progress. State lives on the GitHub Project board + the inflight lockfiles, not in the orchestrator's session.
 
 If a problem surfaces during the run, the orchestrator's reply is: "I saw X. Want me to dig in or stop the runner?" — not "I went ahead and fixed it."
@@ -29,10 +29,9 @@ If a problem surfaces during the run, the orchestrator's reply is: "I saw X. Wan
 
 Workers (`drover-build`, `drover-qa`, `drover-review`) share the dispatcher's `gh` token bucket. They MUST:
 
-- Required GitHub reads use `.claude/bin/drover-github-read.py`; exit 79 stops the run.
+- Required GitHub reads use `drover github-read`; exit 79 stops the run.
 - Check its `--check` before GitHub writes, migrations, merges, and new dispatch; preserve work when halted.
-- Source `.claude/bin/drover-gh-guard.sh` (`scripts/` in this repo) at worker start.
-- Call `sb_gh_guard_check 200` before any burst of `gh` calls.
+- Run `drover gh-guard check 200` at worker start and before any burst of `gh` calls.
 - Prefer local `git blame` / `git log` over `gh api graphql` for any sub-agent that doesn't need fresh state.
 - Cap adversarial sub-agents at 50 gh calls each. If a sub-agent runs out, it returns `confidence: insufficient_data` rather than burning the shared quota.
 - Append `gh-quota-on-exit: graphql=<n>/5000 rest=<n>/5000` to the PR handoff comment.
@@ -41,35 +40,38 @@ See `skills/drover/references/rate-limit-etiquette.md` for the full discipline.
 
 ## Installation contract
 
-`install.sh [--no-hooks] [--protect-main] [--hosts claude,codex,opencode] <target>` copies the pack
-once into the target project's shared `.agents/` tree, then links each host folder into it: one
-link per skill under `skills/`, one per file under `bin/`, `workflows/`, `hooks/`. `.claude/` is
-always linked; `.codex/` and `.opencode/` only when that folder already exists, a config `host`
-key names it, `drover-host.sh` reports it, or `--hosts` asks. A real-directory `.claude/`
-install is replaced by links on upgrade; a user's own links and anything not drover's are
-left alone; where no symlink can be made the file is copied. Settings and run state stay in `.claude/`.
+`install.sh` links `bin/drover` into `~/.local/bin` and copies nothing into a project
+(specs/config.md FR-CFG-7). `drover <command>` runs `lib/drover-<command>.sh|py` from the
+install folder; upgrading is `git pull` there. `drover skills install` links the nine skills
+into the harness's user skill folder (`~/.claude/skills`).
+
+A project holds one tracked file, `.drover/config.json` (FR-CFG-1), validated against
+`skills/drover/references/config-schema.json` at the start of every `drover` command.
+`drover onboard` (`lib/drover-setup.py onboard`) is its only writer: it also adds
+`.drover/runs/`, `.drover/worktrees/`, `.claude/settings.local.json*` and `.claude/drover/`
+to `.git/info/exclude`, and merges the guard hooks from the harness entry
+(`harnesses/claude.json` → `hooks`) into the untracked `.claude/settings.local.json`, where
+they run from the install folder. `drover setup fix` finishes an upgrade from an older
+copying install with no question (backup in `.claude/drover/backup/`).
 
 ```
-.agents/
-├── skills/<all nine>/...
-├── hooks/guard-*.py, cleanup-wt.py   (wired into settings.json; --no-hooks skips)
-├── workflows/drover-wave.js, ui-refine-loop.js
-└── bin/drover-*.sh (incl. pr-body), drover-*.py (status, merge-policy, settings, setup), drover-qa-file-bug.sh, drover-review-file-refactor.sh
+bin/drover                 the entry point
+lib/                       runner, card, gate, preflight, status, setup, config, ...
+harnesses/claude.json      worker command, model flag, skill folders, hooks, usage probe, permissions
+hooks/                     guard hooks + cleanup-wt.py, wired per harness
+skills/<all nine>/
+workflows/                 drover-wave.js, ui-refine-loop.js
 ```
-
-It also records an older install in
-`.claude/drover/upgrade.json`, prints grouped plain-text output, and asks nothing:
-`drover onboard` asks the questions. Onboard's Checks step (`scripts/drover-setup.py`)
-fixes must-haves and finishes upgrades with no question.
 
 ## Board shape (v3.0.0)
 
 Columns are always Backlog · Ready · Building · QA · Review · Blocked · Done — no Skipped, no
 per-board `variant`. Labels `qa` · `bug` · `feature` route cards: `qa` skips Building, everything
-else (and no label) is built. Change routing in `scripts/drover-wave-plan.sh`,
+else (and no label) is built. Change routing in `lib/drover-wave-plan.sh`,
 `workflows/drover-wave.js` and `run.md` → "Lanes and label routing" together.
 
-Skills call the dispatcher scripts as `.claude/bin/<script>`.
+Skills call the dispatcher scripts as `drover <command>`; a headless worker's permissions
+(`harnesses/claude.json`) must cover every command a role's rules name (`tests/test_harness_permissions.py`).
 
 ## Writing
 
@@ -85,7 +87,7 @@ every project it is installed in.
 | Comment | `[role] [label] status` · Did · Done · Not done · Next · ≤ 8 lines |
 | PR author notes | Purpose · What changed · Why it matters, in native file/inline review comments; follow `skills/drover/references/pr-author-notes.md` |
 
-- NEVER rewrite a whole PR body: `scripts/drover-pr-body.sh` rewrites one block.
+- NEVER rewrite a whole PR body: `lib/drover-pr-body.sh` rewrites one block.
 - ALWAYS change a format in `writing-standard.md` first, then the templates and `tests/test_writing_format.py`.
 
 ## Release checks
