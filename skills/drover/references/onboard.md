@@ -118,7 +118,7 @@ the step-7 table, then "Onboard found an existing setup. What now?" [Keep all �
   "answers": { "github": {"login": "my-org", "remote": "github.com/my-org/my-app"},
                "board": {"owner": "my-org", "number": 4, "title": "Ledgerly Roadmap", "reused": true},
                "base_branch": "staging",
-               "policies": {"merge_default": "auto", "protect_main": true, "allowed_envs": ["test", "staging"]},
+               "policies": {"merge_default": "auto", "allowed_envs": ["test", "staging"]},
                "permissions": "add", "collect": ["sentry", "github", "prs", "architecture", "linear"],
                "custom": [{"name": "linear", "kind": "mcp", "target": "linear"}] } }
 ```
@@ -281,17 +281,14 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
       merge_policy.default auto · always_human: money, auth, schema · push guard on (main, master,
       <base>) · migrations.allowed_envs: test, staging
       + Bash(gh project:*) + Bash(gh issue:*) + Bash(gh pr:*) + … (the --dry-run output, joined)
-   Review each → ONE more AskUserQuestion call, up to three questions:
+   Review each → ONE more AskUserQuestion call, up to two questions (the push guard is always on):
     a. "Merge" — "Who merges a change that passes review?" [Robot merges normal changes
        (Recommended) / I merge everything]; production base: the order flips, and robot-merges
        sets merge_policy.allow_auto_on_production: true (run.md's guard needs it).
        → merge_policy.default "auto" | "human"; auto_max_lines 400 (lockfiles, generated,
          snapshots, migration SQL not counted); always_human = schema defaults (money, auth,
          destructive schema). A matching PR parks in Blocked with `[needs-you]`.
-    b. "Push guard" — "Block pushing straight to main?" [Yes (Recommended for a repo with
-       commits) / No]. Skipped when .claude/settings.local.json already wires
-       guard-protected-push.py. Yes → step 7 passes `--protect-main`.
-    c. "Databases" (multiSelect, only when migration dirs exist) — "Which databases may the robot
+    b. "Databases" (multiSelect, only when migration dirs exist) — "Which databases may the robot
        migrate?" [test (Recommended) / staging (Recommended) / live] → migrations.allowed_envs;
        target_env "live" on a production base, else "staging"; commands from the manifest's
        migrate scripts (ask only for a missing one). A command needing a DB URL resolves it
@@ -353,7 +350,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    │    collect (incl. custom), notifications {channel: "session", bot_identity},
    │    │    verify_commands (non-blank project checks). No `variant`, no `host`.
    │    ├─ drover onboard --from .claude/drover/onboard-staged/config.json --evidence <branch[:name]|pr:path>
-   │    │    [--protect-main] — the only writer of .drover/config.json (committed): it keeps every
+   │    │    — the only writer of .drover/config.json (committed): it keeps every
    │    │    key already set, adds `harness` (claude), the starting skill routing (`roles`,
    │    │    `labels`), the detected `commit_style`, validates against config-schema.json and
    │    │    writes nothing on a failure (it names the field). It also adds .drover/runs/,

@@ -91,7 +91,7 @@ expect allow guard-worktree-path.py "$(bash_cmd 'git worktree list' "$REPO")"   
 expect allow guard-worktree-path.py "$(bash_cmd 'echo "git worktree add ../x"' "$REPO")"               "quoted text is not a command"
 rm -rf "$REPO"
 
-# ---- guard-protected-push (opt-in) -------------------------------------------
+# ---- guard-protected-push (on by default) --------------------------------------
 REPO=$(mktemp -d); REPO=$(cd "$REPO" && pwd -P)
 git -C "$REPO" init -q -b main
 git -C "$REPO" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
@@ -101,6 +101,7 @@ pp deny  'git push --force origin main'                 "force push to main"
 pp deny  'git push -f origin staging'                   "force push to config base_branch"
 pp deny  'git push --force-with-lease origin HEAD:main' "force-with-lease HEAD:main"
 pp deny  'git push origin feat:refs/heads/master'       "direct push into master by refspec"
+pp deny  'git push origin HEAD:main'                    "direct push HEAD:main"
 pp deny  'git push'                                     "bare push while on main"
 pp deny  'git push origin HEAD'                         "push HEAD while on main"
 pp deny  'git push origin +main'                        "plus-refspec force to main"
@@ -116,6 +117,37 @@ pp allow 'echo "git push --force origin main"'          "quoted text is not a co
 OUT=$(printf '%s' "$(bash_cmd 'git push --force origin main' "$REPO")" | SB_ALLOW_PROTECTED_PUSH=1 CLAUDE_PROJECT_DIR="$REPO" python3 "$H/guard-protected-push.py")
 [ -z "$OUT" ] || fail "SB_ALLOW_PROTECTED_PUSH=1 should turn the guard off"; PASS=$((PASS + 1))
 rm -rf "$REPO"
+
+# ---- guard-merge: no merge outside the gate; only the review lane runs the gate --------
+gm() { expect "$1" guard-merge.py "$(bash_cmd "$2")" "$3"; }
+gm deny  'gh pr merge 3 --squash'                                "plain gh pr merge"
+gm deny  "bash -c 'gh pr merge 3'"                               "bash -c gh pr merge"
+gm deny  "sh -c \"cd /x && gh pr merge 3\""                      "sh -c gh pr merge"
+gm deny  'env GH_TOKEN=x gh pr merge 3'                          "env gh pr merge"
+gm deny  'echo 3 | xargs -I{} gh pr merge {}'                    "xargs gh pr merge"
+gm deny  'gh --repo x/y pr merge 3'                              "gh --repo x pr merge"
+gm deny  'gh -R x/y pr merge 3'                                  "gh -R x pr merge"
+gm deny  'gh api -X PUT repos/o/r/pulls/3/merge'                 "gh api pulls merge"
+gm deny  "gh api graphql -f query='mutation{mergePullRequest(input:{pullRequestId:\"P\"}){clientMutationId}}'" "gh api merge mutation"
+gm deny  "eval 'gh pr merge 3'"                                  "eval gh pr merge"
+gm allow 'gh pr view 3 --json headRefOid'                        "gh pr view"
+gm allow 'gh api repos/o/r/pulls/3'                              "gh api pull read"
+gm allow 'echo "gh pr merge 3"'                                  "quoted text is not a command"
+gm allow 'drover gate --pr 3 --expect-head abc'                  "the gate outside a run"
+gm allow 'bash lib/drover-merge-gate.sh --pr 3 --expect-head abc' "the gate script outside a run"
+for role in build qa; do
+  OUT=$(printf '%s' "$(bash_cmd 'drover gate --pr 3 --expect-head abc')" | DROVER_ROLE=$role python3 "$H/guard-merge.py")
+  printf '%s' "$OUT" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null || fail "drover gate from $role must be denied"
+  OUT=$(printf '%s' "$(bash_cmd 'bash -c "drover gate --pr 3"')" | DROVER_ROLE=$role python3 "$H/guard-merge.py")
+  printf '%s' "$OUT" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null || fail "bash -c drover gate from $role must be denied"
+  RC=0; DROVER_ROLE=$role bash ../bin/drover gate --pr 3 >/dev/null 2>&1 || RC=$?
+  [ "$RC" -eq 77 ] || fail "bin/drover gate from $role should exit 77, got $RC"
+  PASS=$((PASS + 3))
+done
+OUT=$(printf '%s' "$(bash_cmd 'drover gate --pr 3 --expect-head abc')" | DROVER_ROLE=review python3 "$H/guard-merge.py")
+[ -z "$OUT" ] || fail "the review lane may run the gate"; PASS=$((PASS + 1))
+jq -e '[.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[].command] | (any(contains("guard-merge.py")) and any(contains("guard-protected-push.py")))' \
+  ../hooks/settings-snippet.json >/dev/null || fail "the merge and push guards are in the default hook set"; PASS=$((PASS + 1))
 
 # ---- guard-delete-outside ----------------------------------------------------
 # A project path outside every temp root (mktemp lives under one); nothing is created or run.

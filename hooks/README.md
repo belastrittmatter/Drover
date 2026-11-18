@@ -91,15 +91,15 @@ copied into the project. `drover onboard --no-hooks` skips them. By hand, merge 
 branches stay allowed: the rebase pass needs them. `SB_ALLOW_PROTECTED_PUSH=1` turns it off for a
 session.
 
-It is installed but not wired by default: a brand-new repo often pushes its first commits straight
-to `main`. `drover onboard` asks once ("Block direct/force pushes to main? Recommended for
-existing apps; skip for brand-new repos"), and `drover onboard --protect-main` wires it. Either
-way the entry is `settings-protect-main.json`:
+It is wired by default with the other guards (`drover onboard`, `drover setup fix`);
+`SB_ALLOW_PROTECTED_PUSH=1` turns it off for a session, `--no-hooks` skips all guards.
 
-```
-{ "matcher": "Bash", "hooks": [ { "type": "command",
-  "command": "python3 \"{drover_home}/hooks/guard-protected-push.py\"" } ] }
-```
+- `guard-merge.py` — PreToolUse `Bash`: denies any merge outside the merge gate: `gh pr merge`
+  (with global flags such as `--repo`, and inside `bash -c`, `sh -c`, `eval`, `env`, `xargs`),
+  and `gh api` calls to `pulls/<n>/merge` or with a merge mutation. When `DROVER_ROLE` is set (the
+  runner sets it per worker) and is not `review`, it also denies `drover gate`. The gate's own merge
+  runs inside `lib/drover-merge-gate.sh`, out of the hook's sight. Headless workers have a broad
+  allow list (`harnesses/claude.json`); this hook and the push guard are the boundary.
 
 Tests: `tests/test-guard-hooks.sh` (all guards), `tests/test-cleanup-wt.sh`.
 

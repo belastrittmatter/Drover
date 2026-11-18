@@ -209,7 +209,7 @@ crash-recovery sweep of leaked assignees, the rate guard and the usage guard
 Guard hooks, wired by `drover onboard` unless `--no-hooks`: worktrees only under
 `.drover/worktrees/`, no reading of secret files, no API keys written into source, no deleting
 outside the project, and merged-worktree cleanup at session start. Blocking direct and force pushes
-to the base branch is opt-in (`onboard` asks once, or `drover onboard --protect-main`). See
+to the base branch is on by default, and `guard-merge.py` keeps every merge inside the gate. See
 `hooks/README.md`.
 
 **Who merges, and which databases the robot touches** (v2.6.0, config `merge_policy` and

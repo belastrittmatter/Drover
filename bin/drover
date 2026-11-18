@@ -34,7 +34,12 @@ cmd="${1:-help}"
 case "$cmd" in
   help|-h|--help) usage; exit 0 ;;
   version|--version) tr -d '[:space:]' < "$DROVER_HOME/VERSION"; echo; exit 0 ;;
-  gate) cmd=merge-gate ;;
+  gate|merge-gate)
+    cmd=merge-gate
+    # Only the review lane merges (hooks/guard-merge.py denies it too); the runner sets DROVER_ROLE.
+    if [ -n "${DROVER_ROLE:-}" ] && [ "$DROVER_ROLE" != review ]; then
+      echo "drover: the gate runs only in the review lane (DROVER_ROLE=$DROVER_ROLE)" >&2; exit 77
+    fi ;;
   onboard) set -- onboard "$@"; cmd=setup ;;
   skills)
     [ "${1:-}" = install ] || { echo "usage: drover skills install [--dest DIR]" >&2; exit 64; }

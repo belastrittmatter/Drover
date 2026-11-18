@@ -355,7 +355,9 @@ dispatch_lane() {
     < <(python3 "$DROVER_LIB/drover-config.py" worker-argv "$lane" "$prompt")
   [ "${#worker[@]}" -gt 1 ] || { log "worker command: no argv from harness ${HARNESS:-claude}"; exit 66; }
   gh_checkpoint
-  nohup "${worker[@]}" >> "$worker_log" 2>&1 &
+  # DROVER_ROLE / DROVER_ISSUE: guard-merge lets only the review lane run the gate, and
+  # drover gh-guard keys the worker's call budget on them.
+  DROVER_ROLE="$lane" DROVER_ISSUE="$issue" nohup "${worker[@]}" >> "$worker_log" 2>&1 &
   pid=$!
   DISPATCH_COUNT=$((DISPATCH_COUNT + 1))
   DISPATCH_LOG="${DISPATCH_LOG}${issue}

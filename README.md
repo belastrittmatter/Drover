@@ -136,7 +136,7 @@ Run automatically once installed. Python stdlib, JSON in, JSON out.
 | [guard-secrets](hooks/guard-secrets.py) | Blocks reading or piping dotenv files, SSH keys and credential files; key names via `drover-env-check.sh` |
 | [guard-key-literals](hooks/guard-key-literals.py) | Blocks a live-looking API key written into a file; flags one already there |
 | [guard-delete-outside](hooks/guard-delete-outside.py) | Blocks `rm`, `find -delete` and `git clean` aimed outside the project, `~` or `/` |
-| [guard-protected-push](hooks/guard-protected-push.py) | Opt-in (`onboard` asks, or `drover onboard --protect-main`): blocks direct and force pushes to main/master/base |
+| [guard-protected-push](hooks/guard-protected-push.py) | On by default (`SB_ALLOW_PROTECTED_PUSH=1` turns it off for a session): blocks direct and force pushes to main/master/base |
 | [cleanup-wt](hooks/cleanup-wt.py) | Removes merged worktrees and branches after each merge and at session start, with a recovery file |
 | [merge gate](lib/drover-merge-gate.sh) | Merges only after the current base plus your non-empty project `verify_commands` pass (missing checks halt setup), pinned to the reviewed commit; applies `merge_policy` and runs allowed DB migrations |
 

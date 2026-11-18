@@ -7,8 +7,7 @@
   "hooks": {
     "method": "settings-json",
     "file": ".claude/settings.local.json",
-    "snippets": ["hooks/settings-snippet.json"],
-    "protect_main": "hooks/settings-protect-main.json"
+    "snippets": ["hooks/settings-snippet.json"]
   },
   "usage_probe": "drover usage check",
   "permissions": {

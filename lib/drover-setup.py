@@ -6,7 +6,7 @@ the config, so the Checks step can say "Fixed for you" without asking anything.
 
     drover onboard [--from STAGED.json] [--owner O --number N] [--title T] [--base B] [--verify CMD]...
                    [--evidence branch[:NAME]|pr:PATH] [--bot LOGIN] [--merge auto|human]
-                   [--harness claude] [--protect-main] [--no-hooks]
+                   [--harness claude] [--no-hooks]
                                                                        write .drover/config.json, the git
                                                                        excludes and the harness hooks
     drover setup check   [--root DIR] [--pack DIR]            what is missing / old (read-only)
@@ -497,12 +497,12 @@ def remove(path):
         os.remove(path)
 
 
-def install_hooks(root, pack, host, protect=False):
-    """Wire the harness entry's guard hooks into its untracked settings file (FR-HRN-1)."""
+def install_hooks(root, pack, host):
+    """Wire the harness entry's guard hooks into its untracked settings file (FR-HRN-1). The
+    push and merge guards are part of the default set; SB_ALLOW_PROTECTED_PUSH=1 or
+    --no-hooks opts out."""
     entry = drover_config().harness(host)["hooks"]
     snippets = [os.path.join(pack, s) for s in entry["snippets"]]
-    if protect and entry.get("protect_main"):
-        snippets.append(os.path.join(pack, entry["protect_main"]))
     r = run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "drover-settings.py"),
              "hooks", os.path.join(root, entry["file"]), *snippets])
     if r.returncode:
@@ -727,7 +727,7 @@ def onboard(root, rest, pack):
     os.makedirs(os.path.dirname(cfg_path), exist_ok=True)
     write_json(cfg_path, cfg)
     excluded = git_exclude(root)
-    hooks = None if "--no-hooks" in rest else install_hooks(root, pack, cfg.get("harness", "claude"), "--protect-main" in rest)
+    hooks = None if "--no-hooks" in rest else install_hooks(root, pack, cfg.get("harness", "claude"))
     ready = run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "drover-verification-ready.py"),
                  "--config", cfg_path])
     return {"config": os.path.relpath(cfg_path, root), "excluded": excluded, "hooks": hooks,

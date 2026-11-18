@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """PreToolUse(Bash) guard: no direct or force pushes to a protected base branch.
 
-Opt-in. `drover onboard` asks once ("Block direct/force pushes to main?") and
-`drover onboard --protect-main` wires it. Lanes push feature branches and merge through
+On by default: `drover onboard` and `drover setup fix` wire it with the other guards
+(`--no-hooks` skips them all). Lanes push feature branches and merge through
 `drover-merge-gate.sh` (`gh pr merge`), so nothing in the loop needs to push a base.
 
 Protected: main, master, the `base_branch` in .drover/config.json, and

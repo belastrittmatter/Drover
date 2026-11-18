@@ -93,7 +93,11 @@ audit: it only fed an outside skill drover does not ship).
 - **FR-HRN-4** The harness file shall declare the permissions a headless
   worker needs (commands, tools, paths), and drover shall pass them at
   start. A worker shall never wait on an approval prompt; any command a
-  role's rules tell it to run shall be covered. (Stage 0: upstream's first
+  role's rules tell it to run shall be covered. The allow list is broad (the
+  shell tools, `gh`, `git`, `drover`); the boundary is enforced by hooks the
+  harness installs: no merge outside the merge gate in any form, only the
+  review role runs the gate, no push to a protected base branch, and no edit
+  of the drover install folder, which workers may read. (Stage 0: upstream's first
   worker command needed approval, so every headless worker quit. Upstream's
   `test_run_allowlist.py` never read the runner's worker prompt; drover's
   coverage test shall read the worker prompt and every role rules file.)
