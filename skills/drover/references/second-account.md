@@ -98,14 +98,14 @@ NEVER print token values or read dotenv files to diagnose it.
 
 Stage `notifications.bot_identity` as the bot username for new boards; save at onboard step 8.
 Existing boards may keep the owner's name. The bot can assign either account.
-`run-workflow.md` step 3 proceeds only when assignees equal exactly `[bot_identity]`.
+The runner claims a card by adding `bot_identity` as its assignee (`try_claim_assignee`).
 NEVER change that identity during a run or because the active login changes.
 
 Optional per-run fallback: the person may ask the orchestrator to also use the owner's bucket
 (~10,000 points/hr combined, less the owner's use). No config key or automatic switch is added.
-Before each wave, with no workers running, check `gh api rate_limit`. If GraphQL remaining is
+Before each run, with no workers running, check `gh api rate_limit`. If GraphQL remaining is
 below ~3,000, `gh auth switch -u <other>` and check again. Keep the other account only if it has
-more; otherwise switch back. Keep existing rate guards and halt rules; NEVER switch mid-wave.
+more; otherwise switch back. Keep existing rate guards and halt rules; NEVER switch mid-run.
 
 ## End of run
 

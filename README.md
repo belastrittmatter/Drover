@@ -23,7 +23,6 @@
 Before you start:
 
 - [ ] Claude Code, and `gh` with board access: `gh auth refresh -s project,read:project,repo`
-- [ ] Dynamic workflows on in `/config` ([backends](docs/drover/README.md#backends))
 - [ ] `verify_commands` set in your config, so the merge gate can prove the build ([setup notes](docs/drover/README.md#setup-notes))
 
 ```bash
@@ -49,8 +48,6 @@ Two security skills come with every install, and they stay separate:
 `--no-helper-skills` skips the `security-audit` download; `/drover onboard` adds it later.
 Claude Code's built-in `/security-review` is left as it is.
 
-Running from Codex or OpenCode? See [supported hosts](docs/hosts.md) for tested versions, sign-in and gaps.
-
 ## Quick start
 
 ### 1. Install
@@ -74,10 +71,11 @@ Checks · GitHub · Board · Branch · Policies · Bug sources · Review. <kbd>E
 ### 3. Run
 
 ```
-/drover run my-app
+/drover run
 ```
 
-Add cards to `Ready`. The board drains on its own.
+It starts the runner in the background and prints its PID and log. Add cards to `Ready`; the
+board drains on its own. `/drover status` shows progress.
 
 ## How it works
 
@@ -92,7 +90,7 @@ Add cards to `Ready`. The board drains on its own.
 
 | Skill | What it does |
 |---|---|
-| [`/drover`](skills/drover/README.md) | Orchestrator: plans waves, runs Build → QA → Review, merges when green. |
+| [`/drover`](skills/drover/README.md) | Orchestrator: starts the runner, which runs Build → QA → Review and merges when green. |
 | [`/drover-collect`](skills/drover-collect/README.md) | Finds problems, verifies them, writes a findings doc for /to-spec and /to-tickets. |
 | [`/ui-refine-loop`](skills/ui-refine-loop/README.md) | Critique → refine loop that polishes one page or component. |
 | [`/visual`](skills/visual/README.md) | One HTML page: branch recap, plan, or codebase map with diagrams. |
@@ -124,7 +122,7 @@ Each name links to that skill's README. Adding a skill? Write its `SKILL.md` and
 /git-sync                     # commit, pull, push
 ```
 
-Flags: `run --low|--high` · `run --codex[=<model>]` · `drover-collect --since 30d`
+Flags: `drover-collect --since 30d`
 
 ## Guards & hooks
 
@@ -142,22 +140,14 @@ Run automatically once installed. Python stdlib, JSON in, JSON out.
 
 ## Models
 
-A cheap router grades each card easy, medium or hard first; the run flag picks the model for each grade. With `--codex`, every lane runs on Codex GPT models instead of Claude.
+A fast classifier grades each Ready card low, medium or high complexity first; the config's
+`model_tier` picks the Builder's model for each grade. A role's `model` in the config wins.
 
-| Command | Router | Easy card | Medium card | Hard card |
+| `model_tier` | Classifier | Low | Medium | High |
 | --- | --- | --- | --- | --- |
-| `/drover run` | Haiku 4.5 | Sonnet 5.5 | Opus 5.5 | session model |
-| `/drover run --low` | Haiku 4.5 | Haiku 4.5 | Sonnet 5.5 | Opus 5.5 |
-| `/drover run --high` | Sonnet 5.5 | Opus 5.5 | Opus 5.5 | Opus 5.5 |
-| `/drover run --codex` | gpt-6-luna | gpt-6.1-sol | gpt-6.1-sol | gpt-6-astra |
-| `/drover run --codex --low` | gpt-6-luna | gpt-6-luna | gpt-6.1-sol | gpt-6.1-sol |
-| `/drover run --codex --high` | gpt-6-luna | gpt-6-astra | gpt-6-astra | gpt-6-astra |
-
-`/drover run --codex=<model>` pins one model for every card and skips the router.
-
-Run inside Codex? plain `/drover run` switches to the Codex ladder by itself. Codex has no
-`/drover` command: it finds skills in `.agents/skills/` (symlinks followed), so link
-the skills there (`drover skills install --dest .agents/skills`) and type `$drover run`.
+| `medium` (default) | haiku | sonnet | opus | harness default |
+| `low` | haiku | haiku | sonnet | opus |
+| `high` | sonnet | opus | opus | opus |
 
 ## Writing standard
 

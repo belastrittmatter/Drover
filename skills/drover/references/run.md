@@ -1,8 +1,8 @@
 # drover run — full contract
 
-**Scope:** the lane lifecycles (Builder, Tester, Reviewer) that both backends use, and the headless runner (`drover run`, or `/drover run --headless`). The default in-session wave loop is in `run-workflow.md`.
+**Scope:** the lane lifecycles (Builder, Tester, Reviewer) and the runner (`drover run`) that dispatches them.
 
-**Where the headless runner runs:** headless. Spawned as a `nohup`-backgrounded process; the current Claude session exits immediately after dispatch. The runner script (`drover run`, lib/drover-run.sh) is a pure shell while-loop that dispatches one worker per lane with the command, model flag and permissions in `harnesses/<harness>.json`, and never holds Claude session state. Each `claude -p` worker is its own short-lived headless context — load this file at the start of every lane.
+**Where the runner runs:** in the background. `/drover run` starts `drover run` as a background process, prints its PID and manifest path, and ends the turn; `drover run` in a shell is the same runner. The runner script (lib/drover-run.sh) is a pure shell while-loop that dispatches workers per lane with the command, model flag and permissions in `harnesses/<harness>.json`, and never holds session state. Each worker is its own short-lived headless context — load this file at the start of every lane. Progress: `drover status`.
 
 ## Required GitHub reads can pause a run
 
@@ -14,28 +14,31 @@ Check the helper's `--check` before each write, migration, or merge. Preserve
 worktrees, claims, card/approval state, and the shared local halt record. Report
 the reason locally when GitHub cannot accept a comment. Do not blindly retry a
 mutation: a lost response may conceal a successful write. Confirm its remote
-outcome once service is available before resuming. Recovery and workflow
-checkpoint limitations: [run-workflow.md](run-workflow.md#required-github-evidence-and-a-paused-run).
+outcome once service is available before resuming. After fixing access or the
+invalid query, resume explicitly with `drover github-read --resume`: it rechecks the
+failed read before clearing the marker and archives the original reason. An uncertain
+write has no automatic recovery probe: inspect the remote outcome first, then archive
+the halt record explicitly; never rerun a migration or write as a health check.
 
 ## Orchestrator delegation contract (NON-NEGOTIABLE)
 
 **Drover is an autonomous trader. The interactive Claude session that invokes `drover run` is an orchestrator, NOT a worker.** Its only jobs are:
 
 1. Verify preconditions (see table below).
-2. Spawn the headless `nohup drover run &` runner.
-3. Report runner PID + log path back to the user.
-4. Exit.
+2. Start the runner in the background: `mkdir -p .drover/runs && nohup drover run >>.drover/runs/runner.log 2>&1 &`.
+3. Report the runner PID and the manifest path (`.drover/runs/<date>-<repo>.md`) back to the user.
+4. End the turn. `--headless` is accepted and ignored for one release (it is the only mode now); say so in one line.
 
 The orchestrator MUST NOT:
 
-- Build, test, review, or fix issues itself. All product work is delegated to `claude -p` workers via `dispatch_lane`.
+- Build, test, review, or fix issues itself. All product work is delegated to the runner's headless workers via `dispatch_lane`.
 - Patch the dispatcher script or skill files unless the user explicitly asked for that change. Drift fixes belong in a follow-up issue, not a side-edit during a run dispatch.
 - Wait for workers to finish. Workers run in their own contexts and write evidence back to the issue + PR. The orchestrator's output to the user is the dispatch confirmation, not the run result.
 - Hold context for multi-card progress. Workers own the state machine via the GitHub Project board + assignee mutex + inflight lock files.
 
 If a problem surfaces during the run (bug in the dispatcher, missing skill, stuck card), the orchestrator should: (a) capture the symptom, (b) tell the user what they observed, (c) wait for explicit approval before touching anything. **Do not silently expand the task into "fix the dispatcher while you're at it" — that's the orchestrator becoming a worker.**
 
-When the user asks for diagnostics or a fix, prefer dispatching a focused `claude -p` worker (or named subagent) over doing the work in the orchestrator session, so the orchestrator's context stays small and the work stays inspectable in its own log.
+When the user asks for diagnostics or a fix, prefer a focused subagent over doing the work in the orchestrator session, so the orchestrator's context stays small and the work stays inspectable in its own log.
 
 ## Intro shown when run starts
 
@@ -78,9 +81,8 @@ label picks its path — three labels, no per-board variant:
 | `qa` | Ready → QA → Review → Done | test what already exists; skips Building |
 | none | as `feature` | the classifier adds `feature` or `bug`; it never adds `qa` |
 
-`drover-wave-plan.sh` puts `lane` (`build` / `qa` / `review`) and `labels` on every picked
-card; `drover-wave.js` sends a `qa` card from Ready straight to the Tester. The legacy runner
-reads the label of the top Ready card the same way (`card_lane`).
+The runner reads the label of the top Ready card (`card_lane`): `qa` goes straight to the
+Tester, anything else to the Builder.
 
 ```
 Builder:   Ready → Building → QA
@@ -244,9 +246,11 @@ Threads are resolved via `gh api graphql` `resolveReviewThread` mutation when th
 
 Two agents must never build the same thing, and nothing already on the base branch gets built
 twice. So before a Builder starts, a **fresh, cheap sub-agent** (no code, no worktree) checks the
-card. Workflow backend: the wave's `Pre-flight` phase does it, one agent per batch of up to 5 Ready
-cards, before `runLane('build')`. Headless runner: the Builder runs it as step 0 below,
-in a sub-agent, before touching a worktree.
+card. The runner does it before any build claim: one short agent (role `preflight`, model
+`sonnet`, `haiku` on a `low` tier) per batch of up to 5 Ready build cards, which returns one
+JSON verdict per card. The agent writes nothing; the runner posts the Block template, moves held
+and sequenced cards to Blocked, and logs one "preflight batch" manifest line per batch.
+Builders the same batch cleared may run side by side (`roles.build.max_workers`).
 
 ```
 [ ] drover gh-guard check 200
@@ -270,8 +274,8 @@ The script asks four questions and the agent adds a fifth; the agent owns the ju
 
 **Two Ready cards that overlap each other, neither with an open PR, go one at a time.** The
 lower-numbered card proceeds; only the other is sequenced, with `blocked-by: #<lower>`, and the
-wave-start sweep frees it once the lower one closes. Sequencing each against the other leaves
-both with nothing to wait on and neither built — the same deadlock comes back every wave.
+Blocked sweep frees it once the lower one closes. Sequencing each against the other leaves
+both with nothing to wait on and neither built — the same deadlock comes back every round.
 
 The agent may turn a `proceed` into a `hold` on evidence. It may turn a mechanical `hold` into
 `proceed` only by naming why the match is a different feature. Its own branch's PR
@@ -286,17 +290,29 @@ The agent may turn a `proceed` into a `hold` on evidence. It may turn a mechanic
 | `hold` — in progress | move card to Blocked | `[blocked:duplicate]` · names the open PR / card · `blocked-by: <the issue that PR or card closes>` — the sweep returns it when that closes, and pre-flight then finds it done |
 | `hold` — unclear | move card to Blocked | `[blocked:unclear]` · the missing AC or the contradiction with `file:line` · `blocked-by: -` |
 | `hold` — too big | move card to Blocked | `[blocked:too-big]` · "too big — likely over <cap> changed lines / spans <areas>" · suggests splitting with `/to-tickets` into vertical slices, each under the cap · `blocked-by: -` |
-| `sequence` — `blockedBy` non-empty | move card to Blocked | `[blocked:sequenced]` · the overlapping PR and files · `blocked-by: <blockedBy>` — the wave-start sweep frees it |
+| `sequence` — `blockedBy` non-empty | move card to Blocked | `[blocked:sequenced]` · the overlapping PR and files · `blocked-by: <blockedBy>` — the Blocked sweep frees it |
 | `sequence` — `blockedBy` empty | proceed (card stays Ready, return column `Ready`), comment `expected conflict with PR #<P> on <files> — the merge gate will rebase` | — |
 | `halted` | script exit 79: required evidence unavailable; leave the card untouched, stop this run, resume explicitly after recovery | — |
 
 A card the pre-flight agent returns no verdict for is treated as `skipped` (a verdict, not a
-column), never built unchecked. `qa` cards are not pre-flighted: nothing is built.
+column), never built unchecked; the next tick asks again. `qa` cards are not pre-flighted: nothing is built.
+
+### Classifier (before any Ready claim)
+
+A fast agent (role `classify`, model `haiku`, `sonnet` on a `high` tier) reads each Ready card
+once per run and returns `kind`, `complexity` and `risk`. The runner then:
+
+- adds `feature` or `bug` when the card has no type label (it never overrides one, never adds `qa`);
+- adds each missing risk label of `security`, `migration`, `payments`, `auth`;
+- never removes a label;
+- when it added a label, posts one comment `[orchestrator] [classify] added label <labels>` with
+  `Did: classified as <type>, complexity <tier>` and `Why: <one line>`; no comment otherwise;
+- picks the Builder's (or a `qa` card's Tester's) model from `model_tier` and the complexity:
+  `low` haiku / sonnet / opus, `medium` (default) sonnet / opus / harness default, `high` opus.
+  A role's `model` in the config wins. The Reviewer always runs on the role or harness default.
 
 ### Builder (first pass)
 
-0. Legacy backend only: run the Builder pre-flight above in a sub-agent. Anything but `proceed`
-   (or a conflict-note `sequence`) → do what its row says, release the claim, exit.
 1. Create worktree `.drover/worktrees/issue-<N>-build/` off `config.base_branch`.
 2. Create branch `issue-<N>-<slug>` from `config.base_branch` — unless one already exists
    (the card came back from Building after a stopped run): then check it out, keep its
@@ -495,7 +511,7 @@ on the base branch**.
           `migrations.human_steps`). Card Review → **Blocked** `[needs-you]`
           (block-template.md → "`[needs-you]`"), the commands copied verbatim into
           `To unblock`, label `needs-you` on issue and PR, `blocked-by: -`. When the
-          human comments `done` after the current pinned request, the wave planner
+          human comments `done` after the current pinned request, the runner
           verifies their permission and the head before resuming Review. For exits
           7 and 8, copy the gate's `approval-request:` line into the canonical issue
           block; link it from the PR without duplicating the request.
@@ -643,6 +659,20 @@ The dispatcher MUST also:
 
 The locks (assignee, in-flight file) are defense in depth: either alone has a race window; together they make a duplicate dispatch effectively impossible.
 
+## Usage pause
+
+Before each dispatch the runner runs the harness's `usage_probe` (`harnesses/<harness>.json`;
+Claude: `drover usage check --threshold <usage_pause_pct>`). At or above `usage_pause_pct`
+(default 95) it starts no new worker, lets running workers finish, and logs
+`usage pause: <n>% >= <pct>%, no new workers`; when usage drops it logs `usage resume: <n>%` and
+dispatches again. Paused rounds do not count toward the runaway halt. A harness with no probe,
+or a probe with no reading, is said once per run and never pauses.
+
+Claude's reading is the `rate_limits` block Claude Code pipes to the status line. It reaches
+the probe only if the owner's status-line command records it; add one line after it reads stdin:
+`printf '%s' "$input" | drover usage record`. Pro/Max only (API-key sessions have no
+`rate_limits`); it refreshes on the owner's interactive turns, not on headless workers.
+
 ## Halt gates
 
 | Gate | Action |
@@ -687,31 +717,36 @@ without a marker and still failed to typecheck.
 about behaviour, or resolving requires a product decision. That is a `[blocked:unclear]` or `[blocked:review]` block with the
 usual template — and, per §4, a `blocked-by:` line.
 
-### The wave-start sweep
+### The Blocked sweep and approval resume
 
-Before planning any wave, `drover-wave-plan.sh` reports five lists the orchestrator must act on
-**before** launching:
+Every fresh board read with a card in `Ready` or `Blocked` also reads the dependency graph
+(`drover-deps.sh`: the last `blocked-by:` line of a Block comment, else the issue body's
+`## Blocked by` section, plus the approval check of `drover-approval.py`). The runner then,
+before it dispatches anything that tick:
 
-- **`sweep`** — `Blocked` cards whose blockers have all closed. Move each to `Ready` and comment
-  naming what cleared it (`clearedBy` carries the numbers). They then join this very wave.
-- **`stranded`** — `Building` cards with no claim. Nothing selects from Building,
-  so a wave stopped mid-build leaves them there forever. Remove any leftover build worktree, keep
-  the branch, move the card to `Ready`, and comment naming the branch. The legacy dispatcher does
-  the same once at start (`reclaim_stranded_building`).
-- **`resume`** — `[needs-you]` `Blocked` cards whose newest pinned request has a later `done`
+- **unblocks** a `Blocked` card whose `blocked-by:` issues have all closed: moves it to `Ready`,
+  comments `[orchestrator] [report] moved back to Ready · blocker closed`, and logs
+  `unblocked #<n>: blocker #<m> closed, back to Ready`. It is claimed on the next tick.
+  A card with `blocked-by: -` waits for a person and is never swept.
+- **resumes** a `[needs-you]` `Blocked` card whose newest pinned request has a later `done`
   from a human with verified write, maintain or admin permission, for the current
-  PR head. Move each to **Review**; `needs-you:done` may be kept as a display label
-  only. Do not create or copy approval evidence. The Reviewer re-runs the gate,
+  PR head: moves it to **Review** and logs `approval resume #<n>: owner approved head <sha7>,
+  back to Review`. `needs-you:done` is a display label only. The Reviewer re-runs the gate,
   which independently checks the request, current policy/steps and head, verifies
   the build, and runs allowed migrations. New code or a newer request needs fresh
   human approval; a label or old bare comment cannot bypass that hold.
-- **`refreshApproval`** — a PR head changed while its card was still `Blocked`.
-  Move it to **Review** and remove stale `needs-you:done` display labels. The Reviewer
-  reviews the new code and lets the gate produce a new pinned request, then returns
-  it to **Blocked** for a fresh human reply. This is not an approved resume.
-- **`flag`** — cards whose `## Blocked by` section could not be parsed. Leave them where they are
-  and comment asking for the line to be fixed, quoting the `why`. Never guess: a card treated as
-  free on an unreadable line gets built against a base that does not have what it needs.
+- **refreshes** a card whose PR head changed while it was `Blocked`: moves it to **Review** with a
+  comment that the old approval does not cover the new head. The Reviewer reviews the new code
+  and lets the gate produce a new pinned request, then returns it to **Blocked** for a fresh
+  human reply. This is not an approved resume.
+- **holds** a `Ready` card whose blockers are still open, whose `## Blocked by` line cannot be
+  parsed, or which the graph does not know: it is not claimed. An unreadable line gets one comment
+  per run asking for `- #N` bullets or `- None.`. Never guess: a card treated as free on an
+  unreadable line gets built against a base that does not have what it needs.
+
+`Building` cards with no claim and no live worker go back to `Ready` too
+(`reclaim_stranded_building`, at start and after every fresh board read): nothing selects from
+Building. A leftover build worktree is removed only when it is clean; the branch is kept.
 
 **Why the sweep exists.** `Blocked` used to be terminal. A card parked naming the issue it waited
 for, that issue later merged, and nothing ever read the note back — the run's own done-condition

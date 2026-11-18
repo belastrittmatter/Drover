@@ -7,21 +7,21 @@ Part of the [drover spec](README.md).
 | ID | Must keep working | Source @ d0b7d5a | Test |
 |---|---|---|---|
 | FR-RUN-1 | `run` checks preconditions before any dispatch and changes nothing if one fails: config, board and columns, `gh` scopes, clean tree on base, usable `verify_commands`, no leftover workers, database reach | `references/run.md` "Preconditions" | `test-run-gates.sh`, `test_verification_readiness.py` |
-| FR-RUN-3 | Dispatch order Review, then QA, then Build | `references/run.md` "Dispatch allocation" | `test-wave-plan.sh` |
+| FR-RUN-3 | Dispatch order Review, then QA, then Build | `references/run.md` "Dispatch allocation" | `test_run_ports.py` (`test_preflight_verdicts`) |
 | FR-RUN-4 | A card is claimed by setting the issue assignee before a worker starts; a failed claim skips the card | `scripts/super-board-run.sh` `try_claim_assignee` | `test-run-gates.sh` |
-| FR-RUN-5 | Pre-flight before any build claim: one cheap agent per batch of up to 5 Ready cards; verdict proceed / hold (done, in progress, unclear, too big) / sequence; no verdict means not built | `references/run.md` "Builder pre-flight", `scripts/super-board-preflight.sh` | `test-preflight.sh`, `test-wave-preflight.sh` |
+| FR-RUN-5 | Pre-flight before any build claim: one cheap agent per batch of up to 5 Ready cards; verdict proceed / hold (done, in progress, unclear, too big) / sequence; no verdict means not built | `references/run.md` "Builder pre-flight", `scripts/super-board-preflight.sh` | `test-preflight.sh`, `test_run_ports.py` |
 | FR-RUN-6 | Two overlapping Ready cards without open PRs: lower number builds, the other is sequenced `blocked-by:` it | `references/run.md` "Builder pre-flight" | `test-preflight.sh` |
 | FR-RUN-9 | GraphQL quota below 200 waits for reset | `scripts/super-board-gh-guard.sh` | `test_github_reads.py` |
 | FR-RUN-10 | `stop` comments "stopped mid-flight" on in-flight issues and PRs, releases claims, stops workers, keeps branches, PRs and worktrees | `references/stop.md`, `scripts/super-board-stop.sh` | none (add in stage 0) |
 | FR-RUN-11 | `run` after a stop continues existing branches and PRs | `references/run.md` builder step 2 | none (add in stage 0) |
 | FR-RUN-12 | After `rebuild_cap` (default 2) bounces a card goes to Blocked `[blocked:rebuild-cap]` | `references/run.md` reviewer step 7 | none |
 
-FR-RUN-5's batch before any claim exists only in the `workflow` backend
+FR-RUN-5's batch before any claim existed only in upstream's `workflow` backend
 (`workflows/super-board-wave.js:206-284`). Upstream's `claude-p` runner
-has the builder run pre-flight itself, one card at a time, after the claim
-(`references/run.md` "Builder pre-flight"). Stage 6 moves the batch into
-the runner; for the runner this is new behaviour, with `workflow` as the
-reference.
+had the builder run pre-flight itself, one card at a time, after the claim
+(`references/run.md` "Builder pre-flight"). Stage 6 moved the batch into
+the runner (`lib/drover-run.sh` `preflight_ok`), with the `workflow` backend
+as the reference, and deleted that backend.
 
 ## New or changed
 

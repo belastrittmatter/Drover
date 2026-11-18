@@ -378,7 +378,7 @@ two complete builds. In order, no shortcuts:
    **Exit 79 — required GitHub evidence unavailable:** stop the current run. Leave
    the card, approval, claims, and worktree intact. Report the local halt reason;
    do not classify missing data as safe, bounce it to Build, or post a new approval
-   request. Explicit recovery is in run-workflow.md → Required GitHub evidence.
+   request. Explicit recovery is in run.md → Required GitHub reads can pause a run.
 
    `gh pr view <PR> --json state,mergeCommit` must report `MERGED` plus a commit sha,
    and that sha must be an ancestor of the base branch

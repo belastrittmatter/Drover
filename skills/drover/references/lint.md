@@ -116,7 +116,7 @@ choices already settled by an applicable design record keep the normal path.
 Both were added on 2026-08-20 after a real board stalled on them. They are different from 1–12:
 those judge whether a **human** can act on a ticket, these judge whether the **loop** can.
 
-**13 — the dependency line.** The wave planner reads `## Blocked by` to decide what may start and to
+**13 — the dependency line.** The runner reads `## Blocked by` to decide what may start and to
 sweep cards whose blockers have closed. Three shapes defeat it, and all three were on the board:
 
 | On the ticket | A human reads | The planner reads |

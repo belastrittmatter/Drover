@@ -174,11 +174,6 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    git or gh → halt: "Without <tool> the board can't <why>. Your answers are saved — run
    │    the command, then re-run onboard."
    ├─ Re-check (`check --text`) after every install; move on only when it says all green.
-   ├─ Workflow runtime: syntax-check the installed workflow (same command run.md uses):
-   │      { echo '(async function(){'; sed 's/^export const meta/const meta/' \
-   │        "$(drover config home)/workflows/drover-wave.js"; echo '})'; } | node --check --input-type=module
-   │    Fails → halt (error table). Remind once: dynamic
-   │    workflows must be ON in /config.
    └─ OLDER DROVER (the result says `upgraded: true`): same rule, no question. Header
       `1 of 7 · Checks — found drover v<from>; upgrading to v<pack>.` and the list:
           Upgraded for you (backup: .claude/drover/backup/<ts>/)
@@ -298,11 +293,9 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
        failure is fixed here, not discovered at the first merge. For Supabase the URL is the
        Session pooler string (port 5432) with special characters in the password URL-encoded,
        and a just-reset password takes ~20 s to reach the pooler — retry once before calling it wrong.
-   Permission lines (in-session runs; headless workers get theirs from harnesses/claude.json):
-   the base list in run-workflow.md → "Mid-run permission prompts" (`Bash(drover:*)` covers every
-   drover command, the gate included), plus "Bash(gh pr merge:*)" when merge_policy.default is
-   "auto", one "Bash(<migrate command>)" per allowed env and the test runner. N counts what is NOT
-   already in settings.local.json: `drover settings allow .claude/settings.local.json <rules…> --dry-run`.
+   Permission lines (the session that starts runs; headless workers get theirs from
+   harnesses/claude.json): `Bash(drover:*)`, which covers every drover command, `drover run`
+   and the gate included. N counts what is NOT already in settings.local.json: `drover settings allow .claude/settings.local.json <rules…> --dry-run`.
 
 6. BUG SOURCES — tick sources; "Add another source" is the free-text box
    ├─ AskUserQuestion multiSelect "Where should I look for problems?" (header "Bug sources"):
@@ -386,7 +379,6 @@ answers are kept and it resumes at <step>".
 | 1 | `drover` not on PATH | `drover isn't installed. Run ./install.sh from a drover checkout, then re-run onboard.` |
 | 1 | A tool install declined (git, gh) | `Without <tool> the board can't <why>. Your answers are saved — run <command>, then re-run onboard.` |
 | 1 | Node declined, or `npx skills add` fails | `Required worker skills remain unavailable: <exact names>. Install for <host> and restart.` Setup stays red; dispatch halts before claims. |
-| 1 | Workflow fails `node --check` | `workflows/drover-wave.js in the drover install folder is corrupt. Run git pull there — don't hand-edit it.` |
 | 1 | settings.local.json invalid JSON | `.claude/settings.local.json is not valid JSON; I left it untouched. Fix it, then re-run — only the settings entries repeat.` |
 | 2 | Scope refused in the browser | `GitHub asked for project,read:project,repo and you said no. Without them I can't read or move cards. Re-run: gh auth refresh -s project,read:project,repo.` |
 | 2 | Repo create refused | `GitHub refused to create the repo (org admin required, or the free-repo quota). Pick an existing repo, or create one in the web UI, then re-run.` |
@@ -426,7 +418,6 @@ remove a pending recovery record; use its saved state to reconcile a conflict be
    Building, QA, Review, Blocked, Done (no Skipped); `gh label list` has qa, bug, feature.
 4. **Setup green** — `drover setup check` exits 0 (or only `needs`
    the user declined).
-5. **Workflow runtime** — the step-1 `node --check` passes.
 
 Any check fails → no completion screen: name the failed check and say "re-run `/drover onboard` — it resumes there".
 

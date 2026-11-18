@@ -29,7 +29,7 @@ RUNNER = ROOT / "lib/drover-run.sh"
 # run.md sections for the orchestrator and the runner itself, not for a worker.
 RUNNER_SECTIONS = re.compile(r"^##+ (Orchestrator delegation|Intro shown|Preconditions|Lanes and label routing|"
                              r"Dispatch allocation|Per-tick logic|Done conditions|Run manifest|Notification cadence|"
-                             r"Anti-zombie addendum)")
+                             r"Anti-zombie addendum|Usage pause|The Blocked sweep|Classifier)")
 ROLE_FILES = sorted(
     [ROOT / f"skills/drover-{r}/SKILL.md" for r in ("build", "qa", "review")]
     + [p for r in ("build", "qa", "review") for p in (ROOT / f"skills/drover-{r}/references").glob("*.md")]

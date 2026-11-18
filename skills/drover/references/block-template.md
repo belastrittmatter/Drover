@@ -10,7 +10,7 @@
 | Done (closed as not planned) | Card dropped on purpose: out of scope, wrong place, won't do | Any lane; `[dropped]` comment below |
 
 Once moved, the card waits. **A card blocked only on other cards no longer waits for a human:**
-the wave planner sweeps `Blocked` at the start of every wave, and any card whose `## Blocked by`
+the runner sweeps `Blocked` on every fresh board read, and any card whose `blocked-by:`
 issues have all closed is moved back to `Ready` automatically, with a comment saying what cleared
 it. Everything else — credentials, permissions, product decisions — still waits for a person.
 

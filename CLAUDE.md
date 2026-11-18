@@ -11,16 +11,18 @@ Worktree cleanup (`hooks/cleanup-wt.py`) is a hook, not a skill.
 **`drover` is an autonomous trader. The interactive Claude session that invokes `/drover run` is an *orchestrator*, NOT a worker.** Its only jobs are:
 
 1. Verify preconditions (clean git, no orphan workers, GraphQL quota, etc.).
-2. Dispatch:
-   - default: stay in-session and run the wave loop in `skills/drover/references/run-workflow.md`: plan a wave, claim assignees, launch the `drover-wave` dynamic workflow, reconcile, repeat. Lane agents inside the workflow do all product work.
-   - `--headless`: spawn the headless runner `nohup drover run &`, report PID + log path, exit. Workers start with the command, model flag and permissions in `harnesses/<harness>.json`.
-3. Report back to the user (dispatch confirmation, or one status line per wave).
+2. Dispatch: start the runner in the background (`mkdir -p .drover/runs && nohup drover run >>.drover/runs/runner.log 2>&1 &`). Its
+   headless workers do all product work; they start with the command, model flag and
+   permissions in `harnesses/<harness>.json`. `--headless` is accepted and ignored for one
+   release (it is the only mode now).
+3. Report back to the user: the runner PID and the manifest path, then end the turn. Progress is
+   `drover status`.
 
 The orchestrator MUST NOT:
 
-- Build, test, review, or fix issues itself. All product work is delegated to workflow lane agents (or headless workers from `drover run`).
+- Build, test, review, or fix issues itself. All product work is delegated to the runner's headless workers.
 - Patch the dispatcher script or skill files mid-run, even if it sees a problem. Capture the symptom and tell the user; wait for explicit approval.
-- Wait on individual workers or relay their work. They write their evidence back to the GitHub issue + PR. The orchestrator's user-facing output is the dispatch confirmation (headless) or one short report per wave (workflow), not the run result.
+- Wait on the runner or its workers, or relay their work. They write their evidence back to the GitHub issue + PR. The orchestrator's user-facing output is the dispatch confirmation, not the run result.
 - Hold context for multi-card progress. State lives on the GitHub Project board + the inflight lockfiles, not in the orchestrator's session.
 
 If a problem surfaces during the run, the orchestrator's reply is: "I saw X. Want me to dig in or stop the runner?" — not "I went ahead and fixed it."
@@ -60,15 +62,15 @@ lib/                       runner, card, gate, preflight, status, setup, config,
 harnesses/claude.json      worker command, model flag, skill folders, hooks, usage probe, permissions
 hooks/                     guard hooks + cleanup-wt.py, wired per harness
 skills/<all nine>/
-workflows/                 drover-wave.js, ui-refine-loop.js
+workflows/                 ui-refine-loop.js (the standalone ui-refine-loop skill)
 ```
 
 ## Board shape (v3.0.0)
 
 Columns are always Backlog · Ready · Building · QA · Review · Blocked · Done — no Skipped, no
 per-board `variant`. Labels `qa` · `bug` · `feature` route cards: `qa` skips Building, everything
-else (and no label) is built. Change routing in `lib/drover-wave-plan.sh`,
-`workflows/drover-wave.js` and `run.md` → "Lanes and label routing" together.
+else (and no label) is built. Change routing in `lib/drover-run.sh` (`card_lane`) and
+`run.md` → "Lanes and label routing" together.
 
 Skills call the dispatcher scripts as `drover <command>`; a headless worker's permissions
 (`harnesses/claude.json`) must cover every command a role's rules name (`tests/test_harness_permissions.py`).
