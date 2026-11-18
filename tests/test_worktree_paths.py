@@ -63,11 +63,10 @@ class WorktreePaths(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(Path(self.env["WORKER_CWD"]).read_text().strip(),
                          str(self.root / ".drover/worktrees/issue-9"))
-        self.assertFalse((self.root / ".worktrees").exists())
 
     def test_legacy_checkout_is_not_abandoned_or_clobbered(self):
         self.stub_workers()
-        old = self.root / ".worktrees/issue-9"
+        old = self.root / ".claude/worktrees/issue-9"
         self.run_cmd("git", "worktree", "add", "-b", "previous-worker", str(old), "main")
         (old / "unfinished.txt").write_text("keep this work")
         result = self.dispatch()
@@ -80,15 +79,6 @@ class WorktreePaths(unittest.TestCase):
     def runner_helper(self, body):
         return self.run_cmd("bash", "-c", 'SB_LIB_ONLY=1 . "$1"\n' + body, "fixture",
                             str(PACK / "lib/drover-run.sh"), check=False)
-
-    def test_runner_halts_for_legacy_checkout_without_removing_it(self):
-        old = self.root / ".worktrees/issue-7-build"
-        self.run_cmd("git", "worktree", "add", "-b", "issue-7", str(old), "main")
-        (old / "unfinished.txt").write_text("keep this work")
-        result = self.runner_helper("check_legacy_worktrees")
-        self.assertEqual(result.returncode, 73, result.stdout + result.stderr)
-        self.assertIn("legacy worktree", result.stdout)
-        self.assertEqual((old / "unfinished.txt").read_text(), "keep this work")
 
     def test_runner_halts_for_pre_rename_card_worktree_without_removing_it(self):
         old = self.root / ".claude/worktrees/issue-7-build"

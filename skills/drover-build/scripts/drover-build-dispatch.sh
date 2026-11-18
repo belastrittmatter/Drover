@@ -83,9 +83,9 @@ PROMPT_FILE="$LOG_DIR/issue-$N.prompt.md"
 
 
 # Refuse to clobber an existing worktree/branch silently
-if [[ -e ".worktrees/issue-$N" ]]; then
-  echo "error: legacy worktree .worktrees/issue-$N exists — inspect it before resuming" >&2
-  echo "       Stop its worker, preserve edits, then git worktree move .worktrees/issue-$N $WORKTREE_DIR" >&2
+if [[ -e ".claude/worktrees/issue-$N" ]]; then
+  echo "error: legacy worktree .claude/worktrees/issue-$N exists — inspect it before resuming" >&2
+  echo "       Stop its worker, preserve edits, then git worktree move .claude/worktrees/issue-$N $WORKTREE_DIR" >&2
   exit 64
 fi
 if [[ -e "$WORKTREE_DIR" ]]; then
