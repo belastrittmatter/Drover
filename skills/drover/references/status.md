@@ -266,7 +266,7 @@ the `blocked:` prefix. The tags are the ones in `lib/drover-reasons.json`
 ### §G — Recent-events section format
 
 Tail the last 5 state-transition lines from the most recent run manifest
-(`docs/drover/runs/<YYYY-MM-DD>-<slug>.md`). Reformat each as:
+(`.drover/runs/<YYYY-MM-DD>-<slug>.md`). Reformat each as:
 
 ```
    T-<Nm>    <verb>      #<NNN> → <Target>  <detail>
@@ -363,7 +363,7 @@ the script is missing.
   read its tag as in §F. Cache results during the snapshot — do
   not re-read mid-render.
 - **Recent events:** tail the most recent run manifest at
-  `docs/drover/runs/<YYYY-MM-DD>-<slug>.md`. Filter to state-transition
+  `.drover/runs/<YYYY-MM-DD>-<slug>.md`. Filter to state-transition
   lines (§G); skip `tick —` lines. Take the last 5 after filtering.
 - **Health:**
   - `Last tick` — most recent `tick —` line in today's manifest.

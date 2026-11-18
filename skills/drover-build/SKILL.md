@@ -203,7 +203,7 @@ The preamble at `references/worker-preamble.md` is the worker contract: decision
 
 If the user invokes `/drover-build` after a partial run:
 - Re-read `gh issue list`. Issues already closed are skipped automatically.
-- If legacy `.worktrees/issue-N` exists, stop and inspect it before dispatch. Preserve edits and use `git worktree move` to the matching `.drover/worktrees/issue-N` path; never delete the old folder to make a fresh dispatch fit.
+- If a pre-rename `.claude/worktrees/issue-N` exists, stop and inspect it before dispatch. Preserve edits and use `git worktree move` to the matching `.drover/worktrees/issue-N` path; never delete the old folder to make a fresh dispatch fit.
 - If `.drover/worktrees/issue-N` exists for an N that's still open: a previous worker was interrupted. Default: notify the user and ask before auto-resuming (a re-dispatch overwrites the previous attempt's branch).
 - If the `loop:in-progress` label is set on issue N but no worktree exists: stale lock from a crashed orchestrator. Remove the label and treat as ready.
 

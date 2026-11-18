@@ -176,7 +176,7 @@ tick, closed-without-merge, runs in `.drover/runs/`, and the stage 5 smoke fixes
 `permissions.allow_commands`). 6b: the ports, deleting the workflow and Codex
 backends, usage pause, FactoryBench.
 
-- `lib/worker.sh start|alive|stop` with the `process` backend; route every
+- `lib/drover-worker.sh start|alive|stop` with the `process` backend; route every
   `nohup claude -p`, `kill -0` and `pgrep` site in the runner and stop
   scripts through it. Lock files store `HANDLE=` (read old `PID=` too).
 - `max_workers` per role: replace the single `BUILD_PID`/`QA_PID`/
