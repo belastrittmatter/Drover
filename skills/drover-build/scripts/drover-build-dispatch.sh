@@ -7,19 +7,20 @@
 #          REPO_DIR    (optional) — defaults to PWD; the working repo root
 #          SKILL_DIR   (optional) — defaults to the dir this script lives in's parent
 #          MAX_TURNS   (optional) — default 250
+#          CONFIG_PATH (optional) — drover config; defaults to the one .claude/drover/active names
 #   - Side effects:
 #       * git worktree add -b loop/issue-N .drover/worktrees/issue-N BASE_BRANCH
 #       * runs `claude -p` inside that worktree with the composed prompt
 #       * captures stdout+stderr to .planning/drover-build-logs/issue-N.log
 #   - Exit codes:
-#       0  success           — worker produced `🔧 [chore] loop: close #N` commit on loop/issue-N
-#       2  worker non-zero   — `claude -p` exited non-zero AND no recognizable done/WIP marker
-#       3  no done-commit    — `claude -p` exited zero but no `🔧 [chore] loop: close #N` commit
+#       0  success           — a commit on loop/issue-N carries the body trailer `Drover: done #N`
+#       2  worker non-zero   — `claude -p` exited non-zero AND no done/partial trailer
+#       3  no done-commit    — `claude -p` exited zero but no `Drover: done #N` trailer
 #       4  HUMAN GATE        — log contains `HUMAN GATE TRIPPED:`
 #       5  WIP-PARTIAL       — log final assistant message starts with `WIP-PARTIAL:` AND
-#                              a `🚧 [wip] loop: #N partial` commit exists on the branch
-#   Subjects follow writing-standard.md § 1. The old `chore(loop):` / `wip(loop):` shapes
-#   are still accepted so a branch started before the switch is not read as a failure.
+#                              a commit on the branch carries `Drover: partial #N`
+#   Done and partial come from the commit body trailer only (writing-standard.md § 1),
+#   never from the subject: the subject follows the repo's commit_style.
 #
 # Notes:
 #   - The dispatcher never merges, never closes the issue, never edits labels — those
@@ -46,6 +47,11 @@ if [[ -z "$BASE_BRANCH" ]]; then
 fi
 
 REPO_DIR="${REPO_DIR:-$PWD}"
+CONFIG_PATH="${CONFIG_PATH:-}"
+if [[ -z "$CONFIG_PATH" && -f "$REPO_DIR/.claude/drover/active" ]]; then
+  CONFIG_PATH="$REPO_DIR/.claude/drover/configs/$(tr -d '[:space:]' < "$REPO_DIR/.claude/drover/active").json"
+fi
+[[ -f "$CONFIG_PATH" ]] || CONFIG_PATH=""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="${SKILL_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 MAX_TURNS="${MAX_TURNS:-250}"
@@ -115,6 +121,8 @@ ISSUE_BODY=$(printf '%s' "$ISSUE_JSON" | jq -r '.body')
 {
   printf 'First operation: repeat drover-skills-ready.py --root %s --host claude --cards - --lane build with %s as stdin. Halt on exit 10 before any lifecycle writes. Recheck conditional helpers with --require before use.\n' "$REPO_DIR" "$CARD_JSON"
   cat "$PREAMBLE"
+  # FR-CNV-2: the repo's commit style and three real subjects from the base branch.
+  printf '\n%s\n' "$(python3 "$SB_BIN/drover-commit-style.py" --root "$REPO_DIR" --base "$BASE_BRANCH" ${CONFIG_PATH:+--config "$CONFIG_PATH"} --prompt 2>/dev/null || true)"
   printf '\n# Issue #%s — %s\n\n' "$N" "$ISSUE_TITLE"
   printf '%s\n' "$ISSUE_BODY"
   printf '\n---\n\n'
@@ -131,7 +139,7 @@ fi
 # Record the base SHA so we can diff afterward
 BASE_SHA=$(git -C "$WORKTREE_DIR" rev-parse HEAD)
 
-echo "▶︎ dispatching worker for issue #$N — worktree $WORKTREE_DIR — base $BASE_BRANCH @ ${BASE_SHA:0:7}" | tee -a "$LOG_FILE"
+echo "dispatching worker for issue #$N — worktree $WORKTREE_DIR — base $BASE_BRANCH @ ${BASE_SHA:0:7}" | tee -a "$LOG_FILE"
 
 # Run the worker. stdin gets the composed prompt; stdout+stderr both stream to the log.
 # We do NOT use --output-format stream-json here because we want a plain-text log we
@@ -145,47 +153,55 @@ WORKER_EXIT=0
     < "$PROMPT_FILE"
 ) >>"$LOG_FILE" 2>&1 || WORKER_EXIT=$?
 
-echo "▶︎ worker for issue #$N exited with code $WORKER_EXIT" | tee -a "$LOG_FILE"
+echo "worker for issue #$N exited with code $WORKER_EXIT" | tee -a "$LOG_FILE"
 
 # Inspect outcome on the worker branch
 HEAD_SHA=$(git -C "$WORKTREE_DIR" rev-parse HEAD)
 COMMITS_RANGE="${BASE_SHA}..${HEAD_SHA}"
 
+# "<sha> <subject>" of the newest commit in COMMITS_RANGE whose BODY (never the subject)
+# has the line `Drover: <kind> #N` (FR-CNV-6). Records end in 0x1e, fields split on 0x1f.
+trailer_commit() {
+  git -C "$WORKTREE_DIR" log --format='%H%x1f%s%x1f%b%x1e' "$COMMITS_RANGE" 2>/dev/null \
+    | awk -v RS='\036' -v FS='\037' -v want="Drover: $1 #$N" '
+        { n = split($3, lines, "\n")
+          for (i = 1; i <= n; i++) { l = lines[i]; sub(/[ \t\r]+$/, "", l)
+            if (l == want) { sha = $1; gsub(/[^0-9a-f]/, "", sha); print sha " " $2; exit } } }'
+}
+
 CLOSE_COMMIT=""
 WIP_COMMIT=""
 if [[ "$BASE_SHA" != "$HEAD_SHA" ]]; then
-  CLOSE_COMMIT=$(git -C "$WORKTREE_DIR" log --format="%H %s" "$COMMITS_RANGE" 2>/dev/null \
-    | grep -E "^[0-9a-f]+ ([^ ]+ \[chore\] loop|chore\(loop\)): close #$N( |$)" | head -1 || true)
-  WIP_COMMIT=$(git -C "$WORKTREE_DIR" log --format="%H %s" "$COMMITS_RANGE" 2>/dev/null \
-    | grep -E "^[0-9a-f]+ ([^ ]+ \[wip\] loop|wip\(loop\)): #$N partial" | head -1 || true)
+  CLOSE_COMMIT=$(trailer_commit done || true)
+  WIP_COMMIT=$(trailer_commit partial || true)
 fi
 
 # Detect HUMAN GATE in log
 if grep -q "HUMAN GATE TRIPPED:" "$LOG_FILE"; then
-  echo "▶︎ HUMAN GATE TRIPPED detected in log for issue #$N" | tee -a "$LOG_FILE"
+  echo "HUMAN GATE TRIPPED detected in log for issue #$N" | tee -a "$LOG_FILE"
   exit 4
 fi
 
 # Detect WIP-PARTIAL: requires both the literal log marker AND a wip commit
 if [[ -n "$WIP_COMMIT" ]] && grep -q "^WIP-PARTIAL:" "$LOG_FILE"; then
-  echo "▶︎ WIP-PARTIAL detected for issue #$N: $WIP_COMMIT" | tee -a "$LOG_FILE"
+  echo "WIP-PARTIAL detected for issue #$N: $WIP_COMMIT" | tee -a "$LOG_FILE"
   exit 5
 fi
 
-# Detect success: a `[chore] loop: close #N` commit is present
+# Detect success: a commit carries the `Drover: done #N` trailer
 if [[ -n "$CLOSE_COMMIT" ]]; then
   if [[ "$WORKER_EXIT" -ne 0 ]]; then
-    echo "▶︎ worker exited non-zero ($WORKER_EXIT) but produced close-commit; treating as success" | tee -a "$LOG_FILE"
+    echo "worker exited non-zero ($WORKER_EXIT) but produced close-commit; treating as success" | tee -a "$LOG_FILE"
   fi
-  echo "▶︎ success: $CLOSE_COMMIT" | tee -a "$LOG_FILE"
+  echo "success: $CLOSE_COMMIT" | tee -a "$LOG_FILE"
   exit 0
 fi
 
 # No done-commit
 if [[ "$WORKER_EXIT" -ne 0 ]]; then
-  echo "▶︎ worker failed (exit $WORKER_EXIT) with no done-commit" | tee -a "$LOG_FILE"
+  echo "worker failed (exit $WORKER_EXIT) with no done-commit" | tee -a "$LOG_FILE"
   exit 2
 fi
 
-echo "▶︎ worker exited 0 but produced no [chore] loop: close #$N commit" | tee -a "$LOG_FILE"
+echo "worker exited 0 but no commit carries Drover: done #$N" | tee -a "$LOG_FILE"
 exit 3

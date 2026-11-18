@@ -5,7 +5,7 @@
 
 ---
 
-## ⚡ Fast path — prefer this
+## Fast path — prefer this
 
 If `.claude/bin/drover-status.py` exists:
 
@@ -73,7 +73,7 @@ editing the script and need to confirm the locked template.
 ## Intro shown when status starts
 
 ```
-📊 drover status
+drover status
 ────────────────────────────────────────────────────────────────────────────────
 ```
 
@@ -84,11 +84,11 @@ editing the script and need to confirm the locked template.
 This is a **template, not an example**. Print every section, in this order,
 every time — even when counts are zero. Width is fixed at 80 columns. The
 sample below is rendered against live data, but the structure is what's
-locked: section labels, box layout, emoji, timestamp format, empty-state
+locked: section labels, box layout, lane and reason tags, timestamp format, empty-state
 strings. Do **not** improvise.
 
 ```
-📊 drover · <Project Title> (#<number>)
+drover · <Project Title> (#<number>)
 ────────────────────────────────────────────────────────────────────────────────
 config: <slug>   labels: qa · bug · feature   base: <base_branch>
 mode:   <auto-merge|human-approves>        truth gate: <off|non-trivial (≥N)|always>
@@ -109,7 +109,7 @@ mode:   <auto-merge|human-approves>        truth gate: <off|non-trivial (≥N)|a
 │ <card lines>                                                                 │
 └──────────────────────────────────────────────────────────────────────────────┘
 ┌─ Blocked  [N] ───────────────────────────────────────────────────────────────┐
-│ <card lines with reason glyph>                                               │
+│ <card lines with reason tag>                                                 │
 └──────────────────────────────────────────────────────────────────────────────┘
 ┌─ Done     [N] ───────────────────────────────────────────────────────────────┐
 │ <collapsed line — see §D>                                                    │
@@ -119,6 +119,7 @@ mode:   <auto-merge|human-approves>        truth gate: <off|non-trivial (≥N)|a
    <one line per in-flight worker — see §E>
 
 ▎Block reasons
+   Blocked <n> · <tag> <count> · <tag> <count> …
    <one line per reason tag — see §F>
 
 ▎Recent  (last 5 manifest events)
@@ -131,7 +132,7 @@ mode:   <auto-merge|human-approves>        truth gate: <off|non-trivial (≥N)|a
 ### Sample render (today's live board)
 
 ```
-📊 drover · My App Board (#1)
+drover · My App Board (#1)
 ────────────────────────────────────────────────────────────────────────────────
 config: my-app-drover   labels: qa · bug · feature   base: staging
 mode:   auto-merge                 truth gate: non-trivial (≥70)
@@ -140,38 +141,39 @@ mode:   auto-merge                 truth gate: non-trivial (≥70)
 │ #33 #31 #30   (not started, collapsed)                                       │
 └──────────────────────────────────────────────────────────────────────────────┘
 ┌─ Ready    [1] ───────────────────────────────────────────────────────────────┐
-│ 🔨 #26  Strip nav + editor groups from command palette            ↻ 2/3      │
+│ [B] #26  Strip nav + editor groups from command palette                ↻ 2/3 │
 └──────────────────────────────────────────────────────────────────────────────┘
 ┌─ Building [0] ───────────────────────────────────────────────────────────────┐
 │ (empty)                                                                      │
 └──────────────────────────────────────────────────────────────────────────────┘
 ┌─ QA       [2] ───────────────────────────────────────────────────────────────┐
-│    #24  Unify status options across Ads and Organic                          │
-│ 🔍 #29  Organic video detail modal — create + edit-ready          ↻ 1/3      │
+│     #24  Unify status options across Ads and Organic                         │
+│ [Q] #29  Organic video detail modal — create + edit-ready              ↻ 1/3 │
 └──────────────────────────────────────────────────────────────────────────────┘
 ┌─ Review   [0] ───────────────────────────────────────────────────────────────┐
 │ (empty)                                                                      │
 └──────────────────────────────────────────────────────────────────────────────┘
 ┌─ Blocked  [1] ───────────────────────────────────────────────────────────────┐
-│ 🛡 #25  Add Controle page — gated on #24                                     │
+│ sequenced #25  Add Controle page                                             │
 └──────────────────────────────────────────────────────────────────────────────┘
 ┌─ Done     [9] ───────────────────────────────────────────────────────────────┐
 │ #20 #18 #7 #6 #5 #4 #3 #2 #1   (squash-merged, collapsed)                    │
 └──────────────────────────────────────────────────────────────────────────────┘
 
 ▎Workers  (claim: LucariusWest · 2/3 active)
-   🔨 Builder  #26  attempt 2/3 · 6m · loop:rebuild-1
-   🔍 Tester   #29  attempt 1/3 · 6m
+   [B] Builder   #26  attempt 2/3 · 6m · loop:rebuild-1
+   [Q] Tester    #29  attempt 1/3 · 6m
 
 ▎Block reasons
-   🛡 ×1  dependency gate    #25 → waiting on #24
+   Blocked 1 · sequenced 1
+   sequenced    #25
 
 ▎Recent  (last 5 manifest events)
-   T-6m    🔨 dispatch  #26 → Builder  attempt 2/3
-   T-6m    🔍 dispatch  #29 → Tester   attempt 1/3
-   T-6m    ♻ reap      #29 stale lock + assignee swept
-   T-16m   ♻ reap      #26 stale lock + assignee swept
-   T-22m   🔨 dispatch  #29 → Builder  attempt 1/3
+   T-6m    dispatch  #26  → Building  attempt 2/3
+   T-6m    dispatch  #29  → QA        attempt 1/3
+   T-6m    reap      #29            stale lock + assignee swept
+   T-16m   reap      #26            stale lock + assignee swept
+   T-22m   dispatch  #29  → Building  attempt 1/3
 
 ▎Health
    last tick: 93s ago    run started: 67m ago    workers: 2/3    worktrees cleaned: 5
@@ -211,18 +213,18 @@ mode:   auto-merge                 truth gate: non-trivial (≥70)
 Inside a Kanban box, one line per issue:
 
 ```
-│ <glyph> #<NNN>  <title…>                                    <suffix>      │
+│ <lane> #<NNN>  <title…>                                     <suffix>      │
 ```
 
-- **glyph** (2 visual cells + space): the lane glyph (`🔨`/`🔍`/`✏️`) if the issue
-  is in-flight (claim assignee + `loop:in-{builder,tester,reviewer}` label),
-  else three spaces. **This glyph is the highlight** — no separate "active in
-  column X" callout needed.
+- **lane** (3 cells + space): the lane tag (`[B]`/`[Q]`/`[R]`) if the issue
+  is in-flight (a `dispatch lane=` line in today's manifest with no later reap
+  or zombie line), else three spaces. **This tag is the highlight** — no
+  separate "active in column X" callout needed. In Blocked, the reason tag's
+  short name (§F) takes this place.
 - **#NNN**: issue number, left-padded to keep title column aligned.
 - **title**: truncated to `…` to fit the remaining budget after the suffix.
 - **suffix** (right-justified):
   - In-flight rebuild: `↻ N/3` (from `loop:rebuild-N` label)
-  - Blocked: `— <reason glyph> <short reason>` or `— gated on #N`
   - Otherwise: empty
 
 ### §D — Backlog and Done collapsing
@@ -237,7 +239,7 @@ than ~12 issues at 80-col width, truncate with `… +N more` at the end.
 One line per in-flight worker, sorted by lane (Builder, Tester, Reviewer):
 
 ```
-   <glyph> <Role-padded-to-8>  #<NNN>  attempt <a>/3 · <Nm> · <extra-labels>
+   <lane> <Role-padded-to-8>  #<NNN>  attempt <a>/3 · <Nm> · <extra-labels>
 ```
 
 Where `<Nm>` is "minutes since the most recent `dispatch lane=…` line for that
@@ -246,15 +248,21 @@ issue in the run manifest". `<extra-labels>` lists any other meaningful
 
 ### §F — Block-reasons section format
 
-Group `Blocked` cards by reason-tag emoji, sorted by count desc:
+Group `Blocked` cards by reason tag: one summary line, then one line per tag,
+sorted by count desc (ties in the order of `drover-reasons.json`):
 
 ```
-   <glyph> ×<count>  <short reason>    <#N> → <detail> [, <#N> → <detail>…]
+   Blocked 3 · creds 1 · unclear 1 · needs-you 1
+   creds        #31
+   unclear      #28
+   needs-you    #25
 ```
 
-Reason glyph is determined by parsing the latest §4 reason-tag comment on each
-issue. Use the locked vocabulary in §I — never improvise. Fall back to `🚫
-other` if the comment can't be parsed.
+The tag comes from the `Reason tag:` line of the newest comment on each issue
+(else the first known tag anywhere in it). The short name drops the brackets and
+the `blocked:` prefix. The tags are the ones in `.claude/bin/drover-reasons.json`
+(see block-template.md) — never improvise. A comment with no known tag counts as
+`other`.
 
 ### §G — Recent-events section format
 
@@ -262,14 +270,13 @@ Tail the last 5 state-transition lines from the most recent run manifest
 (`docs/drover/runs/<YYYY-MM-DD>-<slug>.md`). Reformat each as:
 
 ```
-   T-<Nm>    <glyph> <verb>      #<NNN> → <Target>  <detail>
+   T-<Nm>    <verb>      #<NNN> → <Target>  <detail>
 ```
 
 Where:
 
 - `T-<N>m` if event was < 60 minutes ago, `T-<N>h` if < 24h, `T-<N>d` otherwise.
 - `<verb>`: `dispatch`, `pass`, `block`, `skip`, `reap`, `alert`, `zombie`, `merge`.
-- `<glyph>`: the lane glyph for `dispatch`, else the action glyph from §I.
 - `<Target>`: target lane/column for the transition (or omit for `reap`).
 - Pad columns so verbs align visually.
 
@@ -280,51 +287,29 @@ A "state-transition line" is any manifest line containing `dispatch`,
 
 ### §H — No-active-run state
 
-If today's manifest doesn't exist or its last line is `✅ … exiting cleanly`,
+If today's manifest doesn't exist or its last line is `… exiting cleanly`,
 the run is not active. Adjust three sections:
 
 - `▎Workers` → `   (no active run — \`drover run\` to start)`
 - `▎Recent` → tail the most recent manifest (any date) and prefix each event
-  with the date when it's not today: `2026-05-25 T-1d ✅ #20 → Done`
+  with the date when it's not today: `2026-05-25 T-1d dispatch #20 → Review`
 - `▎Health` → `last run: completed <N>{m,h,d} ago    workers: 0/<max> idle`
 
 The Kanban board still renders normally — column counts come from the live
 Projects v2 API, not from the manifest.
 
-### §I — Locked emoji vocabulary
+### §I — Locked lane tags
 
-Pick from this set only. If a runtime situation doesn't match, fall back to
-`🚫`. Do **not** invent new emoji.
+Plain text only; the snapshot prints no emoji.
 
-**Lane roles:**
-
-| Glyph | Meaning          |
+| Tag   | Meaning          |
 | ----- | ---------------- |
-| 🔨    | Builder lane     |
-| 🔍    | Tester (QA) lane |
-| ✏️    | Reviewer lane    |
+| `[B]` | Builder lane     |
+| `[Q]` | Tester (QA) lane |
+| `[R]` | Reviewer lane    |
 
-**Action markers (Recent + Workers):**
-
-| Glyph | Meaning                                  |
-| ----- | ---------------------------------------- |
-| ↻     | rebuild iteration (`attempt N/3`)        |
-| ✅    | pass / merged / lane-complete            |
-| ⛔    | blocked transition (Ready → Blocked)     |
-| ♻     | reap stale lock + assignee swept         |
-| ⚠     | block-rate / rebuild-cap / generic alert |
-| 💀    | zombie worker killed                     |
-
-**Block reason tags (Blocked column suffixes, ▎Block reasons):**
-
-| Glyph | Meaning                                   |
-| ----- | ----------------------------------------- |
-| 🛡    | dependency gate (waiting on another card) |
-| 🔐    | missing creds / API key                   |
-| 💳    | quota / billing                           |
-| ❓    | ambiguous AC (lint flagged)               |
-| ⚙     | infra / tooling issue                     |
-| 🚫    | unparsed "other" reason — fallback        |
+`↻ N/3` marks a rebuild iteration (`attempt N/3`). Block reason tags are §F's
+short names from `drover-reasons.json`; `other` is the fallback.
 
 ### §J — Timestamp format (locked)
 
@@ -376,7 +361,7 @@ the script is missing.
   Do **not** call `gh project item-edit` or any mutation in this verb.
 - **Block-reason parsing:** for each issue in `Blocked`, read the
   latest §4 reason-tag comment via `gh issue view <N> --json comments` and
-  match the leading emoji against §I. Cache results during the snapshot — do
+  read its tag as in §F. Cache results during the snapshot — do
   not re-read mid-render.
 - **Recent events:** tail the most recent run manifest at
   `docs/drover/runs/<YYYY-MM-DD>-<slug>.md`. Filter to state-transition

@@ -17,6 +17,7 @@ export const meta = {
 //     lane: 'build' | 'qa' | 'review' — a Ready card labelled `qa` has lane 'qa'
 //     and skips the Builder; every other Ready card is built first (v3.0.0).
 //   tier: 'low' | 'medium' | 'high' (optional, default 'medium'),  // run model ladder
+//   commitStyle: the `drover-commit-style.py --prompt` line (optional; lanes run it when absent)
 // }
 // The harness can deliver `args` as a JSON-encoded string (the tool param is
 // untyped) — normalize before validating.
@@ -122,8 +123,8 @@ const REVIEW_MEMORY = [
   // Truth-check brief is fixed (drover-review → Adversarial mode); a hand-written one once made over-building blocking.
   `Truth-check sub-agents get the fixed brief from drover-review → "Adversarial mode", verbatim. After collecting, reclass any Over-engineering Blocker to Should fix; it never decides merge or bounce.`,
   // Merge policy + migrations live in the gate (run.md → Merge protocol step 5).
-  `Merge only via drover-merge-gate.sh. Exit 7 = merge_policy says a human merges (money/auth/schema/size): Blocked with the 🙋 template quoting its human-gate lines; To unblock = merge it yourself, or comment done to approve.`,
-  `Exit 8 = 🙋 needs you (migration for a DB the robot may not touch, failed migrate, declared human step): Blocked with the 🙋 template, exact commands from its needs-you lines, label needs-you.`,
+  `Merge only via drover-merge-gate.sh. Exit 7 = merge_policy says a human merges (money/auth/schema/size): Blocked [needs-you] with the block-template.md needs-you comment quoting its human-gate lines; To unblock = merge it yourself, or comment done to approve.`,
+  `Exit 8 = [needs-you] (migration for a DB the robot may not touch, failed migrate, declared human step): Blocked [needs-you] with the needs-you comment, exact commands from its needs-you lines, label needs-you.`,
 ]
 
 // GitHub budget (rate-limit-etiquette.md → "Price list"). Measured 2026-10-04: a
@@ -152,6 +153,7 @@ const lanePrompt = (lane, card) => [
   `move the project card yourself, clean up the worktree on exit. Config: ${input.configPath}.`,
   BOARD_IO(),
   `Commits, PR title, PR body blocks, comments: .claude/skills/drover/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/drover-pr-body.sh.`,
+  input.commitStyle || `Commit style: run python3 .claude/bin/drover-commit-style.py --config ${input.configPath} --prompt and write commit subjects and the PR title as its line says.`,
   ...(lane === 'review' ? REVIEW_MEMORY : []),
   ...(lane === 'qa' && card.status === 'Ready'
     ? [`This card is labelled qa: it skips Building. Move it Ready → QA yourself, create the issue branch from the base branch, and test what is already there (run.md → "qa cards").`]

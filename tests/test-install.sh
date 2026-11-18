@@ -171,7 +171,7 @@ T=$(mktemp -d)
 for s in drover-run.sh drover-stop.sh drover-wave-plan.sh \
          drover-lane.sh drover-codex-lane.sh drover-codex-wave.sh drover-card.sh drover-throttle.sh drover-host.sh \
          drover-deps.sh drover-preflight.sh drover-merge-gate.sh drover-usage.sh drover-pr-body.sh \
-         drover-review-file-refactor.sh drover-qa-file-bug.sh; do
+         drover-review-file-refactor.sh drover-qa-file-bug.sh drover-status.py drover-reasons.json drover-commit-style.py; do
   [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed, or is not executable"
 done
 # The Codex shim runs the shared launcher installed beside it.
@@ -256,16 +256,16 @@ cp "$T/AGENTS.md" "$T/AGENTS.before"; cp "$T/CLAUDE.md" "$T/CLAUDE.before"
 OUT=$("$INSTALL" --no-hooks "$T" 2>&1)
 cmp -s "$T/AGENTS.md" "$T/AGENTS.before" || fail "install changed AGENTS.md"
 cmp -s "$T/CLAUDE.md" "$T/CLAUDE.before" || fail "install changed CLAUDE.md"
-[ "$(echo "$OUT" | tail -1)" = "👉 next: open Claude Code here and run /drover onboard" ] || fail "last line should name onboard, got: $(echo "$OUT" | tail -1)"
+[ "$(echo "$OUT" | tail -1)" = "next: open Claude Code here and run /drover onboard" ] || fail "last line should name onboard, got: $(echo "$OUT" | tail -1)"
 rm -rf "$T"
 # DROVER_QUIET_NEXT=1 (for a wrapper that prints its own header and next step)
-# prints only the 🔧 installing group: one line per group of files, no per-file list.
+# prints only the installing group: one line per group of files, no per-file list.
 T=$(mktemp -d)
 OUT=$(DROVER_QUIET_NEXT=1 "$INSTALL" "$T" 2>&1)
-[ "$(echo "$OUT" | head -1)" = "🔧 installing" ] || fail "quiet mode should start at the installing group, got: $OUT"
+[ "$(echo "$OUT" | head -1)" = "installing" ] || fail "quiet mode should start at the installing group, got: $OUT"
 echo "$OUT" | grep -q "next:" && fail "quiet mode must not print the next step"
 echo "$OUT" | grep -q "✓ skills, scripts and workflows → .agents/" || fail "quiet mode should print the grouped files line"
-echo "$OUT" | grep -q "🛡️  6 guard hooks → .claude/settings.json (new file)" || fail "guard line should count hooks, got: $OUT"
+echo "$OUT" | grep -q "   6 guard hooks → .claude/settings.json (new file)" || fail "guard line should count hooks, got: $OUT"
 [ "$(echo "$OUT" | wc -l | tr -d ' ')" -le 3 ] || fail "grouped output should be ≤ 3 lines here, got: $OUT"
 rm -rf "$T"
 
@@ -276,7 +276,7 @@ echo "1.8.2" > "$T/.claude/skills/drover/VERSION"
 OUT=$("$INSTALL" --no-hooks "$T" 2>&1)
 jq -e --arg v "$(cat ../VERSION)" '.from == "1.8.2" and .to == $v and (.added_skills | index("drover-collect")) and (.added_skills | index("drover-build") | not)' \
   "$T/.claude/drover/upgrade.json" >/dev/null || fail "upgrade.json wrong: $(cat "$T/.claude/drover/upgrade.json" 2>&1)"
-echo "$OUT" | grep -q "⬆️  upgrade from 1.8.2" || fail "the upgrade should be one grouped line, got: $OUT"
+echo "$OUT" | grep -q "   upgrade from 1.8.2" || fail "the upgrade should be one grouped line, got: $OUT"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1
 jq -e '.from == "1.8.2"' "$T/.claude/drover/upgrade.json" >/dev/null || fail "a second install must keep the original from-version"
 rm -rf "$T"

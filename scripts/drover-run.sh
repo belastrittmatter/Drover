@@ -11,7 +11,7 @@
 #   4. Rate-limit guard — sleeps until reset when GraphQL remaining < 200.
 #   5. Per-tick project-items cache — one gh call per tick, not per column lookup.
 #   6. Tick interval bumped from 30s → 120s (GraphQL ProjectsV2 query is ~103 pts; 120s keeps usage <3.1k/hr vs 5k budget).
-#   7. Lane-zombie watchdog (added 2026-05-24 after fitbox-v4 first-run hang) — kills lane PIDs whose
+#   7. Lane-zombie watchdog (added 2026-05-24 after a first-run hang on a live board) — kills lane PIDs whose
 #      claimed issue has already moved out of the lane's expected source column. The worker's logical
 #      work is done; if the claude -p process lingers, lane appears busy forever and downstream cards
 #      pile up unprocessed. Uses the project-items cache so it costs zero extra API calls per tick.
@@ -91,7 +91,7 @@ MAX_DISPATCHES=$(jq -r '.max_dispatches // 0' "$CONFIG_PATH")
 # Workflow is the default backend (v1.6.0). This legacy dispatcher only runs
 # when the config opts in explicitly — never by accident or stale habit.
 if [ "$WORKER_BACKEND" != "claude-p" ]; then
-  echo "🛑 board '${CONFIG_SLUG}' uses the workflow backend (worker_backend=${WORKER_BACKEND})." >&2
+  echo "board '${CONFIG_SLUG}' uses the workflow backend (worker_backend=${WORKER_BACKEND})." >&2
   echo "    Run it in-session: /drover run ${CONFIG_SLUG}  (see references/run-workflow.md)" >&2
   echo "    To use this legacy dispatcher, set \"worker_backend\": \"claude-p\" in the config." >&2
   exit 78
@@ -159,9 +159,9 @@ status_option_id() {
 set_card_status() {
   # $1 = project item id, $2 = target status name. Returns non-zero if unresolvable.
   local item_id="$1" name="$2" opt_id
-  resolve_status_field || { gh_checkpoint; log "⚠ could not resolve Status field — skipping reconcile"; return 1; }
+  resolve_status_field || { gh_checkpoint; log "could not resolve Status field — skipping reconcile"; return 1; }
   opt_id=$(status_option_id "$name") || {
-    log "⚠ Status option '${name}' not present on the board — skipping reconcile"; return 1; }
+    log "Status option '${name}' not present on the board — skipping reconcile"; return 1; }
   local project_id
   project_id=$(project_node_id) || return $?
   gh_checkpoint
@@ -282,7 +282,7 @@ gh_rate_guard() {
     now=$(date +%s)
     wait=$((reset - now + 10))
     [ "$wait" -lt 60 ] && wait=60
-    log "⚠ GraphQL rate limit low (${remaining} left) — sleeping ${wait}s until reset"
+    log "GraphQL rate limit low (${remaining} left) — sleeping ${wait}s until reset"
     sleep "$wait"
   fi
 }
@@ -339,6 +339,8 @@ dispatch_lane() {
     review) prompt="Run drover-review on issue #${issue} for drover run. Read .claude/skills/drover/references/run.md → Reviewer lifecycle. Config: ${CONFIG_PATH}." ;;
     *) log "unknown lane: $lane"; return 1 ;;
   esac
+  # FR-CNV-2: the repo's commit style and three real subjects ride in every lane prompt.
+  prompt="$prompt $(python3 "$(dirname "$SB_GITHUB_READ")/drover-commit-style.py" --root "$PWD" --config "$CONFIG_PATH" --prompt 2>/dev/null || true)"
   prompt="First operation: run .claude/bin/drover-skills-ready.py --root '$PWD' --host claude --cards - --lane '$lane' --hydrate with $card as stdin. Halt on exit 10 before worktree creation or lifecycle writes; preserve claims and approval evidence. Load resolved paths and only declared fallbacks; recheck conditionals with --require before activation. $prompt"
   # Worker output goes to a per-worker log, not /dev/null (issue #13). Redirect at the
   # `claude` invocation itself — no wrapping subshell, no `exec` — so the wire to the
@@ -395,7 +397,7 @@ check_lane_zombie() {
   done
   if [ "$found" -eq 0 ]; then
     gh_checkpoint
-    log "💀 zombie ${lane} worker on #${issue} (pid=${pid}) — card moved to '${cur}'; killing"
+    log "zombie ${lane} worker on #${issue} (pid=${pid}) — card moved to '${cur}'; killing"
     kill "$pid" 2>/dev/null || true
     sleep 1
     kill -9 "$pid" 2>/dev/null || true
@@ -496,7 +498,7 @@ check_legacy_worktrees() {
   local wt
   for wt in .worktrees/issue-* .claude/worktrees/issue-*; do
     [ -e "$wt" ] || continue
-    log "🛑 legacy worktree $wt exists — stop its worker and inspect/preserve its edits"
+    log "legacy worktree $wt exists — stop its worker and inspect/preserve its edits"
     log "    Move it with git worktree move to .drover/worktrees/ before resuming."
     return 73
   done
@@ -517,7 +519,7 @@ cleanup_stale_worktrees() {
       if git worktree remove "$wt" 2>/dev/null; then
         log "stale worktree: $wt (branch '$branch' missing) — removed"
       else
-        log "⚠ kept worktree $wt — inspect its edits/lock before cleanup"
+        log "kept worktree $wt — inspect its edits/lock before cleanup"
       fi
     fi
   done
@@ -540,23 +542,23 @@ reclaim_stranded_building() {
     if [ -d "$wt" ]; then
       wt_branch=$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
       if [ -z "$wt_branch" ] || ! git worktree remove "$wt" 2>/dev/null; then
-        log "⚠ stranded #${issue}: kept $wt and Building status — inspect its detached commits/edits/lock before resuming"
+        log "stranded #${issue}: kept $wt and Building status — inspect its detached commits/edits/lock before resuming"
         continue
       fi
     fi
     if ! set_card_status "$item_id" "Ready"; then
       gh_checkpoint
-      log "⚠ stranded #${issue} in Building — could not move it to Ready; drag it by hand"
+      log "stranded #${issue} in Building — could not move it to Ready; drag it by hand"
       continue
     fi
     [ -n "$BOT_LOGIN" ] && gh_write_once issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
     # Comment format: writing-standard.md § 4.
     gh_checkpoint
-    gh_write_once issue comment "$issue" --body "[orchestrator] [report] ↩️ back to Ready · stranded in Building
+    gh_write_once issue comment "$issue" --body "[orchestrator] [report] moved back to Ready · stranded in Building
 Did: found no live worker; the last run stopped mid-build
-✅ Done: card moved to Ready · branch ${branch:-none found}${branch:+ kept}
+Done: card moved to Ready · branch ${branch:-none found}${branch:+ kept}
 Next: builder (next tick${branch:+, continues on the branch})" >/dev/null 2>&1 || true
-    log "↩ stranded #${issue}: Building → Ready (branch ${branch:-none})"
+    log "stranded #${issue}: Building → Ready (branch ${branch:-none})"
   done <<EOF
 $(echo "$PROJECT_ITEMS_JSON" | jq -r --arg bot "$BOT_LOGIN" '
     .items[]
@@ -598,7 +600,7 @@ log "drover run started — config=${CONFIG_SLUG} base=${BASE_BRANCH} tick=${TIC
 ORPHANS=$(pgrep -f 'claude -p .*drover run' 2>/dev/null | grep -v "^$$\$" | wc -l | tr -d ' ' || true)
 ORPHANS=${ORPHANS:-0}
 if [ "$ORPHANS" -gt 0 ]; then
-  log "🛑 refusing to start: ${ORPHANS} drover claude workers already running."
+  log "refusing to start: ${ORPHANS} drover claude workers already running."
   log "    Stop them first: pkill -f 'claude -p .*drover run'"
   log "    Then re-run: $0 $CONFIG_SLUG"
   exit 73
@@ -607,7 +609,7 @@ fi
 # Workflow-backend mutual exclusion (see references/run-workflow.md §Preconditions).
 WAVE_LOCK=".claude/drover/inflight/workflow-wave.lock"
 if [ -f "$WAVE_LOCK" ]; then
-  log "🛑 refusing to start: workflow-backend wave in flight ($WAVE_LOCK exists)."
+  log "refusing to start: workflow-backend wave in flight ($WAVE_LOCK exists)."
   log "    If no wave is actually running, remove the stale lock: rm $WAVE_LOCK"
   exit 74
 fi
@@ -616,7 +618,7 @@ fi
 if [ "$BASE_BRANCH" = "main" ] && [ "$HUMAN_APPROVES" = "false" ]; then
   if rg -qU 'on:\s*\n?\s*push:\s*\n?\s*branches:[^a-z]*main' .github/workflows 2>/dev/null \
      || [ -f vercel.json ] || [ -f netlify.toml ]; then
-    log "🛡 refusing to start: would auto-merge to production main."
+    log "refusing to start: would auto-merge to production main."
     exit 75
   fi
 fi
@@ -650,7 +652,7 @@ while true; do
   # check alone leaves a TOCTOU window where a workflow run starting at the
   # same moment as this dispatcher is never detected by either side.
   if [ -f "$WAVE_LOCK" ]; then
-    log "🛑 workflow-backend wave appeared mid-run ($WAVE_LOCK) — halting for mutual exclusion."
+    log "workflow-backend wave appeared mid-run ($WAVE_LOCK) — halting for mutual exclusion."
     log "    Resume after the wave: $0 $CONFIG_SLUG"
     exit 74
   fi
@@ -708,14 +710,14 @@ while true; do
 
   if [ "$READY" -eq 0 ] && [ "$BUILDING" -eq 0 ] && [ "$QA" -eq 0 ] && [ "$REVIEW" -eq 0 ] \
      && [ "$BUILD_IDLE" -eq 1 ] && [ "$QA_IDLE" -eq 1 ] && [ "$REVIEW_IDLE" -eq 1 ]; then
-    log "✅ all active-pipeline columns empty and all lanes idle — exiting cleanly"
+    log "all active-pipeline columns empty and all lanes idle — exiting cleanly"
     break
   fi
 
   if [ "${BLOCK_ALERT_SENT:-0}" -eq 0 ] && [ "$INITIAL_READY" -gt 0 ] && [ "$BLOCK_ALERT_PCT" -gt 0 ]; then
     PCT=$(( BLOCKED * 100 / INITIAL_READY ))
     if [ "$PCT" -ge "$BLOCK_ALERT_PCT" ]; then
-      log "⚠ block-rate alert: ${BLOCKED}/${INITIAL_READY} (${PCT}%)"
+      log "block-rate alert: ${BLOCKED}/${INITIAL_READY} (${PCT}%)"
       BLOCK_ALERT_SENT=1
     fi
   fi
@@ -759,7 +761,7 @@ while true; do
   #    exists to catch is a pipeline that is 100% busy and lands nothing, and the old
   #    `AND no lane active` clause made that case unhaltable (293 ticks, 0 merges).
   if ! record_cycle_progress "$(done_signature)"; then
-    log "🛑 halt — RUNAWAY: no card reached Done in ${NO_PROGRESS_CYCLES} dispatch cycles"
+    log "halt — RUNAWAY: no card reached Done in ${NO_PROGRESS_CYCLES} dispatch cycles"
     runaway_summary
     break
   fi
@@ -767,7 +769,7 @@ while true; do
   # ── Hard dispatch ceiling. Bounds worst-case spend even if the board keeps
   #    trickling just enough Done movement to reset the gate above.
   if dispatch_ceiling_hit; then
-    log "🛑 halt — dispatch ceiling reached (${DISPATCH_COUNT}/${MAX_DISPATCHES})"
+    log "halt — dispatch ceiling reached (${DISPATCH_COUNT}/${MAX_DISPATCHES})"
     runaway_summary
     break
   fi

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests scripts/drover-setup.py — onboard's 🔍 Checks, the upgrade path, config
+# Tests scripts/drover-setup.py — onboard's Checks step, the upgrade path, config
 # migration, board names, branch detection, and the GitHub board ranking / migration.
 # Offline: `gh` is a stateful stub on PATH (board state in a JSON file, every call
 # logged), install.sh comes from this checkout, helper skills are skipped.

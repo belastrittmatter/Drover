@@ -23,11 +23,11 @@ Keep this run choice in each wave and resume command; skip only the Claude usage
 **Inside Codex, plain `run` is `--codex`.** Your tool list has no Workflow tool, or
 `bash .claude/bin/drover-host.sh --config <config-path>` prints `codex` → run as `--codex` (tier flags and
 `--codex=<model>` still apply); it counts as explicit `--codex`, Review included.
-Say so once, in the first wave report: `🔁 codex host — running as --codex`. Never improvise a Claude workflow wave in Codex.
+Say so once, in the first wave report: `codex host — running as --codex`. Never improvise a Claude workflow wave in Codex.
 
 **Unknown host halts.** Run the host check before preconditions. Exit 65 (no host sign) or
 `opencode` (no OpenCode backend yet) halts before any claim, even with no Workflow tool, with one line:
-`⛔ unknown host — set DROVER_HOST=claude|codex and re-run`. Never guess a backend.
+`unknown host — set DROVER_HOST=claude|codex and re-run`. Never guess a backend.
 
 After the same plan and claim steps, launch this command as a background task:
 `bash .claude/bin/drover-codex-wave.sh --config <config-path> --cards <claimed-cards.json> --codex[=<model>] --tier <low|medium|high> --output <wave-result.json>`.
@@ -154,12 +154,12 @@ Repeat until a done condition or halt gate fires:
      card at a time claim it, run `bash .claude/bin/drover-codex-lane.sh --config
      <config-path> --card '<card JSON>' --lane <build|qa>`, read its JSON exit like a lane
      result, then reconcile (step 5). Re-run the usage check between cards; on exit 0
-     return to normal waves. The report line says `🔁 codex fallback`. Without
+     return to normal waves. The report line says `codex fallback`. Without
      `usage_fallback: "codex"` the launcher refuses (exit 78) unless `--codex` is given.
    - exit 10 otherwise (pause) → launch nothing new. A wave already running finishes —
      stopping it mid-lane loses work. Then release claims as usual, post the
      resume note (one line to the user and the run manifest:
-     `⏸ paused at <window> <used>% — resets <local time>; remaining: <N> cards; resume: /drover run <slug>`),
+     `paused at <window> <used>% — resets <local time>; remaining: <N> cards; resume: /drover run <slug>`),
      remove the wave lock, and wait for the reset. If a wake tool is available
      (`ScheduleWakeup`, or a `/loop` re-entry), schedule
      `min(3600, resets_at - now + 60)` seconds and chain until the reset; on
@@ -220,8 +220,8 @@ Repeat until a done condition or halt gate fires:
    keep the folder and Building status, report the recovery path, and do not
    redispatch that card until its work is preserved. Otherwise keep the branch and PR,
    move the card to `Ready`, and comment:
-   `[orchestrator] [report] ↩️ back to Ready · stranded in Building` / `Did: found no live
-   worker` / `✅ Done: card moved to Ready · branch <name> kept` / `Next: builder`
+   `[orchestrator] [report] moved back to Ready · stranded in Building` / `Did: found no live
+   worker` / `Done: card moved to Ready · branch <name> kept` / `Next: builder`
    (writing-standard.md § 4). The next Builder continues on the branch.
    **Builder pre-flight.** No card goes Ready → Building unchecked. The wave's first phase
    (`Pre-flight` in `drover-wave.js`, before `runLane('build')`) runs one cheap sub-agent per
@@ -250,8 +250,10 @@ Repeat until a done condition or halt gate fires:
    "Codex runs" above. The host check printing `claude` uses the Workflow tool; exit 65 or
    `opencode` never reaches Launch (see "Unknown host halts"). Workflow tool with
    `scriptPath: .claude/workflows/drover-wave.js` and
-   `args: { configPath, cards, humanApprovesMerge, tier }` (`cards` hydrated after the planner: each
-   carries `lane` and `labels`, and a `qa` card skips the Builder). Runs in the background; the
+   `args: { configPath, cards, humanApprovesMerge, tier, commitStyle }` (`cards` hydrated after the planner: each
+   carries `lane` and `labels`, and a `qa` card skips the Builder). `commitStyle` is the line
+   `python3 .claude/bin/drover-commit-style.py --config <config> --prompt` prints: the repo's
+   `commit_style` and three real subjects, which every lane prompt carries. Runs in the background; the
    orchestrator stays responsive. `humanApprovesMerge` comes from the config; when false the workflow serializes Review-lane agents (merge-race guard, execution side).
    `tier` is the run's model ladder: `'low'` when the user invoked
    `drover run --low` (haiku/sonnet/opus by card complexity), `'high'`
@@ -278,18 +280,18 @@ Repeat until a done condition or halt gate fires:
 
    ```
    Wave 3 · 5 cards → 2 merged · 1 bounced · 1 blocked · 1 failed · usage 5h 62%
-     🛡 #15 Blocked 🔐 missing STRIPE_TEST_KEY — owner: Eric
-     ❌ #18 failed: build lane returned no result — retried next wave
-   Next: wave 4 (3 cards)   |   ⏸ paused until 14:05   |   ✅ board drained
+     #15 blocked [blocked:creds] missing STRIPE_TEST_KEY — owner
+     #18 failed: build lane returned no result — retried next wave
+   Next: wave 4 (3 cards)   |   paused until 14:05   |   board drained
    ```
-   A throttle hit adds one line: `🐢 GitHub hourly limit hit — max_workers 3 → 2 (config saved)`.
+   A throttle hit adds one line: `GitHub hourly limit hit — max_workers 3 → 2 (config saved)`.
    Merged and bounced cards are counts, not lines — they need nobody. Every
    `human-gate`/`blocked` card gets its line and its owner: that is the
    human's queue. Never report a card as done that is not on the base branch.
 7. **Halt gates** — stop with a report if: 3 consecutive waves made zero
    progress (every card bounced/failed); block-rate exceeds
    `block_rate_alert_pct` of initial Ready; or the user says stop. The halt
-   note is four lines: `🛑 halted — <gate>` · the evidence (counts, the cards
+   note is four lines: `halted — <gate>` · the evidence (counts, the cards
    that kept bouncing) · what is left in flight or claimed · `Resume:
    /drover run <slug> [--codex[=<model>]] [--low|--high]` (retain the run's choice) and who must act first.
 8. Loop to 1. For unattended cadence, the user may wrap this loop in /loop;
@@ -334,6 +336,7 @@ don't stall on prompts:
     "Bash(.claude/bin/drover-github-read.py:*)",
     "Bash(python3 .claude/bin/drover-verification-ready.py:*)",
     "Bash(python3 .claude/bin/drover-skills-ready.py:*)",
+    "Bash(python3 .claude/bin/drover-commit-style.py:*)",
     "Bash(bash .claude/bin/drover-usage.sh:*)",
     "Bash(bash .claude/bin/drover-throttle.sh:*)",
     "Bash(bash .claude/bin/drover-codex-lane.sh:*)",
@@ -371,7 +374,7 @@ up front (onboard → Permissions), so the first overnight run does not stall:
 Without them every Reviewer merge pauses for one interactive approval, so the
 backend is **attended-only**. With them, the gate still enforces
 `merge_policy` (money / auth / destructive schema / over `auto_max_lines` → human, exit 7) and `migrations`
-(live DB → 🙋 needs you, exit 8), so the allowlist removes the prompt, not
+(live DB → `[needs-you]`, exit 8), so the allowlist removes the prompt, not
 the policy. Pair auto-merge with a non-production `base_branch`.
 
 > **Read this before starting an overnight wave (issue #9).** The two settings
@@ -387,8 +390,8 @@ the policy. Pair auto-merge with a non-production `base_branch`.
 > | Intent | Configuration | Allowlist `gh pr merge` | Reviewer's terminal state |
 > | --- | --- | --- | --- |
 > | Attended — approve each merge command | `human_approves_merge: false`, `merge_policy.default: "auto"` | no | pauses on a tool permission prompt |
-> | Unattended auto-merge | `human_approves_merge: false`, `merge_policy.default: "auto"` | **yes** | card → Done after confirmed merge; configured human gates → 🙋 Blocked |
-> | Every PR requires human approval through the gate | `human_approves_merge: false`, `merge_policy.default: "human"` | needed only if the agent will merge after approval | gate exits 7 → 🙋 Blocked until a human merges or approves the pinned request |
+> | Unattended auto-merge | `human_approves_merge: false`, `merge_policy.default: "auto"` | **yes** | card → Done after confirmed merge; configured human gates → Blocked `[needs-you]` |
+> | Every PR requires human approval through the gate | `human_approves_merge: false`, `merge_policy.default: "human"` | needed only if the agent will merge after approval | gate exits 7 → Blocked `[needs-you]` until a human merges or approves the pinned request |
 > | Legacy human-only switch | `human_approves_merge: true` | no | Reviewer stops before the gate; card stays in Review |
 >
 > Gate-based rows also need the merge-gate command allowed. A tool permission prompt

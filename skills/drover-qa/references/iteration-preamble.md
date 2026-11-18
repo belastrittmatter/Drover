@@ -20,7 +20,7 @@ Run **one iteration** of the loop:
    classify it, write a spec, run it, mark `[x]` or `[b]`, walk the page,
    push children to the back of the queue.
 3. **Report** — write `docs/drover-qa/iter/iteration-N.md`, regenerate
-   `docs/drover-qa/report/QA-REPORT.md`, commit `🧪 [test] drover-qa: iter N (X bugs, Y items, Z PRs opened)`,
+   `docs/drover-qa/report/QA-REPORT.md`, commit with trailer `Drover: qa-iter N (X bugs, Y items, Z PRs opened)`,
    exit cleanly.
 
 ## Your iteration
@@ -218,7 +218,7 @@ assertions ("Per-spec expectations" above) onto the 5 existing specs in
 `e2e/paths/` (login, dashboard, orders, orders-new, order-detail). One
 commit:
 
-  `🧪 [test] drover-qa: retrofit forensics assertions onto existing specs`
+  `test(drover-qa): retrofit forensics assertions onto existing specs` (or the same words in the repo's `commit_style`)
 
 When a `[b]` is filed, the bug body produced for `drover-qa-file-bug.sh`
 MUST carry these artifacts in its folded Evidence table (writing-standard.md § 3):
@@ -305,12 +305,12 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
 4. **Commit + push + open PR:**
    ```bash
    git add -p   # stage only fix-relevant hunks
-   git commit -m "🐛 [fix] <area>: <one-line bug summary>" -m "- <what changed>
+   git commit -m "<fix subject in commit_style, e.g. fix(<area>): <one-line bug summary>>" -m "- <what changed>
    - <spec that proves it>
    Refs #${ISSUE_N}"
    git push -u origin HEAD
    gh pr create \
-     --title "🐛 [fix] <area>: <one-line bug summary>" \
+     --title "<the same subject>" \
      --label drover-qa \
      --label "$([[ "$SIGNAL" = "objective" ]] && echo auto-merge-candidate || echo needs-human-review)" \
      --body-file /tmp/drover-qa-pr-body-${N}-${slug}.md
@@ -320,8 +320,8 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
    (`.claude/bin/drover-pr-body.sh --skeleton`): status card with
    `Closes #${ISSUE_N}`, Problem (the failing assertion / signal type, lettered
    steps, screenshot), Solution (plain bullets), Acceptance criteria with proof
-   lines, Iteration history, Risk (🟢/🟡/🔴 + Door + Blast radius — subjective
-   signals are never 🟢).
+   lines, Iteration history, Risk (**Low**/**Medium**/**High** + Door + Blast radius — subjective
+   signals are never Low).
    Forensics excerpts go in the proof lines, not as file lists.
    After opening the PR and after each later push, follow
    `.claude/skills/drover/references/pr-author-notes.md`: one file-level review
@@ -353,14 +353,14 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
 
 **On the active branch (the loop's working branch), only commit:**
 - The forensics fixture extension (iter 2 onwards, separate commit)
-- The per-iter close-out commit `🧪 [test] drover-qa: iter N (X bugs, Y items, Z PRs opened)`
+- The per-iter close-out commit (trailer `Drover: qa-iter N (X bugs, Y items, Z PRs opened)`)
 - The per-iter `iteration-N.md` + `QA-REPORT.md` + `queue.md` updates
 - New `e2e/paths/<slug>.spec.ts` files (these ARE the deliverable)
 
 **Never on the active branch:**
 - A change to production code (`client/`, `server/`, `shared/`) — those
   go through PRs.
-- A `🚧 [wip] drover-qa:` commit for an unresolved fix — close the fix branch and leave
+- A `Drover: qa-checkpoint` commit for an unresolved fix — close the fix branch and leave
   the GH issue open instead.
 
 ### Phase 2 — Explore (bounded)
@@ -369,7 +369,7 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
 - Default 5 cells popped per iter.
 - Wall-clock cap 30 min from iter start.
 - When wall-clock hits mid-cell, finish the current cell, write the report,
-  exit. When wall-clock hits mid-fix, commit a `🚧 [wip] drover-qa:` checkpoint with the
+  exit. When wall-clock hits mid-fix, commit a checkpoint (trailer `Drover: qa-checkpoint N`) with the
   failing spec still red and exit (the orchestrator records this as status 5).
 
 **Per cell:**
@@ -412,7 +412,7 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
 
    **If `docs/SPEC.md` has no section matching this route:**
    - Log `MISSING-SPEC: <route>` to `iteration-N.md` Section 1.
-   - File a low-priority docs issue with title `📝 QA docs <route> — Missing SPEC section` and labels `docs`, `source:qa`, `priority:low`, `qa:docs`, and `area:<area>`.
+   - File a low-priority docs issue with `--kind docs`, bare title `SPEC section missing for <route>` and labels `docs`, `source:qa`, `priority:low`, `qa:docs`, and `area:<area>`.
    - Write a render-only smoke spec for now (TC-1 only). Continue.
 
    **If iter 1 (read-only smoke):** TC-1 only — read requirements but do
@@ -470,7 +470,7 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
      it as a low-risk change.
    - If you can't add the testid (e.g., it's in a 3rd-party component),
      file a low-priority tests issue with labels `tests`, `source:qa`, `priority:low`, and `qa:testability`:
-     title `🧪 QA tests <route> — Add data-testid to <element-description>`.
+     `--kind tests`, bare title `add data-testid to <element-description> on <route>`.
      Use `getByRole` for now and reference the issue in a `// TODO` next
      to the brittle selector.
 
@@ -616,7 +616,7 @@ detection (do NOT batch at end of iter):
    - `## Fix` — first-suspect `file:line` and the intended change in 1–3 lines.
    - `## Acceptance Criteria` — `- [ ]` checklist: user-visible fix + regression
      coverage + Drover QA rerun.
-   - `## Risk` — 🟢/🟡/🔴 + one line.
+   - `## Risk` — **Low** / **Medium** / **High** + one line.
    The owner goes in `--suggested-skill` (`drover-build` for implementation,
    `ui-refine-loop` for a UI ticket a human runs, `drover-qa` for harness/test-only,
    `drover-review` for release-readiness), the dedupe key in `--fingerprint`
@@ -637,7 +637,7 @@ detection (do NOT batch at end of iter):
      --fingerprint "<slug>|<tc>|<failure-signature>" \
      --suggested-skill drover-build)
    ```
-   The issue title will be board-readable, for example `🐛 [bug] imports: CSV upload fails after submit`, and the labels will include `bug`, `source:qa`, `priority:<high|medium|low>`, optional `area:<area>`, optional `qa:<category>`, and optional `skill:<owner>`. The script validates required body sections and dedupes by fingerprint: if the same open `source:qa` issue already exists, it comments with the new evidence and returns the existing issue number instead of creating a duplicate card.
+   The issue title will be board-readable, for example `[bug] imports: CSV upload fails after submit`, and the labels will include `bug`, `source:qa`, `priority:<high|medium|low>`, optional `area:<area>`, optional `qa:<category>`, and optional `skill:<owner>`. The script validates required body sections and dedupes by fingerprint: if the same open `source:qa` issue already exists, it comments with the new evidence and returns the existing issue number instead of creating a duplicate card.
 
    The script prints the new issue number on stdout and drops the issue card
    in the `Bug` column of the resolved **drover QA** project (see
@@ -645,7 +645,7 @@ detection (do NOT batch at end of iter):
    everywhere downstream:
    - In `queue.md` line: `[b] /foo → BUG-N.M → #${ISSUE_N} (iter:N)`
    - In `iteration-N.md` Section 3 YAML: `gh_issue: ${ISSUE_N}`
-   - In any fix commit: `🐛 [fix] <area>: …` with `Closes #${ISSUE_N}` in the body
+   - In any fix commit: a subject in `commit_style` (e.g. `fix(<area>): …`) with `Closes #${ISSUE_N}` in the body
 
 3. **If the script exits non-zero:**
    - Exit 64/66/70: bad arguments — log a `loop-internal` failure to
@@ -768,9 +768,12 @@ git add e2e/paths/<new-or-modified specs> \
         docs/drover-qa/report/<slug>/  # if new screenshots
 ```
 
-**Final commit (mandatory format — orchestrator parses):**
+**Final commit (mandatory trailer — orchestrator parses the body, never the subject):**
 ```
-🧪 [test] drover-qa: iter N (X bugs, Y items, Z PRs opened)
+<subject in commit_style, e.g. test(drover-qa): iter N report>
+
+- <short bullet>
+Drover: qa-iter N (X bugs, Y items, Z PRs opened)
 ```
 where:
 - `X` = total bugs found in this iter (regression + explore combined)
@@ -781,16 +784,16 @@ STOP. Do NOT advance to a next iteration.
 ## Failure modes
 
 - **Found zero bugs and explored zero cells (queue empty):** valid outcome.
-  Final commit `🧪 [test] drover-qa: iter N (0 bugs, 0 items, 0 PRs)`. Exit 0. Orchestrator
+  Final commit with trailer `Drover: qa-iter N (0 bugs, 0 items, 0 PRs opened)`. Exit 0. Orchestrator
   will detect the queue is empty and terminate.
 - **Real blocker (env unreachable, BASE_URL 500s, qa-bot can't log in):**
   document the blocker in `iteration-N.md` Section 1, do NOT make a
-  `🧪 [test] drover-qa:` commit, exit non-zero.
-- **Wall-clock hit mid-fix:** make a `🚧 [wip] drover-qa: iter N — <one-liner>`
-  commit with the failing spec still red. Then make the close-out
-  `🧪 [test] drover-qa: iter N (X bugs, Y items, Z PRs opened)` commit anyway, noting in
+  `Drover: qa-iter` commit, exit non-zero.
+- **Wall-clock hit mid-fix:** make a checkpoint commit (trailer `Drover: qa-checkpoint N`)
+  with the failing spec still red. Then make the close-out commit (trailer
+  `Drover: qa-iter N (X bugs, Y items, Z PRs opened)`) anyway, noting in
   `iteration-N.md` Section 1 that one fix is in flight. Exit 0. The
-  orchestrator will see the `🚧 [wip]` and the close-out and treat it as a
+  orchestrator will see the checkpoint and the close-out and treat it as a
   successful iter (not exit 5 — exit 5 is for missing close-out commits
   that the orchestrator infers were time-clipped).
 

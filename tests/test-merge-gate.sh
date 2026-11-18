@@ -188,9 +188,9 @@ teardown
 # 9b — the squash message: --subject and --body-file reach `gh pr merge` (writing standard).
 head_setup
 printf -- '- 413 shows the size message\nCloses #1\n' > "$TMP/msg.md"
-RC=0; STUB_OID="$SHA" gate --expect-head "$SHA" --subject "🐛 [fix] receipts: show a size error" --body-file "$TMP/msg.md" >/dev/null 2>&1 || RC=$?
+RC=0; STUB_OID="$SHA" gate --expect-head "$SHA" --subject "fix(receipts): show a size error" --body-file "$TMP/msg.md" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 0 ] || fail "a merge with a subject should exit 0, got $RC"
-grep -q -- "--subject 🐛 \[fix\] receipts: show a size error" "$GH_LOG" || fail "merge must pass --subject, got: $(cat "$GH_LOG")"
+grep -q -- "--subject fix(receipts): show a size error" "$GH_LOG" || fail "merge must pass --subject, got: $(cat "$GH_LOG")"
 grep -q -- "--body-file $TMP/msg.md" "$GH_LOG" || fail "merge must pass --body-file, got: $(cat "$GH_LOG")"
 RC=0; STUB_OID="$SHA" gate --expect-head "$SHA" --body-file /nope.md >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 66 ] || fail "an unreadable --body-file should exit 66, got $RC"
@@ -374,7 +374,7 @@ REQUEST=$(echo "$OUT" | sed -n 's/^approval-request: //p')
 [ -n "$REQUEST" ] || fail "a hold must emit a pinned request"
 make_approval() {
   jq -n --argjson request "$REQUEST" '[[
-    {id:1,body:("Reason tag: 🙋 needs you\napproval-request: " + ($request|tojson)),created_at:"2026-10-03T00:00:01Z",updated_at:"2026-10-03T00:00:01Z",user:{login:"owner",type:"User"}},
+    {id:1,body:("Reason tag: [needs-you] needs you\napproval-request: " + ($request|tojson)),created_at:"2026-10-03T00:00:01Z",updated_at:"2026-10-03T00:00:01Z",user:{login:"owner",type:"User"}},
     {id:2,body:"done",created_at:"2026-10-03T00:00:02Z",updated_at:"2026-10-03T00:00:02Z",user:{login:"owner",type:"User"}}
   ]]' > "$STUB_COMMENTS"
 }
@@ -394,7 +394,7 @@ make_approval
 RC=0; STUB_PERMISSION_FAIL=1 STUB_OID="$SHA" STUB_META="$(meta money src/x.ts)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 79 ] || fail "unreadable authority must halt, got $RC"
 rm -f "$SB_GITHUB_HALT_FILE"  # next test starts a separate recovered run
-jq '.[0] += [{id:3,body:"Reason tag: 🙋 new decision",created_at:"2026-10-03T00:00:03Z",updated_at:"2026-10-03T00:00:03Z",user:{login:"owner",type:"User"}}]' "$STUB_COMMENTS" > "$TMP/new.json"
+jq '.[0] += [{id:3,body:"Reason tag: [needs-you] new decision",created_at:"2026-10-03T00:00:03Z",updated_at:"2026-10-03T00:00:03Z",user:{login:"owner",type:"User"}}]' "$STUB_COMMENTS" > "$TMP/new.json"
 mv "$TMP/new.json" "$STUB_COMMENTS"
 RC=0; STUB_OID="$SHA" STUB_META="$(meta money,needs-you:done src/x.ts)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 7 ] || fail "new human block must revoke prior approval, got $RC"
@@ -424,7 +424,7 @@ cat > "$TMP/new-block.py" <<'NEWBLOCK'
 import json, os
 p=os.environ["STUB_COMMENTS"]
 x=json.load(open(p))
-x[0].append({"id":3,"body":"Reason tag: 🙋 a new human decision","created_at":"2026-10-03T00:00:03Z","updated_at":"2026-10-03T00:00:03Z","user":{"login":"owner","type":"User"}})
+x[0].append({"id":3,"body":"Reason tag: [needs-you] a new human decision","created_at":"2026-10-03T00:00:03Z","updated_at":"2026-10-03T00:00:03Z","user":{"login":"owner","type":"User"}})
 with open(p,"w") as f: json.dump(x,f)
 NEWBLOCK
 jq --arg cmd "python3 $TMP/new-block.py" '.verify_commands=[$cmd]' "$TMP/c.json" > "$TMP/new.json"
@@ -453,7 +453,7 @@ RC=0; STUB_OID="$SHA" STUB_META="$(meta "" supabase/migrations/001_add.sql)" gat
 [ -f "$TMP/ran-test" ] && [ -f "$TMP/ran-staging" ] || fail "both allowed migrate commands should have run"
 teardown
 
-# 19 — the target env is NOT allowed (live): 🙋 exit 8 with the exact command,
+# 19 — the target env is NOT allowed (live): [needs-you] exit 8 with the exact command,
 #      no merge. The allowed env still ran, so the human has one step left.
 head_setup
 cfgset ".migrations = {allowed_envs: [\"staging\"], target_env: \"live\",
@@ -494,7 +494,7 @@ teardown
 head_setup
 RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts '<!-- sb:status -->
 > [!WARNING]
-> 🛑 Blocked · needs you · Closes #7 · head `3f9c2a1`
+> Blocked · needs owner · Closes #7 · head `3f9c2a1`
 > needs-you: `npm run backfill -- --env live`
 <!-- /sb:status -->
 

@@ -38,9 +38,10 @@ skip a hook (`--no-verify`).
 1. The host's `AGENTS.md`, `CLAUDE.md` or `CONTRIBUTING.md` defines a commit format: follow it
    (for example `#N: type: description`).
 2. Otherwise use section "1 · Commit" of the drover writing standard
-   (`.claude/skills/drover/references/writing-standard.md`): emoji, `[type]`, scope,
-   subject, 1–4 bullets, `Closes #N` when the commit finishes a ticket.
-3. Keep any attribution trailer the session asks for.
+   (`.claude/skills/drover/references/writing-standard.md`): the subject in the repo's
+   `commit_style` (`python3 .claude/bin/drover-commit-style.py --prompt` prints it with three
+   real subjects), 1–4 bullets, `Closes #N` when the commit finishes a ticket. No emoji.
+3. Add no attribution, `Co-Authored-By` or generated-by footer.
 
 ## 3 · Supabase gate
 

@@ -31,7 +31,7 @@ Reads `Ready` from the repo's feature project. Resolution order:
 2. **`BUILD_LOOP_OWNER`** env var — project owner (e.g. `my-org`)
 3. **Auto-discovery fallback:** if env vars unset, run `gh project list --owner $(gh repo view --json owner -q .owner.login) --format json` and pick the project whose `title` matches the repo name, or the only open project if there's exactly one.
 
-Surface: `🎯 Reading project: <owner>/<title> (#<n>), column "Ready"`.
+Surface: `Reading project: <owner>/<title> (#<n>), column "Ready"`.
 
 ## Algorithm
 
@@ -68,7 +68,7 @@ For each Ready item:
 1. **Board order first** — `items` returns cards in the human's manual board order. Respect that. If the user wants Issue X before Issue Y, they drag X above Y on the board.
 2. **Tiebreaker (rare):** within the same drag-position, sort by priority extracted from title regex `^\[?(P[1-4])\]?`: `P1` < `P2` < `P4` < `P3` < no priority. Then issue number ascending.
 
-If `Ready` is empty: print `📭 Project board "Ready" column is empty — nothing to dispatch.` and exit 0. This is not an error; it means the human hasn't curated work yet.
+If `Ready` is empty: print `Project board "Ready" column is empty — nothing to dispatch.` and exit 0. This is not an error; it means the human hasn't curated work yet.
 
 ### 1b. Resolve the selected worker skills before locks
 
@@ -93,7 +93,7 @@ gh label create human-gated --color B60205 --description "Requires manual handli
 
 Worker cap on this legacy path: `max_workers` from the drover config when set, otherwise 3.
 
-Report once per wave: `▶️ Drover Build dispatching: Issues [#N1, #N2, #N3] (parallel)`
+Report once per wave: `Drover Build dispatching: Issues [#N1, #N2, #N3] (parallel)`
 
 For each issue N in the ready set (up to the cap at a time):
 
@@ -104,7 +104,7 @@ gh issue edit N --add-label loop:in-progress
 
 b. **Announce on the issue** (so a human reading the issue page knows it's being worked):
 ```bash
-gh issue comment N --body "🤖 Dispatched by /drover-build — worker spinning up in worktree \`.drover/worktrees/issue-N\` on branch \`loop/issue-N\`. Skills: <skills-line-from-body-or-defaults>."
+gh issue comment N --body "Dispatched by /drover-build — worker spinning up in worktree \`.drover/worktrees/issue-N\` on branch \`loop/issue-N\`. Skills: <skills-line-from-body-or-defaults>."
 ```
 
 c. **Dispatch:**
@@ -118,7 +118,7 @@ The dispatcher (this skill's `scripts/drover-build-dispatch.sh`) handles:
 - `gh issue view N --json title,body,labels` to compose the worker prompt
 - prepend `references/worker-preamble.md` + append working-directory footer
 - `cd` into worktree and exec `claude -p --dangerously-skip-permissions --output-format stream-json --verbose --max-turns 250`
-- verify the worker produced a `🔧 [chore] loop: close #N` commit on its branch
+- verify the worker produced a commit with the body trailer `Drover: done #N` on its branch
 - exit 0 (success) / 2 (worker non-zero) / 3 (no done-commit) / 4 (HUMAN GATE TRIPPED)
 
 **Base branch:** the orchestrator's currently-checked-out branch (e.g. `frontend-rebuild`). Pass via `BASE_BRANCH` env var to the dispatcher. Don't assume `main`.
@@ -133,33 +133,33 @@ handoff complete. Add file summaries and critical inline notes on the PR, not in
 
 **On dispatcher exit 0 (success):**
 - `git -C .drover/worktrees/issue-N push -u origin loop/issue-N`
-- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<emoji> [<type>] <scope>: <subject>" --body-file <body.md>` — title in commit-subject format, body = the marker-block template from `skills/drover/references/run.md` (writing-standard.md § 2), `Closes #N` in the status card, `Docs:` bullets in Solution, Door + Blast radius in Risk
+- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<subject in commit_style>" --body-file <body.md>` — title in the repo's commit style (writing-standard.md § 1), body = the marker-block template from `skills/drover/references/run.md` (writing-standard.md § 2), `Closes #N` in the status card, `Docs:` bullets in Solution, Door + Blast radius in Risk
 - `gh issue edit N --remove-label loop:in-progress`
-- `gh issue comment N --body "[builder] [report] ✅ built · PR <URL>"` (Next line: `qa`)
+- `gh issue comment N --body "[builder] [report] built · PR <URL>"` (Next line: `qa`)
 - Move the project card to `QA`. The Tester and Reviewer take it from there; the issue closes when the Reviewer merges through the merge gate.
 - Leave the worktree in place — the merge gate (after the merge) or the cleanup-wt SessionStart hook removes it once the work is on the base branch.
-- Report: `✅ Drover Build issue #N → PR <URL>, card in QA`
+- Report: `Drover Build issue #N → PR <URL>, card in QA`
 - Recompute ready set; if new issues are now unblocked, dispatch in the next wave (respecting the worker cap)
 
 **On dispatcher exit 5 (intentional WIP-PARTIAL — open a partial PR, do NOT close):**
 - `git -C .drover/worktrees/issue-N push -u origin loop/issue-N`
-- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "🚧 [wip] <scope>: <slice from worker's final message>"` — the status card says `Refs #N`, never `Closes`, so the merge does not close the issue.
+- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<slice from worker's final message, in commit_style>"` — the status card says `Refs #N`, never `Closes`, so the merge does not close the issue.
 - `gh issue edit N --remove-label loop:in-progress --add-label human-gated`
-- `gh issue comment N --body "[builder] [report] ⚠️ partial · PR <URL>\nDid: <slice>\n❌ Not done: <worker's reason for stopping>\nNext: Eric"` — the issue stays open with `human-gated` until the rest lands.
-- Report: `🟡 Issue #N partial PR opened — issue stays open (human-gated)`
+- `gh issue comment N --body "[builder] [report] partial · PR <URL>\nDid: <slice>\nNot done: <worker's reason for stopping>\nNext: owner"` — the issue stays open with `human-gated` until the rest lands.
+- Report: `Issue #N partial PR opened — issue stays open (human-gated)`
 - **Continue dispatching the next issue in the wave.** A WIP-PARTIAL is NOT a halt. The worker did intentional, scoped work and the orchestrator advances.
 
 **On dispatcher exit 2 or 3 (worker failed or no done-commit):**
 - `gh issue edit N --remove-label loop:in-progress`
-- `gh issue comment N --body "[builder] [report] ❌ failed · exit <X>\nDid: worker ran; worktree \`.drover/worktrees/issue-N\` kept\n❌ Not done: <one line from the log>\nNext: Eric\n\n<details><summary>log tail</summary>\n\n\`\`\`\n$(tail -50 .planning/drover-build-logs/issue-N.log)\n\`\`\`\n</details>"`
+- `gh issue comment N --body "[builder] [report] failed · exit <X>\nDid: worker ran; worktree \`.drover/worktrees/issue-N\` kept\nNot done: <one line from the log>\nNext: owner\n\n<details><summary>log tail</summary>\n\n\`\`\`\n$(tail -50 .planning/drover-build-logs/issue-N.log)\n\`\`\`\n</details>"`
 - Report to the user with `tail -50` of `.planning/drover-build-logs/issue-N.log`
 - Do NOT open a PR; leave the worktree intact for human inspection
 - Halt the loop
 
 **On dispatcher exit 4 (HUMAN GATE TRIPPED):**
 - `gh issue edit N --remove-label loop:in-progress --add-label human-gated`
-- `gh issue comment N --body "🔴 HUMAN GATE TRIPPED — needs manual handling. See worktree \`.drover/worktrees/issue-N\`."`
-- Report: `🔴 Issue #N tripped HUMAN GATE — needs manual handling`
+- `gh issue comment N --body "HUMAN GATE TRIPPED — needs manual handling. See worktree \`.drover/worktrees/issue-N\`."`
+- Report: `Issue #N tripped HUMAN GATE — needs manual handling`
 - Halt the loop
 
 ### 5. Final report
@@ -251,13 +251,13 @@ Follow spec `.claude/skills/drover/references/run.md` → Builder (first pass). 
 Each PR stays under the merge size cap: `merge_policy.auto_max_lines` (default 400 changed lines,
 additions + deletions; lockfiles, generated files, snapshots and migration SQL do not count — see
 `merge_policy.size_exclude`). A PR over the cap is never auto-merged: the merge gate parks it in
-Blocked 🙋 "big PR — please review".
+Blocked `[needs-you]` "big PR — please review".
 
 Check `git diff --shortstat origin/<base>...HEAD` (minus excluded files) before each push. If the
 change grows past the cap mid-build, **stop — do not push on**. Commit and push what you have on
 the branch, leave the PR as a draft, and post a PR comment proposing the split: the vertical
 slices (each thin end to end, under the cap, with its own ACs), which slice this PR keeps, and
-`/to-tickets` as the way to file the rest. Then move the card to Blocked with `❓` ("too big —
+`/to-tickets` as the way to file the rest. Then move the card to Blocked with `[blocked:too-big]` ("too big —
 split proposed in PR #<P>", `block-template.md`). Never pad past the cap to "finish" the ticket.
 
 ### Lifecycle (Builder, rebuild)
@@ -267,7 +267,7 @@ Triggered when card returns to Ready/Building with `loop:rebuild-N` label.
    ```bash
    gh api graphql -f query='mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{isResolved}}}' -f threadId="<thread-id>"
    ```
-3. Address any new failure feedback from Tester's latest ❌ comment.
+3. Address any new failure feedback from Tester's latest `[qa] [report] failing` comment.
 4. Commit + push to same branch. Verify ALL `[builder]` threads are resolved before exit.
 5. Refresh [PR author notes](../drover/references/pr-author-notes.md), rewrite your PR body blocks (`drover-pr-body.sh`), post `[builder] [report]` PR + issue comments. Move card Ready/Building → QA.
 
@@ -300,4 +300,4 @@ Hash inputs (joined with `|`): lane (`build`) | error class | first 3 unique nor
 Builder NEVER squash-merges. Reviewer owns merge.
 
 ### Block exits use the §4 mandatory template
-When moving a card to Blocked (or dropping it: closed as not planned, Done, 🤷), populate the full template from `.claude/skills/drover/references/block-template.md`. A 1-line "needs creds" comment is a contract violation.
+When moving a card to Blocked (or dropping it: closed as not planned, Done, `[dropped]`), populate the full template from `.claude/skills/drover/references/block-template.md`. A 1-line "needs creds" comment is a contract violation.

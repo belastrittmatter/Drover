@@ -121,17 +121,23 @@ hits only LICENSE; tests green.
   regex in `tests/test_writing_format.py` with per-style checks.
 - Blocked reasons: the plain tags in specs/board.md FR-BRD-6 in `block-template.md` and `status.md`; update the grouping
   parser in the status script.
-- Builder success detection in `skills/super-build/scripts/super-build-dispatch.sh`
-  and `skills/super-build/SKILL.md` matches the `[chore] loop: close #N`
-  subject; change it with the commit style (audit section 15.8).
-- Strip emoji from every drover-written comment, log line and PR body;
-  drop the footer boilerplate in the PR body script. Manifest lines keep
+- Builder done / partial detection moves from the commit subject to the
+  `Drover: done #N` / `Drover: partial #N` body trailer (FR-CNV-6): writer
+  (`skills/drover-build/references/worker-preamble.md`, SKILL.md) and every
+  reader (`skills/drover-build/scripts/drover-build-dispatch.sh`, runner,
+  workflow) together (audit section 15.8).
+- `Next:` / `Owner:` / status alert name `owner`, not `Eric` (FR-CNV-7).
+- Strip emoji from every drover-written comment, log line, PR body and the
+  skills' chat output (FR-CNV-3); no footer or attribution lines. Manifest lines keep
   their format (specs/metrics.md FR-MET-2).
 
 Spec: specs/conventions.md, specs/board.md FR-BRD-6.
 
-Exit: no emoji in `lib/`, `skills/`, `hooks/` output; parser tests cover the
-new tags; tests green.
+Exit: no emoji in `scripts/`, `skills/`, `hooks/`, `workflows/` output
+(`tests/test_no_emoji.py`); parser tests cover the new tags; tests green.
+The reason tags are defined once (`scripts/drover-reasons.json`); the other
+FR-CNV-4 markers (thread prefixes, report marker, gate output lines) move
+to a shared definition in stage 7.
 
 ## Stage 5: CLI core + harness layer (2 days)
 
@@ -215,6 +221,8 @@ build in parallel with `max_workers: 2`; tests green.
   commit and bounces if it passes there (FR-BLD-7).
 - Review report lists test-file changes by non-QA commits since QA's last
   pass, visibility only (FR-REV-12).
+- FR-CNV-4 for the remaining markers: thread prefixes, the review report
+  marker and gate output lines, each defined once for writer and parser.
 - Context packs (FR-CTX): `drover context <role> <issue>`, per-role rules
   files split out of upstream's `run.md`, `--claims` gated on recorded
   hypotheses, tests asserting each pack's contents. Adds about 1 day.

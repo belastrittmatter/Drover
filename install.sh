@@ -21,13 +21,13 @@
 # link cannot be made (Windows without symlink rights) the file is copied.
 # Settings and run state (.claude/settings.json, .claude/drover/) stay put.
 #
-# Output is grouped with emojis, one line per group of files (failures still name
-# the file). Environment: DROVER_QUIET_NEXT=1 prints only the "🔧 installing"
+# Output is grouped under plain headers, one line per group of files (failures still name
+# the file). Environment: DROVER_QUIET_NEXT=1 prints only the "installing"
 # group, for a wrapper that prints its own header and summary around it.
 #
 # An older drover already in the target (a different skills/drover/VERSION,
 # or one with no VERSION) is recorded in .claude/drover/upgrade.json
-# {from, to, added_skills}; onboard's 🔍 Checks finishes the upgrade and lists it.
+# {from, to, added_skills}; onboard's Checks step finishes the upgrade and lists it.
 
 set -euo pipefail
 
@@ -107,8 +107,8 @@ if [ -n "$PREV_VERSION" ]; then
   done
 fi
 
-[ -n "$QUIET" ] || echo "🧩 drover $PACK_VERSION → $TARGET"
-echo "🔧 installing"
+[ -n "$QUIET" ] || echo "drover $PACK_VERSION → $TARGET"
+echo "installing"
 
 # Resolve all skill paths before replacing anything. A destination can contain
 # the pack (or a linked source skill); clearing it would destroy our input.
@@ -226,7 +226,7 @@ for skill in $PRIMARY_SKILLS $SECONDARY_SKILLS; do
   install_skill "$skill" "$SHARED/skills/$skill" || true
 done
 
-SCRIPTS="drover-project-verifier.py drover-skills-ready.py drover-verification-ready.py drover-github-read.py drover-collect-state.py drover-run.sh drover-gh-guard.sh drover-card.sh drover-status.py drover-wave-plan.sh drover-lane.sh drover-codex-lane.sh drover-codex-wave.sh drover-deps.sh drover-preflight.sh drover-merge-gate.sh drover-merge-policy.py drover-approval.py drover-env-check.sh drover-settings.py drover-setup.py drover-usage.sh drover-throttle.sh drover-host.sh drover-pr-body.sh drover-review-file-refactor.sh drover-qa-file-bug.sh drover-stop.sh"
+SCRIPTS="drover-project-verifier.py drover-skills-ready.py drover-verification-ready.py drover-github-read.py drover-collect-state.py drover-run.sh drover-gh-guard.sh drover-card.sh drover-status.py drover-wave-plan.sh drover-lane.sh drover-codex-lane.sh drover-codex-wave.sh drover-deps.sh drover-preflight.sh drover-merge-gate.sh drover-merge-policy.py drover-approval.py drover-env-check.sh drover-settings.py drover-setup.py drover-usage.sh drover-throttle.sh drover-host.sh drover-pr-body.sh drover-review-file-refactor.sh drover-qa-file-bug.sh drover-stop.sh drover-reasons.json drover-commit-style.py"
 for script in $SCRIPTS; do
   if [ -f "$REPO_ROOT/scripts/$script" ]; then
     copy_file "$REPO_ROOT/scripts/$script" "$SHARED/bin/$script"
@@ -298,16 +298,16 @@ if [ "$HOOKS" -eq 1 ]; then
   SNIPPETS="$REPO_ROOT/hooks/settings-snippet.json"
   if [ "$PROTECT" -eq 1 ]; then SNIPPETS="$SNIPPETS $REPO_ROOT/hooks/settings-protect-main.json"; fi
   # shellcheck disable=SC2086
-  echo "   🛡️  $n guard hooks → .claude/settings.json ($(merge_settings $SNIPPETS))"
+  echo "   $n guard hooks → .claude/settings.json ($(merge_settings $SNIPPETS))"
 elif [ "$PROTECT" -eq 1 ]; then
   # --no-hooks --protect-main: the one guard asked for, nothing else. This is the
   # command onboard names when its protect-main question finds no guard script.
-  echo "   🛡️  --no-hooks: only the push guard → .claude/settings.json ($(merge_settings "$REPO_ROOT/hooks/settings-protect-main.json"))"
+  echo "   --no-hooks: only the push guard → .claude/settings.json ($(merge_settings "$REPO_ROOT/hooks/settings-protect-main.json"))"
 else
-  echo "   ⏭️  guard hooks skipped (--no-hooks)"
+  echo "   guard hooks skipped (--no-hooks)"
 fi
 
-# Upgrade record for onboard's 🔍 Checks (it migrates config, labels, columns).
+# Upgrade record for onboard's Checks step (it migrates config, labels, columns).
 if [ -n "$PREV_VERSION" ] && [ "$PREV_VERSION" != "$PACK_VERSION" ]; then
   mkdir -p "$TARGET/.claude/drover"
   python3 - "$TARGET/.claude/drover/upgrade.json" "$PREV_VERSION" "$PACK_VERSION" $ADDED_SKILLS <<'PY'
@@ -321,10 +321,10 @@ rec = {"from": old.get("from", frm), "to": to, "added_skills": sorted(set(old.ge
        "at": time.strftime("%Y-%m-%dT%H:%M:%S")}
 json.dump(rec, open(path, "w"), indent=2)
 PY
-  echo "   ⬆️  upgrade from $PREV_VERSION — onboard finishes it (config, labels, columns)"
+  echo "   upgrade from $PREV_VERSION — onboard finishes it (config, labels, columns)"
 fi
 
 if [ -z "$QUIET" ]; then
-  echo "🎉 drover $PACK_VERSION is installed"
-  echo "👉 next: open Claude Code here and run /drover onboard"
+  echo "drover $PACK_VERSION is installed"
+  echo "next: open Claude Code here and run /drover onboard"
 fi

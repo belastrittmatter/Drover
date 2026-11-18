@@ -87,7 +87,7 @@ orchestrator pausing on `AskUserQuestion`.
 **Decide-and-proceed, don't ask, on these classes of issue:**
 
 - Harness script bugs (parser errors, broken xargs, missing
-  `chmod +x`, stale lock files). Fix locally, commit as `🐛 [fix] drover-qa: <what>`
+  `chmod +x`, stale lock files). Fix locally, commit in the repo's `commit_style` (writing-standard.md § 1)
   (writing-standard.md § 1), then continue.
 - Missing env auto-loads, leftover MCP zombies, log-dir creation.
 - Lint / formatting nits introduced by the worker that block its own commit.
@@ -153,16 +153,17 @@ Do **not** use legacy `[VFL]`, `verify-fix`, or `severity:P*` wording in new iss
 **Title format:**
 
 ```text
-<emoji> <Type> <route?> — <short action/result>
+[<kind>] <scope>: <short action/result>
 ```
 
-Examples:
+The filer builds it from `--kind`, `--area` (else the route) and the bare `--title`
+(writing-standard.md § 3). Examples:
 
 ```text
-🐛 Bug /imports — CSV upload fails after submit
-🎨 UX /settings/users — Add user button is a no-op
-🧪 Tests /orders — missing coverage for failed payment state
-📝 Docs /delivery — SPEC section missing for dispatch flow
+[bug] imports: CSV upload fails after submit
+[ui] settings-users: Add user button is a no-op
+[test] orders: missing coverage for failed payment state
+[docs] delivery: SPEC section missing for dispatch flow
 ```
 
 **Priority labels use plain words:**
@@ -284,7 +285,7 @@ exposes everything via `report.forensics.*` (e.g.
   share `queue.md`. To run parallel work, branch and run a second
   orchestrator.)
 
-Report once: `🐛 Drover QA starting — N iterations`.
+Report once: `Drover QA starting — N iterations`.
 
 ### 2. For each iteration N (sequential)
 
@@ -302,20 +303,20 @@ Launch one sub-agent (Agent tool) in the repo root, no worktree, with
 prompt = `references/iteration-preamble.md` + a per-iteration footer (iter
 num, base SHA, mandatory final-commit format) and `DROVER_QA_FORENSICS=1`.
 When it returns, classify the iteration:
-- `0` iter complete — a `🧪 [test] drover-qa: iter N` commit is on the current branch.
+- `0` iter complete — a commit on the current branch carries the trailer `Drover: qa-iter N (…)`.
 - `2` worker failed — it errored and left no done or WIP marker.
-- `3` no done-commit — it finished but no `🧪 [test] drover-qa: iter N` commit exists.
+- `3` no done-commit — it finished but no commit carries `Drover: qa-iter N`.
 - `4` HUMAN GATE — its output contains `HUMAN GATE TRIPPED:`.
-- `5` WIP-CHECKPOINT — it hit its budget mid-fix and left a `🚧 [wip] drover-qa:` commit;
+- `5` WIP-CHECKPOINT — it hit its budget mid-fix and left a `Drover: qa-checkpoint N` commit;
   the next iter picks it up.
 
-Report: `🔍 Iter N launched`.
+Report: `Iter N launched`.
 
 **2c. Wait, then advance**
 
 On status 0:
-- Read the close-out commit subject to extract `(X bugs, Y items)`.
-- Report: `✅ Iter N done — X bugs, Y items processed`.
+- Read the close-out commit's `Drover: qa-iter` trailer (`git log --format=%B`) to extract `(X bugs, Y items)`.
+- Report: `Iter N done — X bugs, Y items processed`.
 - Loop to next iteration.
 
 On status 2 / 3 / 4 / 5:
@@ -382,7 +383,8 @@ OR 30 min wall-clock):
 **Phase 3 — Report.** Write `docs/drover-qa/iter/iteration-N.md` (bugs
 found, items processed, queue size before/after, coverage snapshot). Run
 `npm run qa:report:render`. Commit:
-`🧪 [test] drover-qa: iter N (X bugs, Y items, Z PRs opened)` (writing-standard.md § 1).
+subject in `commit_style`, body trailer `Drover: qa-iter N (X bugs, Y items, Z PRs opened)`
+(writing-standard.md § 1).
 
 ## The bug-handling rule (non-blocking)
 
@@ -519,14 +521,14 @@ QA's one security check. Run it on every PR, not only on security labels; with n
 1. Load `pr-security-review` and follow it on the PR's diff against its base branch
    (`gh pr view <PR> --json baseRefName`). It runs in this lane, not in a sub-agent: it
    launches its own finding and false-positive sub-tasks.
-2. Each finding it keeps is a QA failure, filed the normal way: one `❌ Not done` line
+2. Each finding it keeps is a QA failure, filed the normal way: one `Not done:` line
    (`security: <category> — <one line> · <file:line>`), one `[builder]` PR thread on that
    line, then the **Fail** exit (QA → Ready, `loop:rebuild-N`). A finding outside the
    card's scope is filed with `drover-qa-file-bug.sh` (`source:qa`, priority high) and still
    fails the card while the PR adds the hole.
-3. A finding you can show is wrong goes on the `✅ Done` line with the proof.
+3. A finding you can show is wrong goes on the `Done:` line with the proof.
 4. No findings → `pr-security-review: 0 findings` on the `Did:` line.
-5. Skill missing → Block the card (`🔐`, needs install). Never pass a PR unchecked.
+5. Skill missing → Block the card (`[blocked:access]`, needs install). Never pass a PR unchecked.
 
 This replaces Claude Code's built-in `/security-review`, which drover-qa no longer calls.
 For a deep audit of the whole repo, mention `security-audit` (standalone, if installed);
@@ -607,7 +609,7 @@ docs/drover-qa/report/
 - Default: starts a new batch numbered after the last `iteration-*.md`
   (e.g. if iters 1-5 exist, the next batch starts at 6).
 - `--resume`: only run iters whose number is greater than `max(existing)`.
-- A leftover `🚧 [wip] drover-qa:` commit on the current branch (from a status-5 iteration)
+- A leftover `Drover: qa-checkpoint` commit on the current branch (from a status-5 iteration)
   is OK — the next iter's regression phase finds the red spec and finishes
   the fix.
 
@@ -664,8 +666,8 @@ for affected selection, host readiness, real assertions and fresh proof.
 3c. Run the **Security pass** (above) on the PR's diff. Any kept finding → Fail (step 7).
 4. Run tests. Capture evidence to `docs/drover/runs/issue-<N>-qa-v<N>/`. **For any UI-affecting issue, capture at least one screenshot per AC** (Playwright `page.screenshot` or `browse --screenshot`). Save with descriptive names: `ac1-<short-desc>.png`, not `screenshot1.png`.
 5. **Commit the evidence directory** to the issue branch alongside test files (`git add docs/drover/runs/issue-<N>-qa-v<N>/ && git commit && git push`). This is non-optional — without it, the inline image markdown in the issue comment won't render on GitHub.
-6. **Pass** → tick the PR's `ac` block with proof lines, write `visual` for UI, append a `history` row, rewrite `status` (`drover-pr-body.sh`) → `[qa] [report] ✅` PR comment with results + evidence path → **issue comment with screenshot evidence** (see "Issue-comment evidence format" below) → move QA → Review. Clean up worktree.
-7. **Fail** → leave failing ACs unchecked with the reason, append a `history` row, rewrite `status` → `[qa] [report] ❌` PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" → issue comment with the failure screenshots → increment rebuild counter → move QA → Ready (label `loop:rebuild-N`). Clean up worktree.
+6. **Pass** → tick the PR's `ac` block with proof lines, write `visual` for UI, append a `history` row, rewrite `status` (`drover-pr-body.sh`) → `[qa] [report] pass` PR comment with results + evidence path → **issue comment with screenshot evidence** (see "Issue-comment evidence format" below) → move QA → Review. Clean up worktree.
+7. **Fail** → leave failing ACs unchecked with the reason, append a `history` row, rewrite `status` → `[qa] [report] failing` PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" → issue comment with the failure screenshots → increment rebuild counter → move QA → Ready (label `loop:rebuild-N`). Clean up worktree.
 
 ### Optional project feature verifier
 

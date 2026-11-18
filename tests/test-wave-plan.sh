@@ -140,13 +140,13 @@ lane() { echo "$OUT17" | jq -r --argjson n "$1" '.cards[] | select(.number == $n
 echo "$OUT17" | jq -e '.cards[] | select(.number == 12) | .labels == ["qa"]' >/dev/null \
   || fail "labels must be passed through lower-cased, got: $OUT17"
 
-# 18 — resume: a 🙋 Blocked card whose human step is done (#20) is reported for
+# 18 — resume: a [needs-you] Blocked card whose human step is done (#20) is reported for
 #      the move back to Review; one still waiting (#21) is not. Neither is swept
 #      to Ready or dispatched from Blocked.
 echo "$OUT" | jq -e '[.resume[].number] == [20]' >/dev/null \
   || fail "expected only #20 resumed, got: $(echo "$OUT" | jq -c .resume)"
 echo "$OUT" | jq -e '[.sweep[].number, .cards[].number] | (index(20) == null and index(21) == null)' >/dev/null \
-  || fail "🙋 cards must not be swept to Ready or dispatched"
+  || fail "[needs-you] cards must not be swept to Ready or dispatched"
 
 # 19 — a moved head while Blocked goes to request refresh, never approved resume.
 OUT19=$("$PLAN" --config <(echo "$NOCAP") --items "$ITEMS" --deps <(jq '.["21"].approvalRefresh=true | .["21"].approvalWhy="PR head changed"' "$DEPS"))

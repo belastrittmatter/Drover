@@ -125,7 +125,7 @@
     "comments": {
       "nodes": [
         {
-          "body": "🛡 drover · Review · BLOCKED\nReason tag:  🙋 needs you\nTo unblock:  [ ] npm run db:migrate:live\nblocked-by:  -"
+          "body": "[reviewer] [blocker] blocked [needs-you] migration\nReason tag:  [needs-you] needs you\nTo unblock:  [ ] npm run db:migrate:live\nblocked-by:  -"
         }
       ]
     }
@@ -138,7 +138,7 @@
     "comments": {
       "nodes": [
         {
-          "body": "🛡 drover · Review · BLOCKED\nReason tag:  🙋 needs you\nTo unblock:  [ ] npm run db:migrate:live\nblocked-by:  -"
+          "body": "[reviewer] [blocker] blocked [needs-you] migration\nReason tag:  [needs-you] needs you\nTo unblock:  [ ] npm run db:migrate:live\nblocked-by:  -"
         },
         {
           "body": "Done"
@@ -161,7 +161,7 @@
     "comments": {
       "nodes": [
         {
-          "body": "🛡 drover · Review · BLOCKED\nReason tag:  🙋 needs you\nTo unblock:  [ ] npm run db:migrate:live\nblocked-by:  -"
+          "body": "[reviewer] [blocker] blocked [needs-you] migration\nReason tag:  [needs-you] needs you\nTo unblock:  [ ] npm run db:migrate:live\nblocked-by:  -"
         }
       ]
     }
@@ -177,7 +177,7 @@
           "body": "done"
         },
         {
-          "body": "🛡 drover · Review · BLOCKED\nReason tag:  🙋 needs you\nTo unblock:  [ ] npm run db:migrate:live\nblocked-by:  -"
+          "body": "[reviewer] [blocker] blocked [needs-you] migration\nReason tag:  [needs-you] needs you\nTo unblock:  [ ] npm run db:migrate:live\nblocked-by:  -"
         }
       ]
     }

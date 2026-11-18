@@ -23,7 +23,8 @@ _reader_spec.loader.exec_module(github_read)
 PREFIX = "approval-request: "
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 SCOPE = re.compile(r"[0-9a-f]{64}\Z")
-BLOCK = re.compile(r"Reason tag:[^\n]*🙋|^approval-request:", re.M)
+NEEDS_YOU = json.loads(Path(__file__).with_name("drover-reasons.json").read_text(encoding="utf-8"))["needs_you"]
+BLOCK = re.compile(r"Reason tag:[^\n]*" + re.escape(NEEDS_YOU) + r"|^approval-request:", re.M)
 DONE = re.compile(r"\s*done[.!]?\s*\Z", re.I)
 # GitHub's closing keywords: KEYWORD[:] #N or KEYWORD[:] owner/repo#N.
 CLOSES = re.compile(r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+([\w.-]+/[\w.-]+)?#(\d+)\b", re.I)

@@ -2,7 +2,9 @@
 
 One format for everything drover writes: commits, PR bodies, tickets, comments.
 It applies in the drover repo and in every project drover is
-installed into. A host repo with its own commit style (EricOS root) keeps it outside the pack.
+installed into. Commit subjects and PR titles follow the host repo's own style (§ 1).
+Nothing drover writes carries emoji; GitHub alert boxes (`> [!NOTE]`, `> [!TIP]`,
+`> [!WARNING]`) carry the tone instead.
 
 Every template in this pack points here. Change the format here first, then the templates.
 
@@ -21,57 +23,75 @@ Every template in this pack points here. Change the format here first, then the 
 
 ## 1 · Commit
 
+The subject follows the host repo's own style, stored as `commit_style` in the config. Onboard
+classifies the base branch's last 50 subjects with `drover-commit-style.py`; fewer than 10
+commits or no clear majority gives `conventional`. Every lane prompt carries the style and
+three real subjects from the repo: copy their shape (case, scope, tense).
+
+| `commit_style` | Subject shape | Example |
+|---|---|---|
+| `conventional` (default) | `<type>(<scope>): <subject>` (scope optional) | `fix(receipts): show a size error over 10 MB` |
+| `bracket-tag` | `[<type>] <scope>: <subject>` | `[fix] receipts: show a size error over 10 MB` |
+| `plain` | Capitalized imperative sentence, no prefix | `Show a size error for receipts over 10 MB` |
+| `other` | the shape of the three example subjects | (from the repo) |
+
+Types: `feat` · `fix` · `chore` · `refactor` · `test` · `perf` · `docs` · `ci` · `ui` ·
+`security` · `revert` · `wip`.
+
 ```
-<emoji> [<type>] <scope>: <subject>
+<subject in commit_style>
 
 - <short bullet>
 - <short bullet>
 Closes #<N>
-Co-Authored-By: …
 ```
 
 | Field | Rule | Required |
 |---|---|---|
-| Subject | `<emoji> [<type>] <scope>: <subject>` · imperative · ≤ 72 chars | yes |
+| Subject | in `commit_style` · imperative · ≤ 72 chars · no emoji | yes |
 | Body | 1–4 short bullets: what changed, what proves it | yes, except trivial commits |
 | `Closes #N` | when the commit finishes a ticket | when it applies |
 | `--- decision ---` trailer | a rung-3 fork (drover-build decision policy) | when it applies |
 
-| Emoji | Type | Use for |
+NEVER add `Co-Authored-By`, "Generated with" or any other attribution or footer line to a
+commit or PR.
+
+**Branch-only commits keep a fixed conventional subject.** A few tool commits land only on a
+card or refine branch and never reach the base branch, because the merge gate squashes the
+branch and the squash subject is the PR title (which follows `commit_style`). They do not
+detect the style:
+
+| Commit | Subject | Written by |
 |---|---|---|
-| ✨ | `feat` | new behaviour |
-| 🐛 | `fix` | bug fix |
-| 🔧 | `chore` | tooling, config, loop markers |
-| ♻️ | `refactor` | same behaviour, better shape |
-| 🧪 | `test` | tests only |
-| ⚡ | `perf` | faster, same behaviour |
-| 📝 | `docs` | docs only |
-| 👷 | `ci` | CI pipelines |
-| 💄 | `ui` | visual polish, screenshots |
-| 🔒 | `security` | auth, secrets, hardening |
-| ⏪ | `revert` | revert a commit |
-| 🚧 | `wip` | partial work, checkpoints |
+| ui-refine-loop round | `ui(<slug>): round <n> — <what changed>` | `workflows/ui-refine-loop.js` |
+| ui-refine-loop screenshots | `ui(<slug>): before/after screenshots` | `skills/ui-refine-loop/scripts/pr-shots.sh` |
+| worktree snapshot before cleanup | `wip(cleanup-wt): snapshot <iso time>` | `hooks/cleanup-wt.py` |
 
-Subject regex (checked by `tests/test_writing_format.py`):
-`^(✨|🐛|🔧|♻️|🧪|⚡|📝|👷|💄|🔒|⏪|🚧) \[(feat|fix|chore|refactor|test|perf|docs|ci|ui|security|revert|wip)\] [a-z0-9][a-z0-9._/-]*: \S`
-The emoji must match its type.
+Subject regexes (checked by `tests/test_writing_format.py`):
 
-Machine-read subjects (scripts grep these exact shapes):
-
-| Commit | Subject |
+| `commit_style` | Regex |
 |---|---|
-| Builder done | `🔧 [chore] loop: close #<N> — <summary>` |
-| Builder partial | `🚧 [wip] loop: #<N> partial — <slice or reason>` |
-| drover-qa iteration done | `🧪 [test] drover-qa: iter <N> (<X> bugs, <Y> items, <Z> PRs opened)` |
-| drover-qa checkpoint | `🚧 [wip] drover-qa: iter <N> — <one-liner>` |
+| `conventional` | `^(feat\|fix\|chore\|refactor\|test\|perf\|docs\|ci\|ui\|security\|revert\|wip)(\([a-z0-9._/-]+\))?!?: \S` |
+| `bracket-tag` | `^\[(feat\|fix\|chore\|refactor\|test\|perf\|docs\|ci\|ui\|security\|revert\|wip)\] [a-z0-9][a-z0-9._/-]*: \S` |
+| `plain` | `^[A-Z][a-z]+ \S` |
+
+Machine-read trailers. Scripts and orchestrators read these from the commit body
+(`git log --format=%B`), never from the subject. One trailer line, last in the body:
+
+| Commit | Body trailer | Read by |
+|---|---|---|
+| Builder done | `Drover: done #<N>` | `drover-build-dispatch.sh` (exit 0) |
+| Builder partial | `Drover: partial #<N>` | `drover-build-dispatch.sh` (exit 5, with `WIP-PARTIAL:`) |
+| drover-qa iteration done | `Drover: qa-iter <N> (<X> bugs, <Y> items, <Z> PRs opened)` | drover-qa orchestrator |
+| drover-qa checkpoint | `Drover: qa-checkpoint <N>` | drover-qa orchestrator |
 
 **Squash merge.** Subject = the PR title. Body = the PR's commit bullets, deduplicated, plus
 `Closes #N`. The merge gate takes them as `--subject` and `--body-file`.
 
-Example:
+Example (`conventional`):
 
 ```
-🐛 [fix] receipts: show a size error over 10 MB
+fix(receipts): show a size error over 10 MB
 
 - 413 now shows "File too large"
 - client checks size before upload
@@ -81,7 +101,7 @@ Closes #790
 
 ## 2 · PR
 
-**Title** = commit subject format: `🐛 [fix] receipts: show a size error over 10 MB`.
+**Title** = a subject in `commit_style`: `fix(receipts): show a size error over 10 MB`.
 
 **Body** = marker blocks, in this order. A lane rewrites only its own blocks, with
 `.claude/bin/drover-pr-body.sh` (it refuses when the PR head moved since you read it).
@@ -104,23 +124,23 @@ Each block closes with `<!-- /sb:<name> -->`.
 
 ```
 > [!WARNING]
-> 🔴 Merged with a failing check: `e2e-mobile` · CI budget block; local suite green 42/42, truth 91/100
+> Merged with a failing check: `e2e-mobile` · CI budget block; local suite green 42/42, truth 91/100
 ```
 
 **Status card** — a GitHub alert, one line:
 
 | State | Alert | Line |
 |---|---|---|
-| building, in QA, in review | `> [!NOTE]` | `⏳ In review · round 1 · ✅ 2/3 AC · Closes #790 · head \`3f9c2a1\`` |
-| merged | `> [!TIP]` | `✅ Merged · \`9c41e07\`` |
-| blocked, red check | `> [!WARNING]` | `🛑 Blocked · needs Eric` |
+| building, in QA, in review | `> [!NOTE]` | `In review · round 1 · 2/3 AC · Closes #790 · head \`3f9c2a1\`` |
+| merged | `> [!TIP]` | `Merged · \`9c41e07\`` |
+| blocked, red check | `> [!WARNING]` | `Blocked · needs owner` |
 
 A partial PR writes `Refs #N`, never `Closes #N`. A human-only step can ride inside the
 alert, one `> needs-you: <command>` line each; the merge gate reads it there or under Risk:
 
 ```
 > [!WARNING]
-> 🛑 Blocked · needs you · ✅ 2/3 AC · Closes #790 · head `3f9c2a1`
+> Blocked · needs owner · 2/3 AC · Closes #790 · head `3f9c2a1`
 > needs-you: `npm run db:migrate:live`
 ```
 
@@ -160,7 +180,7 @@ goes in Before | After.
 - [x] No request over 10 MB\
   ↳ spec asserts 0 calls · HAR in `runs/issue-790-qa-v2/`
 - [ ] No new Sentry events after deploy\
-  ↳ not verified: needs prod deploy · Eric
+  ↳ not verified: needs prod deploy · owner
 ```
 
 **Iteration history** — folded in `<details>`, so the reader sees Problem to Risk first.
@@ -171,12 +191,12 @@ fold, above the blank line and `</details>`; an older unfolded history still app
 ```
 <details><summary>Iteration history</summary>
 
-| Lane | Done | Time | Details |
+| Lane | Result | Time | Details |
 |---|---|---|---|
-| 🔨 builder | ✅ | Oct 2, 10:02 EDT | draft · `3f9c2a1` |
-| 🔍 qa | ❌ v1 | Oct 2, 10:40 EDT | mobile hidden · `runs/issue-790-qa-v1/` |
-| 🔍 qa | ✅ v2 | Oct 2, 11:55 EDT | `runs/issue-790-qa-v2/` |
-| 🧐 reviewer | ✅ merged | Oct 2, 12:20 EDT | squash `9c41e07` |
+| builder | pass | Oct 2, 10:02 EDT | draft · `3f9c2a1` |
+| qa | fail v1 | Oct 2, 10:40 EDT | mobile hidden · `runs/issue-790-qa-v1/` |
+| qa | pass v2 | Oct 2, 11:55 EDT | `runs/issue-790-qa-v2/` |
+| reviewer | merged | Oct 2, 12:20 EDT | squash `9c41e07` |
 
 </details>
 ```
@@ -197,30 +217,30 @@ here too.
 
 ```
 ## Risk
-🟢 **Low** · limit read from one constant; no plan differences.
+**Low** · limit read from one constant; no plan differences.
 - **Door:** two-way · revert the PR and the old check returns
 - **Blast radius:** upload form · users with files over 10 MB see a new error
 ```
 
-Levels: 🟢 Low · 🟡 Medium · 🔴 High. **Door** is two-way (a revert undoes it) or one-way
-(hard to undo: DROP, rename, data rewrite, public API, sent email); a one-way door is never 🟢.
+Levels: **Low** · **Medium** · **High**. **Door** is two-way (a revert undoes it) or one-way
+(hard to undo: DROP, rename, data rewrite, public API, sent email); a one-way door is never Low.
 **Blast radius** is a short label (`none`, `page`, `billing`, `all users`) and one line on who
 breaks. A `needs-you: <command>` line (merge gate reads it) goes under Risk or inside the
 status alert.
 
 ## 3 · Ticket
 
-**Title:** `<emoji> [<kind>] <scope>: <what is wrong or wanted>` · ≤ 70 chars, no ticket number.
+**Title:** `[<kind>] <scope>: <what is wrong or wanted>` · ≤ 70 chars, no ticket number, no emoji.
 
 | Kind | Title tag |
 |---|---|
-| bug | `🐛 [bug]` |
-| feature | `✨ [feat]` |
-| ux | `💄 [ui]` |
-| tests | `🧪 [test]` |
-| docs | `📝 [docs]` |
-| tech-debt, refactor | `♻️ [refactor]` |
-| security | `🔒 [security]` |
+| bug | `[bug]` |
+| feature | `[feat]` |
+| ux | `[ui]` |
+| tests | `[test]` |
+| docs | `[docs]` |
+| tech-debt, refactor | `[refactor]` |
+| security | `[security]` |
 
 **Sections**, in order:
 
@@ -231,7 +251,7 @@ status alert.
 | `## Evidence` | the folded 12-row table below | bugs |
 | `## Fix` | the intended change in 1–3 lines. No implementation plan | yes |
 | `## Acceptance Criteria` | 2–5 `- [ ]` items, each checkable by a test | yes |
-| `## Risk` | 🟢/🟡/🔴 level + one line | yes |
+| `## Risk` | **Low** / **Medium** / **High** + one line | yes |
 | `## Blocked by` | `- #N — why` bullets, or exactly `- None.` | yes |
 
 When an unsettled design triggers [design preflight](design-preflight.md), retain the
@@ -241,7 +261,7 @@ spec/ADR there. Keep the same sections. Lint saves only the exact issue edit the
 Example:
 
 ```
-🐛 [bug] receipts: spinner never stops over 10 MB
+[bug] receipts: spinner never stops over 10 MB
 
 ## Problem
 A 12 MB PDF spins forever. The 413 is never handled.
@@ -263,7 +283,7 @@ Map 413 to the size message; check size before upload.
 - [ ] No request over 10 MB leaves the browser
 
 ## Risk
-🟢 **Low** · limit lives in two places today; the fix makes it one constant.
+**Low** · limit lives in two places today; the fix makes it one constant.
 
 ## Blocked by
 - None.
@@ -332,19 +352,19 @@ how to use GitHub's file and line comments, and how to refresh notes without dup
 ### Lane status and findings
 
 ```
-[<role>] [<label>] <status-emoji> <status> · <round or short context>
+[<role>] [<label>] <status> · <round or short context>
 Did: <what this lane did, one line>
-✅ Done: <what passed or landed>
-❌ Not done: <what failed or was skipped, and why>   (omit when nothing)
-Next: <owner>
+Done: <what passed or landed>
+Not done: <what failed or was skipped, and why>   (omit when nothing)
+Next: <who acts next>
 ```
 
 | Field | Values |
 |---|---|
 | role (who writes it) | `builder` · `qa` · `reviewer` · `collect` · `orchestrator` |
 | label | `blocker` · `issue` · `suggestion` · `nit` · `question` · `praise` · `report` |
-| status emoji | ✅ pass/done · ❌ fail · ⏳ in progress · 🛑 blocked · 🙋 needs you · ↩️ moved back · ⚠️ warning |
-| Next | `builder` · `qa` · `reviewer` · `Eric` · `none` |
+| status | a word or two: `pass` · `failing` · `built` · `in progress` · `blocked` · `needs owner` · `moved back` · `partial` · `bounced` · `merged` |
+| Next | `builder` · `qa` · `reviewer` · `owner` · `none` |
 
 Header regex: `^\[(builder|qa|reviewer|collect|orchestrator)\] \[(blocker|issue|suggestion|nit|question|praise|report)\] \S`
 
@@ -357,10 +377,10 @@ Header regex: `^\[(builder|qa|reviewer|collect|orchestrator)\] \[(blocker|issue|
 Example:
 
 ```
-[qa] [report] ❌ failing · round 1
+[qa] [report] failing · round 1
 Did: ran AC1–AC2, desktop + mobile
-✅ Done: AC2 no request over 10 MB
-❌ Not done: AC1 mobile: message under the keyboard
+Done: AC2 no request over 10 MB
+Not done: AC1 mobile: message under the keyboard
 Next: builder
 Local tests: npx playwright test e2e/upload-size.spec.ts
 ```
@@ -375,16 +395,16 @@ R-ids never change; a new finding takes the next free id.
 
 ```
 <!-- drover-review:report -->
-[reviewer] [report] ❌ bounced · round 2
+[reviewer] [report] bounced · round 2
 Did: re-checked R1–R2, fresh pass skipped (R2 open)
-✅ Done: R1 fixed `src/cart.py:12`
-❌ Not done: R2 not fixed `src/cart.py:31`
+Done: R1 fixed `src/cart.py:12`
+Not done: R2 not fixed `src/cart.py:31`
 Next: builder
 
 | ID | Owner | Class | Where | Finding | Status |
 |---|---|---|---|---|---|
-| R1 | builder | Bug | `src/cart.py:12` | average_price divides by zero on an empty cart | ✅ fixed |
-| R2 | builder | Bug | `src/cart.py:31` | discount_pct not clamped to 0–100 | ❌ not fixed |
+| R1 | builder | Bug | `src/cart.py:12` | average_price divides by zero on an empty cart | fixed |
+| R2 | builder | Bug | `src/cart.py:31` | discount_pct not clamped to 0–100 | not fixed |
 ```
 
 Reviewer status words: `merge-ready` · `bounced` · `blocked` · `human-gated` · `unverified` ·
@@ -401,7 +421,7 @@ Reviewer status words: `merge-ready` · `bounced` · `blocked` · `human-gated` 
 
 ## Human approval evidence
 
-A 🙋 merge hold has one canonical request comment on the linked issue (or on the PR
+A `[needs-you]` merge hold has one canonical request comment on the linked issue (or on the PR
 when it has no linked issue). Copy the gate's `approval-request:` line verbatim into
 that comment; it pins the repository, PR, full head and policy/human-step scope.
 Other threads link to that request without repeating its machine lines. A trusted

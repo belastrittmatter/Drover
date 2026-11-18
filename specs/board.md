@@ -11,7 +11,7 @@ Part of the [drover spec](README.md).
 | FR-BRD-5 | When an issue named in `blocked-by:` closes, the next round returns the card to its column | `references/run-workflow.md` round-start sweep, `scripts/super-board-wave-plan.sh`, `scripts/super-board-deps.sh` (`workflow` backend only; stage 6 ports it) | `test-wave-plan.sh` (rewrite against the runner in stage 6) |
 | FR-BRD-7 | A Ready card whose `blocked-by:` names an open issue is not claimed | `scripts/super-board-wave-plan.sh`, `scripts/super-board-deps.sh` (`workflow` backend only; stage 6 ports it) | `test-wave-plan.sh` (rewrite against the runner in stage 6) |
 | FR-BRD-8 | When the owner approves a Blocked `[needs-you]` merge (`done` on the current PR head), the next round moves the card back to Review; if the head changed while Blocked, it asks for a new approval instead | `scripts/super-board-wave-plan.sh` `resume` / `refreshApproval`, `scripts/super-board-approval.py` (`workflow` backend only; stage 6 ports it) | `test-wave-plan.sh` (rewrite against the runner in stage 6) |
-| FR-STS-1 | `status` is read-only and shows column counts, live workers, Blocked grouped by reason (at `d0b7d5a` only 4 of the writer's 12 reason emoji are grouped; the rest show as "other"; FR-BRD-6 fixes it) | `references/status.md`, `scripts/super-board-status.py` | `test_status_parse.py` |
+| FR-STS-1 | `status` is read-only and shows column counts, live workers, Blocked grouped by reason tag (FR-BRD-6; at `d0b7d5a` only 4 of 12 reason emoji were grouped) | `references/status.md`, `scripts/super-board-status.py` | `test_status_parse.py` |
 
 ## Contracts
 
@@ -29,9 +29,14 @@ Part of the [drover spec](README.md).
   open-card side.)
 - **FR-BRD-6 (changed)** Reason tags shall be plain text from one fixed list
   defined in a single file read by both writers and the status parser:
-  `[blocked:duplicate]`, `[blocked:unclear]`, `[blocked:too-big]`,
-  `[blocked:sequenced]`, `[blocked:ci]`, `[blocked:creds]`,
-  `[blocked:schema]`, `[blocked:rebuild-cap]`, `[needs-you]`. They replace
-  upstream's emoji vocabulary (`block-template.md`, `status.md` section I).
+  `[blocked:creds]`, `[blocked:quota]`, `[blocked:access]`,
+  `[blocked:unclear]`, `[blocked:unsafe]`, `[blocked:review]`,
+  `[blocked:design]`, `[blocked:duplicate]`, `[blocked:sequenced]`,
+  `[blocked:too-big]`, `[blocked:ci]`, `[blocked:schema]`,
+  `[blocked:rebuild-cap]`, `[needs-you]`. `drover status` groups Blocked
+  cards by these tags. They replace upstream's 12 reason emoji
+  (`block-template.md`, `status.md` section I); upstream's out-of-scope and
+  wrong-place reasons become `[dropped]`: the card is closed as not planned
+  and moves to Done, as upstream already does for dropped cards.
 - **FR-STS-2 (new)** Where hc is enabled, `drover status` shall show each
   live worker's hc terminal name so the owner can attach to it.

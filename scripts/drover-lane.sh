@@ -182,6 +182,10 @@ Use your own worktree under .drover/worktrees/; never edit the main checkout. Cl
 {backend.label} adaptation: do not launch Claude or other sub-agents. Perform preflight, classification, independent review and truth-check duties inline. This changes the execution host, never the evidence requirements, confidence threshold or merge policy.
 Return JSON: status=advanced|bounced|blocked|human-gate|failed|halted; column=current board column; detail=one line; prUrl/branch when known, otherwise null; priorFindings=review counts or null. A non-advanced exit ends this card's lane chain. On merge-gate exit 9, return status=halted with detail starting exactly "verification-readiness:"; preserve work and never bounce/retry.
 '''
+# FR-CNV-2: the repo's commit style and three real subjects ride in every lane prompt.
+style = subprocess.run([sys.executable, str(script_path.with_name('drover-commit-style.py')), '--root', str(root),
+                        '--config', str(config_path), '--prompt'], capture_output=True, text=True)
+prompt += style.stdout if style.returncode == 0 else ''
 if args.lane == 'build':
     prompt += '''Before creating any worktree or changing code, perform run.md's Builder pre-flight inline: call drover-preflight.sh, judge its candidates semantically, and act on proceed/hold/sequence/skipped. Blind preflight leaves Ready and returns failed. Your own issue branch PR is not a duplicate. Read the issue and all comments; preserve qa/bug/feature labels. Existing docs/ux/tests/refactor/tech-debt rows keep their label chain: classify complexity without adding feature/bug. If truly untyped, classify feature or bug, re-run skills-ready on the proposed labelled card before adding that label, never qa. Then follow the Builder lifecycle.
 '''

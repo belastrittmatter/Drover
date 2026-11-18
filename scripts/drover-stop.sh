@@ -100,20 +100,20 @@ post_stop_comment() {
   pr=$(pr_for_issue "$issue" || echo "")
 
   # Comment format: writing-standard.md § 4.
-  body="[orchestrator] [report] 🛑 stopped · ${lane:-unknown} lane
+  body="[orchestrator] [report] stopped · ${lane:-unknown} lane
 Did: \`drover stop\` ended worker PID ${pid:-unknown} at ${TS}
-✅ Done: resume point is the last pushed commit — ${commit}
-❌ Not done: interrupted work may be uncommitted; inspect the preserved worktree
+Done: resume point is the last pushed commit — ${commit}
+Not done: interrupted work may be uncommitted; inspect the preserved worktree
 Next: preserve edits before \`drover run ${CONFIG_SLUG}\`; dirty or legacy worktrees need inspection"
 
   gh issue comment "$issue" --body "$body" >/dev/null 2>&1 \
-    && log "  💬 issue comment posted on #${issue}" \
-    || log "  ⚠ failed to comment on issue #${issue} (continuing)"
+    && log "  issue comment posted on #${issue}" \
+    || log "  failed to comment on issue #${issue} (continuing)"
 
   if [ -n "$pr" ]; then
     gh pr comment "$pr" --body "$body" >/dev/null 2>&1 \
-      && log "  💬 PR comment posted on #${pr}" \
-      || log "  ⚠ failed to comment on PR #${pr} (continuing)"
+      && log "  PR comment posted on #${pr}" \
+      || log "  failed to comment on PR #${pr} (continuing)"
   fi
 }
 
@@ -124,7 +124,7 @@ release_claim() {
   for label in loop:in-build loop:in-qa loop:in-review; do
     gh issue edit "$issue" --remove-label "$label" >/dev/null 2>&1 || true
   done
-  log "  🔓 released assignee + lane labels on #${issue}"
+  log "  released assignee + lane labels on #${issue}"
 }
 
 kill_pid() {
@@ -140,9 +140,9 @@ kill_pid() {
   done
   if kill -0 "$pid" 2>/dev/null; then
     kill -KILL "$pid" 2>/dev/null || true
-    log "  ☠ ${name} pid=${pid} SIGKILLed (didn't respond to SIGTERM)"
+    log "  ${name} pid=${pid} SIGKILLed (didn't respond to SIGTERM)"
   else
-    log "  ☠ ${name} pid=${pid} SIGTERMed"
+    log "  ${name} pid=${pid} SIGTERMed"
   fi
 }
 
@@ -171,14 +171,14 @@ CODEX_WAVE_PID=""
 if [ -f "$CODEX_WAVE_MARKER" ]; then
   CODEX_WAVE_PID=$(cat "$CODEX_WAVE_MARKER")
   case "$CODEX_WAVE_PID" in ''|*[!0-9]*)
-    log "🛑 invalid Codex wave PID marker; preserve claims and inspect $CODEX_WAVE_MARKER"
+    log "invalid Codex wave PID marker; preserve claims and inspect $CODEX_WAVE_MARKER"
     exit 1 ;;
   esac
   if kill -0 "$CODEX_WAVE_PID" 2>/dev/null; then
     # Refuse a reused PID, or an unavailable process identity, rather than
     # signal an unrelated process and release a still-running wave's claims.
     if ! ps -p "$CODEX_WAVE_PID" -o args= 2>/dev/null | grep -q 'drover-codex-wave'; then
-      log "🛑 cannot identify Codex wave PID $CODEX_WAVE_PID; preserve claims and inspect $CODEX_WAVE_MARKER"
+      log "cannot identify Codex wave PID $CODEX_WAVE_PID; preserve claims and inspect $CODEX_WAVE_MARKER"
       exit 1
     fi
   fi
@@ -193,13 +193,13 @@ fi
 # Stop new Codex dispatch first. Its TERM handler cancels lane process groups
 # and reaps them (up to five seconds), before any claim can be released.
 if [ -n "$CODEX_WAVE_PID" ]; then
-  log "🛑 stopping Codex wave and its lane workers"
+  log "stopping Codex wave and its lane workers"
   kill_pid "$CODEX_WAVE_PID" "codex-wave" 7
 fi
 
 # 2. Per-worker wrap-up: comment, release claim, kill.
 if [ "${#WORKERS[@]}" -gt 0 ]; then
-  log "📋 ${#WORKERS[@]} in-flight worker(s) to wrap up"
+  log "${#WORKERS[@]} in-flight worker(s) to wrap up"
   for entry in "${WORKERS[@]}"; do
     IFS='|' read -r issue lane pid <<< "$entry"
     log ""
@@ -213,7 +213,7 @@ fi
 # 3. Sweep any untracked claude -p drover workers.
 if [ -n "$ORPHAN_WORKERS" ]; then
   log ""
-  log "🧹 sweeping untracked claude -p drover workers"
+  log "sweeping untracked claude -p drover workers"
   for pid in $ORPHAN_WORKERS; do
     kill_pid "$pid" "orphan-worker"
   done
@@ -222,7 +222,7 @@ fi
 # 4. Kill the dispatcher loop.
 if [ -n "$DISPATCHER_PIDS" ]; then
   log ""
-  log "🛑 stopping dispatcher loop"
+  log "stopping dispatcher loop"
   for pid in $DISPATCHER_PIDS; do
     kill_pid "$pid" "dispatcher"
   done
@@ -235,7 +235,7 @@ if [ -d "$INFLIGHT_DIR" ] && [ -n "$(ls -A "$INFLIGHT_DIR" 2>/dev/null)" ]; then
     rm -f "$INFLIGHT_DIR/$issue"
   done
   log ""
-  log "🧽 cleared $INFLIGHT_DIR"
+  log "cleared $INFLIGHT_DIR"
 fi
 [ -z "$CODEX_WAVE_PID" ] || rm -f "$INFLIGHT_DIR/workflow-wave.lock" "$CODEX_WAVE_MARKER"
 
@@ -244,7 +244,7 @@ DISP_COUNT=$(echo "$DISPATCHER_PIDS" | tr ' ' '\n' | grep -c . || true)
 [ -z "$CODEX_WAVE_PID" ] || DISP_COUNT=$((DISP_COUNT + 1))
 echo ""
 echo "════════════════════════════════════════════════════════"
-echo "  ✅ stopped: ${#WORKERS[@]} worker(s), ${DISP_COUNT} dispatcher(s)"
-echo "  📝 wrap-up comments posted on each in-flight issue + PR"
-echo "  ▶  Resume: drover run ${CONFIG_SLUG}"
+echo "  stopped: ${#WORKERS[@]} worker(s), ${DISP_COUNT} dispatcher(s)"
+echo "  wrap-up comments posted on each in-flight issue + PR"
+echo "  Resume: drover run ${CONFIG_SLUG}"
 echo "════════════════════════════════════════════════════════"

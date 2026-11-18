@@ -148,6 +148,18 @@ def test_zombie_and_alert() -> None:
     assert "zombie" in verbs and "alert" in verbs
 
 
+def test_zombie_line_without_emoji() -> None:
+    """The runner logs the zombie line without its old emoji; the parser keys on the words."""
+    manifest = (
+        "[10:00:00] dispatch lane=qa issue=#9 pid=500 claim=bot\n"
+        "[10:10:00] zombie qa worker on #9 (pid=500) — card moved to 'Done'; killing\n"
+    )
+    state = sbs.parse_manifest(manifest, TODAY)
+    assert state["inflight"] == {}
+    assert state["recents"][-1]["verb"] == "zombie"
+    assert state["recents"][-1]["issue"] == "#9"
+
+
 def test_empty_manifest_returns_defaults() -> None:
     state = sbs.parse_manifest("", TODAY)
     assert state == {
@@ -336,12 +348,12 @@ def test_render_kanban_prints_boxes_in_board_order() -> None:
                             {"number": 39, "title": "later too", "labels": []}]
     by_status["Blocked"] = [{"number": 25, "title": "gated", "labels": []}]
     by_status["Done"] = [{"number": 20, "title": "shipped", "labels": []}]
-    out = sbs.render_kanban(by_status, lambda n: "  ", lambda n: "🛡")
+    out = sbs.render_kanban(by_status, lambda n: "   ", lambda n: "sequenced")
     heads = [l.split("[")[0].strip("┌─ ").strip() for l in out.splitlines() if l.startswith("┌─")]
     assert heads == list(sbs.BOARD_ORDER), heads
     assert "#40 #39   (not started, collapsed)" in out, "Backlog collapses to numbers"
     assert "later" not in out, "Backlog shows no titles"
-    assert "🛡 #25  gated" in out
+    assert "sequenced #25  gated" in out
     assert "#20   (squash-merged, collapsed)" in out
     assert all(sbs.visual_width(l) == 80 for l in out.splitlines()), "every box line is 80 cols"
 
@@ -352,6 +364,61 @@ def test_render_kanban_backlog_overflow_truncates() -> None:
     out = sbs.render_kanban(by_status, lambda n: "  ", lambda n: "")
     line = out.splitlines()[1]
     assert "more   (not started, collapsed)" in line and sbs.visual_width(line) == 80
+
+
+# ── block reason tags (specs/board.md FR-BRD-6) ──
+
+FR_BRD_6 = [
+    "[blocked:creds]", "[blocked:quota]", "[blocked:access]", "[blocked:unclear]",
+    "[blocked:unsafe]", "[blocked:review]", "[blocked:design]", "[blocked:duplicate]",
+    "[blocked:sequenced]", "[blocked:too-big]", "[blocked:ci]", "[blocked:schema]",
+    "[blocked:rebuild-cap]", "[needs-you]",
+]
+
+
+def test_reason_table_is_the_spec_list() -> None:
+    assert sbs.REASON_TABLE == FR_BRD_6, sbs.REASON_TABLE
+    assert sbs.REASONS["needs_you"] == "[needs-you]"
+    assert sbs.REASONS["dropped"] == "[dropped]"
+
+
+def test_every_tag_parses_from_a_block_comment() -> None:
+    for tag in FR_BRD_6:
+        body = (
+            f"[reviewer] [blocker] blocked {tag} something is missing\n"
+            "Card:        #12 Add plan column\n"
+            f"Reason tag:  {tag}\n"
+            "blocked-by:  -\n"
+        )
+        assert sbs.reason_for(body) == sbs.reason_short(tag), (tag, sbs.reason_for(body))
+
+
+def test_reason_short_names() -> None:
+    assert sbs.reason_short("[blocked:creds]") == "creds"
+    assert sbs.reason_short("[blocked:rebuild-cap]") == "rebuild-cap"
+    assert sbs.reason_short("[needs-you]") == "needs-you"
+
+
+def test_reason_line_wins_over_prose() -> None:
+    body = ("[qa] [blocker] blocked [blocked:creds] key missing\n"
+            "Why blocked: unlike [blocked:quota] cards, this one needs a key\n"
+            "Reason tag:  [blocked:creds]\n")
+    assert sbs.reason_for(body) == "creds"
+    folded = "<details>\nReason tag: [needs-you] · Owner: owner\nblocked-by: -\n</details>"
+    assert sbs.reason_for(folded) == "needs-you"
+
+
+def test_unknown_or_missing_tag_is_other() -> None:
+    assert sbs.reason_for("") == "other"
+    assert sbs.reason_for("Reason tag: [blocked:nonsense]") == "other"
+    assert sbs.reason_for("Reason tag: 🔐 missing key") == "other"
+
+
+def test_block_reasons_group_by_tag() -> None:
+    lines = sbs.render_block_reasons(["creds", "unclear", "needs-you", "creds"], [12, 13, 14, 15])
+    assert lines[0] == "   Blocked 4 · creds 2 · unclear 1 · needs-you 1", lines[0]
+    assert lines[1].split() == ["creds", "#12,", "#15"], lines[1]
+    assert sbs.render_block_reasons([], []) == ["   (none)"]
 
 
 def _run() -> int:

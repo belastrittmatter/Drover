@@ -46,12 +46,13 @@
 #             "parseable": true, "humanGated": false, "runnable": false, "why": "",
 #             "needsYou": false, "needsYouDone": false } }
 #
-# `needsYou` — the newest Block comment carries the 🙋 reason tag, or the issue
+# `needsYou` — the newest Block comment carries the [needs-you] reason tag
+# (scripts/drover-reasons.json), or the issue
 # has the `needs-you` label: a human-only command is waiting (block-template.md).
 # `needsYouDone` — verified by drover-approval.py: a trusted human replied
 # done after a pinned request for the current PR head. Labels are never authority.
 # Saved --from payloads stay offline and cannot assert verified human approval.
-# A 🙋 card stays humanGated either way — only the resume path moves it.
+# A [needs-you] card stays humanGated either way — only the resume path moves it.
 #
 # `runnable` is true only when the line parses, no blocker is still open, AND the
 # card is not human-gated. `humanGated` comes from `blocked-by: -`, which means
@@ -95,7 +96,7 @@ fi
 
 APPROVAL_REPO="$REPO"
 [ -z "$FROM" ] || APPROVAL_REPO=""
-echo "$ISSUES" | jq --arg only "$ONLY" '
+echo "$ISSUES" | jq --arg only "$ONLY" --arg needs_tag "$(jq -r .needs_you "$HERE/drover-reasons.json")" '
   # ---- the parser ---------------------------------------------------------
   # Everything after the LAST "## Blocked by" heading, stopping at the next
   # "## " heading so a following section is never swallowed.
@@ -142,9 +143,10 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
 
   def bodies: [ (.comments.nodes // .comments // [])[] | (.body // "") ];
   def label_names: [ (.labels.nodes // .labels // [])[] | (.name // "") ];
-  # Index of the newest 🙋 Block comment, or null.
+  # Index of the newest [needs-you] Block comment, or null.
   def needs_at: ( bodies | to_entries
-                  | map(select(.value | test("Reason tag:[^\n]*🙋"))) | last | .key ) // null;
+                  | map(select(.value | split("\n") | any(.[]; (split("Reason tag:")[1:] | any(.[]; contains($needs_tag))))))
+                  | last | .key ) // null;
   def needs_you: (label_names | index("needs-you") != null) or (needs_at != null);
 
 
