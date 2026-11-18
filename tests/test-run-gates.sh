@@ -138,6 +138,16 @@ grep -q 'project item-edit .*opt_done' "$GH_LOG" \
   && ok "closed card reconciled to Done via a name-resolved option ID" \
   || bad "closed card reconciled to Done" "an item-edit to opt_done" "$(tr '\n' '|' < "$GH_LOG")"
 
+# The cache still shows the card in Review: a second scan this tick (the lane's worker
+# already exited) and a new tick both leave it alone. One move per run.
+: > "$GH_LOG"; TICK_SEEN=" "; CLOSED_TARGETS=" "; CLOSED_MOVED=" "
+PROJECT_ITEMS_JSON=$(board 41:Review)
+top_card_in_column "Review" >/dev/null; top_card_in_column "Review" >/dev/null
+TICK_SEEN=" "; top_card_in_column "Review" >/dev/null
+is "a closed card is moved once per run, however often its column is scanned" "1" \
+  "$(grep -c 'project item-edit --id item_41 ' "$GH_LOG")"
+CLOSED_MOVED=" "
+
 CLOSED_ISSUES=""
 PROJECT_ITEMS_JSON=$(board 55:Review)
 top_card_in_column "Review" >/dev/null

@@ -201,6 +201,7 @@ issue_is_open() {
 # with a `[<role>] ` header (writing-standard.md section 4).
 CLOSED_INFO_JQ='{reason: (.stateReason // ""), comments: ([.comments[] | select(.body | test("^\\[(builder|qa|reviewer|orchestrator|collect)\\] ") | not)] | length)}'
 CLOSED_TARGETS=" "   # "<issue>:<Done|Blocked>" decided this run, so a failed move re-reads nothing
+CLOSED_MOVED=" "     # closed issues whose card this run already moved: never moved or commented again
 closed_card_column() {
   # $1 = a CLOSED issue. Prints where its card belongs (FR-BRD-3): Done when a PR from its
   # issue-<N>-* branch is merged into the base, or it was closed as not planned with a comment
@@ -272,7 +273,7 @@ top_card_in_column() {
   TOP_ISSUE=""; TOP_ITEM_ID=""
   while IFS=$'\t' read -r issue item_id; do
     [ -n "$issue" ] || continue
-    case "$TICK_SEEN" in *" $issue "*) continue ;; esac
+    case "$TICK_SEEN$CLOSED_MOVED" in *" $issue "*) continue ;; esac
     issue_locked "$issue" && continue
     local issue_rc=0 target=""
     case "$CLOSED_TARGETS" in *" $issue:"*) target="${CLOSED_TARGETS#* $issue:}"; target="${target%% *}"; issue_rc=1 ;; esac
@@ -291,6 +292,9 @@ top_card_in_column() {
       fi
       gh_checkpoint
       [ -n "$BOT_LOGIN" ] && gh_write_once issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
+      # The board cache can still show the card here (a second scan of this column in the
+      # same tick once a lane frees up, or a stale read later): it is moved once per run.
+      CLOSED_MOVED="${CLOSED_MOVED}${issue} "
       continue
     fi
     TOP_ISSUE="$issue"; TOP_ITEM_ID="$item_id"
