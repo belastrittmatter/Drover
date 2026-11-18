@@ -158,16 +158,18 @@ def allowed(entry, cfg):
     return list(perms.get("tools", [])) + [f"Bash({w}:*)" for w in words] + read_only(entry)[0]
 
 
-def worker_argv(role, prompt, cwd=None):
+def worker_argv(role, prompt, cwd=None, model=None):
     """argv for one headless worker of `role`: the harness command, the prompt, the role's
-    model and the permissions. The runner reads it NUL-separated."""
+    model (else `model`, the runner's pick by card complexity) and the permissions. The runner
+    reads it NUL-separated."""
     p = config_path(cwd)
     cfg = json.loads(p.read_text()) if p.is_file() else {}
     rcfg = (cfg.get("roles") or {}).get(role) or {}
     entry = harness(rcfg.get("harness") or cfg.get("harness") or "claude")
     argv = list(entry["worker_command"]) + [prompt]
-    if rcfg.get("model") and entry.get("model_flag"):
-        argv += [entry["model_flag"], rcfg["model"]]
+    model = rcfg.get("model") or model
+    if model and entry.get("model_flag"):
+        argv += [entry["model_flag"], model]
     perms = entry.get("permissions", {})
     if perms.get("mode"):
         argv += [perms["mode_flag"], perms["mode"]]
@@ -219,8 +221,9 @@ def main(argv):
         return 65 if problems else 0
     elif cmd == "harness":
         print(json.dumps(harness(argv[1] if len(argv) > 1 else configured_harness()), indent=2))
-    elif cmd == "worker-argv" and len(argv) == 3:
-        sys.stdout.write("".join(a + "\0" for a in worker_argv(argv[1], argv[2])))
+    elif cmd == "worker-argv" and len(argv) in (3, 4):
+        model = argv[3] if len(argv) == 4 else None
+        sys.stdout.write("".join(a + "\0" for a in worker_argv(argv[1], argv[2], model=model)))
     elif cmd == "skills-install":
         def opt(flag):
             if flag not in argv:

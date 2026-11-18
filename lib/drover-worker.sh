@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # drover-worker.sh — the one worker interface (specs/runner.md FR-WRK-1, FR-WRK-2).
 #
-#   drover worker start ROLE ISSUE PROMPT LOG   start a headless worker, print its handle
+#   drover worker start ROLE ISSUE PROMPT LOG [MODEL]  start a headless worker, print its handle
 #   drover worker alive HANDLE                  exit 0 while the worker runs, 1 otherwise
 #   drover worker stop HANDLE [GRACE]           TERM, wait up to GRACE s (default 1), then KILL
 #   drover worker lock FILE                     print the handle an in-flight lock records
@@ -28,19 +28,21 @@ process_handle() {
   echo "process:$1:$(process_start "$1")"
 }
 
-# worker_start ROLE ISSUE PROMPT LOG: sets WORKER_HANDLE. Nonzero (66) when the harness
-# gives no command.
+# worker_start ROLE ISSUE PROMPT LOG [MODEL]: sets WORKER_HANDLE. MODEL is used when the role
+# sets none in the config. Extra worker environment comes from the WORKER_ENV array
+# (KEY=VALUE words). Nonzero (66) when the harness gives no command.
 worker_start() {
-  local role="$1" issue="$2" prompt="$3" log="$4" arg
+  local role="$1" issue="$2" prompt="$3" log="$4" model="${5:-}" arg
   local -a argv=()
   WORKER_HANDLE=""
   while IFS= read -r -d '' arg; do argv+=("$arg"); done \
-    < <(python3 "$WORKER_LIB/drover-config.py" worker-argv "$role" "$prompt")
+    < <(python3 "$WORKER_LIB/drover-config.py" worker-argv "$role" "$prompt" ${model:+"$model"})
   [ "${#argv[@]}" -gt 1 ] || { echo "drover worker: no worker command from the harness entry" >&2; return 66; }
   # No subshell or `exec` wrapper, so $! is the worker itself. stdin is /dev/null: a headless
   # claude otherwise waits 3 s for input. DROVER_ROLE / DROVER_ISSUE: guard-merge lets only the
   # review lane run the gate, and drover gh-guard keys the worker's call budget on them.
-  DROVER_ROLE="$role" DROVER_ISSUE="$issue" nohup "${argv[@]}" </dev/null >>"$log" 2>&1 &
+  # `env` execs the worker, so $! stays the worker's pid.
+  DROVER_ROLE="$role" DROVER_ISSUE="$issue" nohup env ${WORKER_ENV[@]+"${WORKER_ENV[@]}"} "${argv[@]}" </dev/null >>"$log" 2>&1 &
   # A worker that already exited gets an empty start: its handle reads as dead.
   WORKER_HANDLE=$(process_handle "$!")
 }
@@ -92,6 +94,17 @@ worker_stop() {
   return 0
 }
 
+# worker_wait HANDLE TIMEOUT: wait until the worker ends, stop it after TIMEOUT seconds.
+# For the short pre-flight and classifier agents the runner waits on. Returns 0.
+worker_wait() {
+  local handle="$1" limit=$(( ${2:-600} * 5 )) n=0
+  while worker_alive "$handle" && [ "$n" -lt "$limit" ]; do
+    sleep 0.2
+    n=$((n + 1))
+  done
+  worker_stop "$handle" 1
+}
+
 # worker_lock FILE: sets HANDLE, LANE, STARTED, COLUMN from an in-flight lock.
 worker_lock() {
   local key val
@@ -121,8 +134,8 @@ write_lock() {
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   set -euo pipefail
   case "${1:-}" in
-    start) [ $# -eq 5 ] || { echo "usage: drover worker start ROLE ISSUE PROMPT LOG" >&2; exit 64; }
-           worker_start "$2" "$3" "$4" "$5"; echo "$WORKER_HANDLE" ;;
+    start) [ $# -eq 5 ] || [ $# -eq 6 ] || { echo "usage: drover worker start ROLE ISSUE PROMPT LOG [MODEL]" >&2; exit 64; }
+           worker_start "$2" "$3" "$4" "$5" "${6:-}"; echo "$WORKER_HANDLE" ;;
     alive) [ $# -eq 2 ] || { echo "usage: drover worker alive HANDLE" >&2; exit 64; }
            worker_alive "$2" ;;
     stop)  [ $# -ge 2 ] || { echo "usage: drover worker stop HANDLE [GRACE]" >&2; exit 64; }
