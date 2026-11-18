@@ -38,15 +38,16 @@ def card(n):
 def save():
     json.dump(board, open(os.environ['BOARD'], 'w'))
 if os.environ.get('USAGE_DROP_AFTER') and args[:2] == ['api', 'rate_limit']:
-    # Usage drops below the pause threshold after N rate-limit reads (one per fresh round).
+    # After N rate-limit reads (one per fresh round) usage drops below the pause threshold;
+    # from USAGE_BLIND_AT reads until then, the snapshot is gone (the probe goes blind).
     count = os.environ['USAGE_FILE'] + '.reads'
     n = int(open(count).read()) + 1 if os.path.exists(count) else 1
     open(count, 'w').write(str(n))
     if n >= int(os.environ['USAGE_DROP_AFTER']):
-        snap = json.load(open(os.environ['USAGE_FILE']))
-        snap['rate_limits']['five_hour']['used_percentage'] = 40
-        snap['recorded_at'] = int(time.time())
-        json.dump(snap, open(os.environ['USAGE_FILE'], 'w'))
+        json.dump({'recorded_at': int(time.time()), 'rate_limits': {'five_hour': {
+            'used_percentage': 40, 'resets_at': int(time.time()) + 3600}}}, open(os.environ['USAGE_FILE'], 'w'))
+    elif n >= int(os.environ.get('USAGE_BLIND_AT', '999999')) and os.path.exists(os.environ['USAGE_FILE']):
+        os.remove(os.environ['USAGE_FILE'])
 if args[:2] == ['api', 'rate_limit']:
     print('{"resources":{"graphql":{"remaining":5000,"reset":0},"core":{"remaining":5000,"reset":0}}}')
 elif args[:2] == ['api', 'graphql'] and 'issues(states:OPEN' in joined:
@@ -97,6 +98,8 @@ elif args[:2] == ['pr', 'list'] and 'merged' in args:
     base = args[args.index('--base') + 1]
     print(json.dumps([{'headRefName': c['merged']} for c in board
                       if c.get('merged') and c.get('merged_base', 'main') == base]))
+elif args[:2] == ['pr', 'list'] and 'url,mergedAt' in args:
+    print(json.dumps([{'url': c['pr'], 'mergedAt': None} for c in board if c.get('pr') and c.get('pr_closed')]))
 elif args[:2] == ['pr', 'list'] and 'headRefName,url' in args:
     print(json.dumps([{'headRefName': 'issue-%%d-fix' %% c['number'], 'url': c['pr']} for c in board if c.get('pr')]))
 elif args[0] == 'api' and re.fullmatch(r'repos/o/r/collaborators/[^/]+/permission', args[-1]):
@@ -114,6 +117,8 @@ elif args[0] == 'api' and re.fullmatch(r'repos/(\{owner\}/\{repo\}|o/r)/issues/\
 elif args[:2] == ['pr', 'list']:
     m = re.search(r'issue-(\d+)-', joined)
     print(os.environ.get('PR_FOR_' + m.group(1), '') if m else '')
+elif args[:2] == ['project', 'item-edit'] and os.environ.get('ITEM_EDIT_FAILS'):
+    sys.exit('item-edit failed')
 elif args[:2] == ['project', 'item-edit']:  # the board remembers column moves
     item, option = args[args.index('--id') + 1], args[args.index('--single-select-option-id') + 1]
     for c in board:
@@ -147,21 +152,37 @@ if sys.argv[1:] == ['--version']:
     sys.exit(0)
 role = os.environ.get('DROVER_ROLE')
 if role in ('preflight', 'classify'):
+    # FAKE_AGENT=garbage answers with no usable JSON, =hang never answers (until signalled),
+    # =<role>-garbage or =<role>-hang only for that role. The reply is wrapped the way
+    # `claude -p --output-format json` wraps it: one envelope whose `result` holds the text.
     prompt = sys.argv[2]
     model = sys.argv[sys.argv.index('--model') + 1] if '--model' in sys.argv else ''
     with open(d / 'agents.jsonl', 'a') as f:
-        f.write(json.dumps({'role': role, 'prompt': prompt, 'model': model}) + '\n')
-    print('working on it')
+        f.write(json.dumps({'role': role, 'prompt': prompt, 'model': model, 'argv': sys.argv[1:]}) + '\n')
+    mode = os.environ.get('FAKE_AGENT', '')
+    mode = mode.split('-', 1)[1] if mode.startswith(role + '-') else ('' if '-' in mode else mode)
+    if mode == 'hang':
+        signal.signal(signal.SIGTERM, lambda *a: sys.exit(0))
+        (d / ('agent-hang-%d' % os.getpid())).write_text(role)
+        time.sleep(60)
+        sys.exit(0)
     if role == 'preflight':
         issues = re.search(r'--issues ([0-9,]+)', prompt).group(1).split(',')
         script = json.loads(os.environ.get('FAKE_PREFLIGHT', '{}'))
         out = [dict({'number': int(n)}, **script.get(n, {'verdict': 'proceed', 'tag': 'clean', 'detail': 'clean'}))
                for n in issues if script.get(n) != 'none']
-        print(json.dumps({'verdicts': out}))
+        answer = json.dumps({'verdicts': out})
     else:
         n = re.search(r'issue #(\d+)', prompt).group(1)
-        print(json.dumps(json.loads(os.environ.get('FAKE_CLASSIFY', '{}')).get(
-            n, {'kind': 'feature', 'complexity': 'medium', 'risk': [], 'why': 'fixture'})))
+        answer = json.dumps(json.loads(os.environ.get('FAKE_CLASSIFY', '{}')).get(
+            n, {'kind': 'feature', 'complexity': 'medium', 'risk': [], 'why': 'fixture'}))
+    if mode == 'garbage':
+        answer = '{"verdicts": [{"number": "x", "verdict": 7, "detail": {"a": 1}}], "complexity": 9'
+    text = 'Here is my answer, as asked: {not json}\n' + answer + '\nDone.'
+    if '--output-format' in sys.argv and sys.argv[sys.argv.index('--output-format') + 1] == 'json':
+        print(json.dumps({'type': 'result', 'is_error': False, 'result': text}))
+    else:
+        print(text)
     sys.exit(0)
 (d / ('argv-%d' % os.getpid())).write_text('\0'.join(sys.argv[1:]))
 (d / ('env-%d' % os.getpid())).write_text('DROVER_ROLE=%s DROVER_ISSUE=%s' % (os.environ.get('DROVER_ROLE'), os.environ.get('DROVER_ISSUE')))
@@ -284,6 +305,13 @@ class RunnerCase(unittest.TestCase):
         path = self.workers / 'agents.jsonl'
         rows = [json.loads(l) for l in path.read_text().splitlines()] if path.exists() else []
         return [r for r in rows if role in (None, r['role'])]
+
+    def wait_for(self, check, seconds=10):
+        # For effects that land in the background (FactoryBench emits are fire and forget).
+        deadline = time.monotonic() + seconds
+        while not check() and time.monotonic() < deadline:
+            time.sleep(.05)
+        return check()
 
     def comments(self, issue):
         return [c[c.index('--body') + 1] for c in self.calls() if c[:3] == ['issue', 'comment', str(issue)]]

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Runner rounds for what stage 6b ported from the workflow backend into lib/drover-run.sh:
 pre-flight (FR-RUN-5/6), classifier (FR-RUN-7/15), dependencies (FR-BRD-5/7/8, replacing
-test-wave-plan.sh), usage pause (FR-RUN-8), manifest lines (FR-RUN-16) and FactoryBench
-(metrics.md FR-MET-4..12). Fakes: tests/runner_fixture.py."""
+test-wave-plan.sh), usage pause (FR-RUN-8), and manifest lines (FR-RUN-16);
+FactoryBench is in test_run_factorybench.py. Fakes: tests/runner_fixture.py."""
 import json
 from pathlib import Path
 import re
@@ -11,7 +11,7 @@ import time
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from runner_fixture import FAKE_FACTORYBENCH, RunnerCase, alive  # noqa: E402
+from runner_fixture import KIT, RunnerCase  # noqa: E402
 
 H1, H2 = 'a' * 40, 'b' * 40
 
@@ -211,77 +211,157 @@ class Ports(RunnerCase):
         self.run_board(cycles=1, rc=64, repo=dict(remote=None))
         self.assertEqual(self.worker_pids(), [])
 
-    def factorybench(self):
-        self.tool('factorybench', FAKE_FACTORYBENCH)
-        self.env.update(FB_LOG=str(self.base / 'fb.jsonl'), FACTORYBENCH_URL='http://fb.invalid')
+    # Review fix: any routing type label counts as typed (ux, refactor, docs ...): the classifier
+    # grades complexity and risk only, and never adds feature or bug to it.
+    def test_classifier_routing_labels_are_typed(self):
+        self.env['FAKE_CLASSIFY'] = json.dumps({
+            '5': {'kind': 'feature', 'complexity': 'low', 'risk': ['auth'], 'why': 'login page copy'},
+            '6': {'kind': 'bug', 'complexity': 'low', 'risk': [], 'why': 'docs'}})
+        self.board({'number': 5, 'status': 'Ready', 'labels': ['ux']}, {'number': 6, 'status': 'Ready', 'labels': ['docs']})
+        self.run_board(cycles=1, roles=dict(build=dict(max_workers=2)))
+        edits = [c for c in self.calls() if c[:2] == ['issue', 'edit'] and '--add-label' in c]
+        self.assertEqual(edits, [['issue', 'edit', '5', '--add-label', 'auth']])
+        prompts = {a['prompt'].split('issue #')[1].split(' ')[0]: a['prompt'] for a in self.agents('classify')}
+        self.assertIn('label says "ux"', prompts['5'])
+        self.assertIn('label says "docs"', prompts['6'])
 
-    def events(self):
-        path = self.base / 'fb.jsonl'
-        return [json.loads(l) for l in path.read_text().splitlines()] if path.exists() else []
+    # NFR-6: Ready cards the graph lists as blocked cost no per-card read; the round stays in budget.
+    def test_blocked_ready_cards_stay_within_the_idle_budget(self):
+        self.env['OPEN_EXTRA'] = '50'
+        blocked = '## Acceptance Criteria\n- it works\n\n## Blocked by\n- #50 the base\n'
+        self.board(*[{'number': n, 'status': 'Ready', 'body': blocked} for n in (1, 2, 3, 4)],
+                   {'number': 9, 'status': 'Blocked', 'comments': [block('[blocked:creds]', '-')]})
+        self.run_board(cycles=1)
+        round_ = self.calls('round')
+        self.assertLessEqual(len(round_), 5, round_)
+        self.assertFalse([c for c in round_ if c[:2] == ['issue', 'view']], round_)
+        self.assertEqual(self.dispatched(), [])
+        self.assertEqual(self.agents(), [])
 
-    # FR-MET-4..12: one attempt per card with its lanes, sent through `factorybench emit`.
-    def test_factorybench_attempt(self):
-        self.factorybench()
-        self.env['FAKE_CLAUDE'] = 'advance'  # each worker moves its card one column and exits
-        self.board({'number': 7, 'status': 'Ready', 'pr': 'https://github.com/o/r/pull/70'})
-        out = self.run_board(cycles=60, metrics=dict(commit_email='drover@example.com'))
-        self.assertIn('exiting cleanly', out)
-        events = self.events()
-        self.assertEqual(events[0], ['emit', '--flush'])
-        emits = [e for e in events[1:]]
-        self.assertTrue(all(e[0] == 'emit' and e[2] == '--attempt' and e[4] == '--key' and e[6] == '--json' for e in emits))
-        self.assertEqual([(e[1], e[5]) for e in emits], [
-            ('attempt.started', 'started'), ('pr.linked', 'pr'), ('gate', 'gate:qa:1'),
-            ('gate', 'gate:review:1'), ('gate', 'gate:merge:1'), ('attempt.finished', 'finished')])
-        self.assertEqual(len({e[3] for e in emits}), 1, 'one attempt for the card')
-        started = json.loads(emits[0][7])
-        self.assertEqual(started['work_item'], {'repo': 'o/r', 'issue': 7})
-        self.assertRegex(started['factory_config_version'], r'^drover@[0-9a-f]+\+claude-code@2\.1\.400\+cfg:[0-9a-f]{8}$')
-        self.assertIn('feature', started['labels'])
-        self.assertNotIn('role', started)
-        self.assertEqual(json.loads(emits[1][7]), {'pr_url': 'https://github.com/o/r/pull/70'})
-        self.assertEqual(json.loads(emits[2][7]), {'name': 'qa', 'passed': True, 'reason': 'QA passed'})
-        self.assertEqual(json.loads(emits[5][7]), {'status': 'completed'})
-        attempt = emits[0][3]
-        phases = []
-        for pid in self.worker_pids():
-            env = json.loads((self.workers / ('otel-%d' % pid)).read_text())
-            self.assertEqual(env['OTEL_EXPORTER_OTLP_LOGS_ENDPOINT'], 'http://fb.invalid/v1/logs')
-            self.assertEqual(env['CLAUDE_CODE_ENABLE_TELEMETRY'], '1')
-            self.assertEqual(env['GIT_AUTHOR_EMAIL'], 'drover@example.com')
-            self.assertFalse({'OTEL_LOG_USER_PROMPTS', 'OTEL_LOG_TOOL_DETAILS', 'OTEL_LOG_RAW_API_BODIES'} & set(env))
-            phases.append(env['OTEL_RESOURCE_ATTRIBUTES'])
-        self.assertEqual(sorted(phases), sorted('factorybench.attempt=%s,factorybench.phase=%s' % (attempt, p)
-                                                for p in ('implement', 'verify', 'review')))
-        self.assertEqual(json.loads((self.root / '.drover/runs/attempts.json').read_text()), {})
+    # Review fix: a pause holds while the probe goes blind until the window resets or usage drops.
+    def test_usage_pause_holds_while_blind(self):
+        usage = self.base / 'usage.json'
+        now = int(time.time())
+        usage.write_text(json.dumps({'recorded_at': now, 'rate_limits': {
+            'five_hour': {'used_percentage': 97, 'resets_at': now + 3600}}}))
+        self.env.update(SB_USAGE_FILE=str(usage), USAGE_FILE=str(usage), USAGE_BLIND_AT='3', USAGE_DROP_AFTER='6')
+        self.board({'number': 7, 'status': 'Ready'})
+        out = self.run_board(cycles=1)
+        manifest = self.manifest()
+        self.assertEqual(manifest.count('usage pause: 97% >= 95%'), 1, manifest)
+        self.assertNotIn('usage resume: 0%', manifest)
+        lines = manifest.splitlines()
+        resumed = next(i for i, l in enumerate(lines) if 'usage resume: 40%' in l)
+        built = next(i for i, l in enumerate(lines) if 'dispatch lane=build issue=#7 ' in l)
+        self.assertLess(resumed, built)
+        self.assertGreaterEqual(sum('] tick — Ready=' in l for l in lines[:resumed]), 4)
+        self.assertNotIn('running without a usage pause', out)
 
-    # FR-MET-5: a stop with the card in flight waits the attempt; the next claim resumes it.
-    def test_factorybench_stop_and_resume(self):
-        self.factorybench()
+    # Review fix 4: an agent that never answers is stopped after the timeout, and its card is not
+    # built; the agent lock goes with it.
+    def test_agent_timeout(self):
+        self.env.update(FAKE_AGENT='preflight-hang', DROVER_AGENT_TIMEOUT='2')
         self.board({'number': 7, 'status': 'Ready'})
         self.run_board(cycles=1)
-        [first] = self.worker_pids(expect=1)
-        self.stop()
-        self.wait_dead(first)
-        self.run_board(cycles=1)
-        emits = [e for e in self.events() if e[0] == 'emit' and e[1] != '--flush']
-        self.assertEqual([(e[1], e[5]) for e in emits], [
-            ('attempt.started', 'started'), ('human.waiting', 'waiting:1'), ('human.resumed', 'resumed:1')])
-        self.assertEqual(json.loads(emits[1][7]), {'reason': 'stopped'})
-        self.assertEqual(len({e[3] for e in emits}), 1)
+        hung = [int(p.name.split('-')[-1]) for p in self.workers.glob('agent-hang-*')]
+        self.assertEqual(len(hung), 1)
+        self.wait_dead(hung[0])
+        self.assertIn('skipped #7 (no verdict)', self.manifest())
+        self.assertEqual(self.dispatched(), [])
+        self.assertIsNone(self.lock('agent'))
 
-    # FR-MET-4: without FACTORYBENCH_URL nothing is sent and nothing is said about it.
-    def test_factorybench_silent_without_url(self):
-        self.factorybench()
-        del self.env['FACTORYBENCH_URL']
-        self.env['FAKE_CLAUDE'] = 'advance'
+    # Review fix 4: TERM to the runner while it waits on an agent stops the agent too.
+    def test_runner_term_stops_its_agent(self):
+        import subprocess
+        self.env.update(FAKE_AGENT='preflight-hang', DROVER_AGENT_TIMEOUT='60')
         self.board({'number': 7, 'status': 'Ready'})
-        out = self.run_board(cycles=60)
-        self.assertEqual(self.events(), [])
-        self.assertFalse((self.root / '.drover/runs/attempts.json').exists())
-        self.assertNotIn('factorybench', (out + self.manifest()).lower())
-        for pid in self.worker_pids():
-            self.assertNotIn('OTEL_RESOURCE_ATTRIBUTES', (self.workers / ('otel-%d' % pid)).read_text())
+        (self.root / '.drover/config.json').write_text(json.dumps(dict(
+            project=dict(owner='o', number=1), base_branch='main', notifications=dict(bot_identity='bot'),
+            verify_commands=['true'], human_approves_merge=True, tick_seconds=0, no_progress_cycles=5,
+            repo=dict(remote='https://github.com/o/r'))))
+        runner = subprocess.Popen(['bash', str(KIT / 'lib/drover-run.sh')], cwd=self.root, env=self.env,
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.addCleanup(lambda: runner.poll() is None and runner.kill())
+        self.assertTrue(self.wait_for(lambda: list(self.workers.glob('agent-hang-*')) if self.workers.exists() else []))
+        agent = int(next(self.workers.glob('agent-hang-*')).name.split('-')[-1])
+        runner.terminate()
+        self.assertEqual(runner.wait(timeout=15), 143)
+        self.wait_dead(agent)
+        self.assertIsNone(self.lock('agent'))
+
+    # Review fixes 4 and 13: no usable pre-flight answer backs off two ticks, and after three it is
+    # held [blocked:unclear]; prose and bad JSON never break the runner.
+    def test_preflight_garbage_backs_off_then_holds(self):
+        self.env['FAKE_AGENT'] = 'preflight-garbage'
+        self.board({'number': 7, 'status': 'Ready'})
+        self.run_board(cycles=12)
+        pre = self.agents('preflight')
+        self.assertEqual(len(pre), 3, pre)
+        self.assertTrue(all('--output-format' in a['argv'] for a in pre))
+        manifest = self.manifest()
+        self.assertEqual(manifest.count('skipped #7 (no verdict)'), 2, manifest)
+        self.assertIn('skipped #7 (no verdict 3 times)', manifest)
+        self.assertEqual(self.read_board()[7]['status'], 'Blocked')
+        [hold] = self.comments(7)
+        self.assertIn('Reason tag:  [blocked:unclear]', hold)
+        self.assertEqual(self.dispatched(), [])
+
+    # Review fix 10: a failed classification is retried on the next tick, at most twice; then the
+    # card is claimed unclassified.
+    def test_classifier_retries_then_claims(self):
+        self.env['FAKE_AGENT'] = 'classify-garbage'
+        self.board({'number': 7, 'status': 'Ready'})
+        out = self.run_board(cycles=4)
+        self.assertEqual(len(self.agents('classify')), 3)
+        self.assertEqual(len(self.agents('preflight')), 1, 'the clearance holds across the retries')
+        self.assertIn('try 1 of 3', out)
+        self.assertIn('try 2 of 3', out)
+        self.assertIn('claimed unclassified', out)
+        self.assertEqual(self.dispatched(), [7])
+        self.assertNotIn('--model', self.worker_args(7))
+
+    # Review fix 6: the Block comment goes first; a move GitHub refuses halts the run (79) and no
+    # "hold" line claims a move that did not happen.
+    def test_preflight_block_write_fails(self):
+        self.env['FAKE_PREFLIGHT'] = json.dumps({'7': {'verdict': 'hold', 'tag': 'unclear', 'detail': 'no AC'}})
+        self.env['ITEM_EDIT_FAILS'] = '1'
+        self.board({'number': 7, 'status': 'Ready'})
+        self.run_board(cycles=1, rc=79)
+        self.assertIn('Reason tag:  [blocked:unclear]', self.comments(7)[0])
+        self.assertNotIn('hold #7', self.manifest())
+        self.assertEqual(self.read_board()[7]['status'], 'Ready')
+
+    # Review fix 7: an unreadable line on a Blocked card is flagged once, and a refresh drops the
+    # stale needs-you:done label.
+    def test_blocked_flag_once_across_ticks(self):
+        self.board({'number': 3, 'status': 'Blocked', 'body': '## Blocked by\n- None, but #26 must merge first\n'},
+                   {'number': 4, 'status': 'Ready'})
+        self.run_board(cycles=3)
+        self.assertEqual(len([c for c in self.comments(3) if 'dependency line unreadable' in c]), 1)
+        self.assertEqual(self.read_board()[3]['status'], 'Blocked')
+
+
+class Helpers(unittest.TestCase):
+    """The clearance and backoff bookkeeping, through the runner's own functions."""
+    def run_lib(self, script):
+        import subprocess
+        body = 'set -euo pipefail\nexport SB_LIB_ONLY=1\n. "$1/lib/drover-run.sh"\n' + script
+        return subprocess.run(['bash', '-c', body, 'helpers', str(KIT)], capture_output=True, text=True)
+
+    def test_clearance_reuse_expiry_and_leaving_ready(self):
+        r = self.run_lib(r'''
+PROJECT_ITEMS_JSON='{"items":[{"status":"Ready","content":{"number":1}},{"status":"Ready","content":{"number":2}}]}'
+PF_TTL=3; TICK=5; PF_CLEARED=" 1:5 2:5 "
+pf_cleared 1 && echo reuse
+TICK=7; pf_cleared 2 && echo still
+TICK=8; pf_cleared 2 || echo expired
+case "$PF_CLEARED" in *" 2:"*) echo kept ;; *) echo dropped ;; esac
+TICK=6; PF_CLEARED=" 1:5 "
+PROJECT_ITEMS_JSON='{"items":[{"status":"Building","content":{"number":1}}]}'
+pf_cleared 1 || echo left
+PF_SKIPS=" 4:1:9 "; TICK=8; pf_waiting 4 && echo waiting; TICK=9; pf_waiting 4 || echo retry
+''')
+        self.assertEqual(r.stdout.split(), ['reuse', 'still', 'expired', 'dropped', 'left', 'waiting', 'retry'], r.stderr)
 
 
 if __name__ == '__main__':

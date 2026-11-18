@@ -139,6 +139,14 @@ if [ -n "$DISPATCHER" ]; then
   worker_alive "$DISPATCHER" || rm -f "$RUNNER_LOCK"
 fi
 
+# The runner's pre-flight or classifier agent, if one runs: it writes nothing, so it is just stopped.
+AGENT_STOPPED=0
+if worker_lock "$INFLIGHT_DIR/agent"; then
+  stop_handle "$HANDLE" "agent(${LANE:-unknown})"
+  worker_alive "$HANDLE" || rm -f "$INFLIGHT_DIR/agent"
+  AGENT_STOPPED=1
+fi
+
 WORKERS=()
 if [ -d "$INFLIGHT_DIR" ]; then
   for lock in "$INFLIGHT_DIR"/*; do
@@ -151,7 +159,7 @@ if [ -d "$INFLIGHT_DIR" ]; then
   done
 fi
 
-if [ "${#WORKERS[@]}" -eq 0 ] && [ -z "$DISPATCHER" ]; then
+if [ "${#WORKERS[@]}" -eq 0 ] && [ -z "$DISPATCHER" ] && [ "$AGENT_STOPPED" = 0 ]; then
   echo "  ✓ nothing to stop — no dispatcher, no in-flight workers"
   echo "════════════════════════════════════════════════════════"
   exit 0

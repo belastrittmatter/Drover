@@ -84,11 +84,13 @@ HARNESS_JSON=$(python3 "$DROVER_LIB/drover-config.py" harness "$HARNESS") || exi
 # FR-RUN-8: the harness's usage probe ("" = none); a leading `drover` is this install's.
 USAGE_PROBE=$(printf '%s' "$HARNESS_JSON" | jq -r '.usage_probe // ""')
 USAGE_PCT=$(jq -r '.usage_pause_pct // 95' "$CONFIG_PATH")
+# The field of the harness's JSON output envelope that holds a short agent's reply ("" = none).
+AGENT_RESULT_KEY=$(printf '%s' "$HARNESS_JSON" | jq -r '.agent.result_key // ""')
 
 # ───────────────────────────── config read ─────────────────────────────
 # `variant` was removed in v3.0.0: one board shape, labels route cards (a Ready card
 # labelled `qa` goes to the Tester, everything else to the Builder). A config still
-# saying "qa-only" is refused, same as the wave planner.
+# saying "qa-only" is refused, same as before.
 VARIANT=$(jq -r '.variant // "full"' "$CONFIG_PATH")
 if [ "$VARIANT" != "full" ]; then
   echo "config still says variant \"$VARIANT\" — removed in v3.0.0. Run /drover onboard to upgrade." >&2
@@ -150,7 +152,8 @@ fi  # end non-lib-only setup
 TICK_SEEN=" "
 MY_HANDLES=" "   # every worker this runner started: the only ones a halt stops (FR-WRK-8)
 : "${REPO_SLUG:=}" ; : "${MODEL_TIER:=medium}" ; : "${COMMIT_EMAIL:=}" ; : "${USAGE_PROBE:=}"
-: "${USAGE_PCT:=95}" ; : "${AUTO_MAX_LINES:=400}" ; : "${HARNESS:=claude}"
+: "${USAGE_PCT:=95}" ; : "${AUTO_MAX_LINES:=400}" ; : "${HARNESS:=claude}" ; : "${AGENT_RESULT_KEY:=}"
+AGENT_HANDLE=""   # the pre-flight or classifier agent the runner is waiting on
 WORKER_ENV=()
 DEPS_JSON="{}"     # the dependency graph of this tick's board read (drover-deps.sh)
 FB_ON=0            # 1 when FactoryBench is configured (drover-metrics.py enabled)
@@ -159,6 +162,8 @@ FB_ON=0            # 1 when FactoryBench is configured (drover-metrics.py enable
 log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*" | tee -a "$RUN_MANIFEST"; }
 # The runner's own output only: the manifest holds FR-MET-1/2 and FR-RUN-16 line types.
 say() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
+# TERM and INT exit through the EXIT trap (halt_cleanup), so a waited-on agent is stopped too.
+on_signals() { trap 'exit 143' TERM; trap 'exit 130' INT; }
 metrics() { [ "$FB_ON" = 1 ] || return 0; python3 "$DROVER_LIB/drover-metrics.py" "$@" || true; }
 
 PROJECT_ITEMS_JSON=""
@@ -309,6 +314,13 @@ top_card_in_column() {
     [ -n "$issue" ] || continue
     case "$TICK_SEEN$CLOSED_MOVED" in *" $issue "*) continue ;; esac
     issue_locked "$issue" && continue
+    # NFR-6: the dependency graph holds open issues only, so a Ready card it lists as not
+    # runnable is open and not claimable: no per-card state read for it.
+    if [ "$col" = Ready ] && [ "$(echo "$DEPS_JSON" | jq -r --arg n "$issue" 'if .[$n] == null then "absent" else .[$n].runnable end')" = false ]; then
+      card_free "$issue" || true
+      TICK_SEEN="${TICK_SEEN}${issue} "
+      continue
+    fi
     local issue_rc=0 target=""
     case "$CLOSED_TARGETS" in *" $issue:"*) target="${CLOSED_TARGETS#* $issue:}"; target="${target%% *}"; issue_rc=1 ;; esac
     [ -n "$target" ] || issue_is_open "$issue" || issue_rc=$?
@@ -486,7 +498,7 @@ EOF
   trap 'held=TERM' TERM; trap 'held=INT' INT
   # The harness's worker command with the role's model and the headless permissions
   # (FR-HRN-4): a worker never waits on an approval prompt.
-  worker_start "$lane" "$issue" "$prompt" "$worker_log" "$(card_model "$issue" "$lane")" || { trap - TERM INT; log "worker command: no argv from harness ${HARNESS:-claude}"; exit 66; }
+  worker_start "$lane" "$issue" "$prompt" "$worker_log" "$(card_model "$issue" "$lane")" || { on_signals; log "worker command: no argv from harness ${HARNESS:-claude}"; exit 66; }
   WORKER_ENV=()
   # Lock format: HANDLE / LANE / STARTED for `drover stop`, COLUMN (the card's column at
   # dispatch) for the failed-dispatch check. Readers still accept the older PID= line.
@@ -494,7 +506,7 @@ EOF
     "$WORKER_HANDLE" "$lane" "$started" "$column")
 "
   MY_HANDLES="${MY_HANDLES}${WORKER_HANDLE} "
-  trap - TERM INT
+  on_signals
   [ -z "$held" ] || exit 143
   DISPATCH_COUNT=$((DISPATCH_COUNT + 1))
   DISPATCH_LOG="${DISPATCH_LOG}${issue}
@@ -764,7 +776,7 @@ EOF
 }
 
 # ───────────────────────── dependencies (FR-BRD-5, 7, 8) ─────────────────────────
-FLAGGED=" "   # Ready cards whose `## Blocked by` line could not be read, commented on once per run
+FLAGGED=" "   # cards whose `## Blocked by` line could not be read, commented on once per run
 refresh_deps() {
   # The dependency graph for this board read: one GraphQL read of open issues (plus the
   # approval reads for [needs-you] cards), only while Ready or Blocked holds a card.
@@ -776,23 +788,26 @@ refresh_deps() {
   printf '%s' "$DEPS_JSON" > "$RUNS_DIR/deps.json"
 }
 
+flag_unreadable() {
+  # $1 = issue, $2 = its column. One comment per run asking for a readable `## Blocked by` line.
+  case "$FLAGGED" in *" $1 "*) return 0 ;; esac
+  FLAGGED="${FLAGGED}$1 "
+  gh_checkpoint
+  gh_write_once issue comment "$1" --body "[orchestrator] [report] not moved · dependency line unreadable
+Did: read the card's dependencies
+Done: nothing; the card stays in $2
+Not done: $(echo "$DEPS_JSON" | jq -r --arg n "$1" '.[$n].why // "-"')
+Next: owner writes \`- #N\` bullets or \`- None.\` under \`## Blocked by\`" >/dev/null 2>&1 || true
+  say "dependency line unreadable on #$1 ($2)"
+}
+
 card_free() {
   # 0 when Ready card $1 may be claimed (FR-BRD-7): its blockers are closed, the line parses and
   # no person must act. Unknown to the graph is not free. An unreadable line is flagged once.
   local d
   d=$(echo "$DEPS_JSON" | jq -c --arg n "$1" '.[$n] // null')
   [ "$(echo "$d" | jq -r '.runnable // false')" = true ] && return 0
-  if [ "$(echo "$d" | jq -r 'if . == null then true else .parseable end')" = false ]; then
-    case "$FLAGGED" in *" $1 "*) return 1 ;; esac
-    FLAGGED="${FLAGGED}$1 "
-    gh_checkpoint
-    gh_write_once issue comment "$1" --body "[orchestrator] [report] not claimed · dependency line unreadable
-Did: read the card's dependencies before claiming it
-Done: nothing; the card stays in Ready
-Not done: $(echo "$d" | jq -r .why)
-Next: owner writes \`- #N\` bullets or \`- None.\` under \`## Blocked by\`" >/dev/null 2>&1 || true
-    say "not claimed #$1: dependency line unreadable"
-  fi
+  [ "$(echo "$d" | jq -r 'if . == null then true else .parseable end')" = true ] || flag_unreadable "$1" Ready
   return 1
 }
 
@@ -805,11 +820,13 @@ cache_set_status() {
 sweep_blocked() {
   # FR-BRD-5 and FR-BRD-8 over the Blocked column. A card whose blockers all closed goes back to
   # Ready; an owner-approved [needs-you] merge goes to Review; one whose PR head moved while
-  # Blocked goes to Review for a fresh request, with no approval. Moved cards wait for the next tick.
+  # Blocked goes to Review for a fresh request, with no approval, and loses its stale
+  # needs-you:done label. An unreadable dependency line is flagged. Moved cards wait a tick.
   local kind issue item extra
   while IFS=$'\t' read -r kind issue item extra; do
     [ -n "$kind" ] || continue
     case "$kind" in
+      flag) flag_unreadable "$issue" Blocked; continue ;;
       sweep)
         set_card_status "$item" Ready || continue
         gh_checkpoint
@@ -825,6 +842,11 @@ Next: builder (next tick)" >/dev/null 2>&1 || true
         cache_set_status "$issue" Review ;;
       refresh)
         set_card_status "$item" Review || continue
+        if [ "$extra" = stale-label ]; then
+          gh_checkpoint
+          # Display state only, never authority: a failed removal changes nothing a gate reads.
+          gh issue edit "$issue" --remove-label needs-you:done >/dev/null 2>&1 || true
+        fi
         gh_checkpoint
         gh_write_once issue comment "$issue" --body "[orchestrator] [report] moved back to Review · PR head changed while Blocked
 Did: found the approval request pinned to an older PR head
@@ -838,57 +860,102 @@ Next: reviewer reviews the new head and posts a fresh approval request" >/dev/nu
 $(echo "$PROJECT_ITEMS_JSON" | jq -r --argjson deps "$DEPS_JSON" '
     .items[] | select(.status == "Blocked" and .content.type == "Issue")
     | (.content.number | tostring) as $n | $deps[$n] as $d | select($d != null)
+    | [((.labels // []) + (.content.labels // []))[] | (if type == "object" then .name else . end)] as $l
     | if ($d.needsYouDone // false) then ["resume", $n, .id, ($d.approvalHead // "")]
-      elif ($d.approvalRefresh // false) then ["refresh", $n, .id, "-"]
+      elif ($d.approvalRefresh // false) then ["refresh", $n, .id, (if ($l | index("needs-you:done")) then "stale-label" else "-" end)]
       elif $d.runnable and (($d.blockers // []) | length) > 0 then ["sweep", $n, .id, ($d.blockers | map(tostring) | join(", #"))]
+      elif ($d.parseable == false) then ["flag", $n, .id, "-"]
       else empty end | @tsv')
 EOF
 }
 
 # ───────────────────────── short agents: pre-flight, classifier ─────────────────────────
-AGENT_TIMEOUT="${DROVER_AGENT_TIMEOUT:-600}"
+# The agents run with the harness's read-only `agent` profile and its JSON output flags
+# (harnesses/<harness>.json); the runner does every GitHub write.
+AGENT_TIMEOUT="${DROVER_AGENT_TIMEOUT:-120}"
+AGENT_LOCK_NAME="agent"   # $INFLIGHT_DIR/agent: the running agent, for halt_cleanup and `drover stop`
 AGENT_JSON_PY='import json, sys
-key, text, found = sys.argv[1], sys.stdin.read(), ""
-for line in text.splitlines():
-    line = line.strip()
-    if line.startswith("{"):
+key, result_key, text = sys.argv[1], sys.argv[2], sys.stdin.read()
+def last_with(text, want):
+    found = None
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("{"):
+            try:
+                value = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(value, dict) and want in value:
+                found = value
+    if found is None and "{" in text:
         try:
-            value = json.loads(line)
+            value = json.loads(text[text.index("{"):text.rindex("}") + 1])
+            found = value if isinstance(value, dict) and want in value else None
         except ValueError:
-            continue
-        if isinstance(value, dict) and key in value:
-            found = line
-if not found and "{" in text:
-    try:
-        value = json.loads(text[text.index("{"):text.rindex("}") + 1])
-        found = json.dumps(value) if isinstance(value, dict) and key in value else ""
-    except ValueError:
-        pass
-print(found)'
+            pass
+    return found
+# The harness output envelope (`--output-format json`) holds the reply as text in result_key.
+envelope = last_with(text, result_key) if result_key else None
+if envelope is not None and isinstance(envelope.get(result_key), str):
+    text = envelope[result_key]
+answer = last_with(text, key)
+print(json.dumps(answer) if answer is not None else "")'
 
 run_agent() {
   # $1 = role (preflight|classify), $2 = log name, $3 = prompt, $4 = model, $5 = the JSON key its
-  # answer carries. Runs one short headless worker through the worker interface, waits for it and
-  # sets AGENT_OUT to the last JSON line holding $5 ("" when it gave none).
+  # answer carries. Runs one short headless worker through the worker interface, waits for it
+  # (AGENT_TIMEOUT, then it is stopped) and sets AGENT_OUT to its JSON answer, "" when it gave none.
   local role="$1" log="${WORKER_LOG_DIR}/$1-$2.log" mark
   printf '=== %s %s at %s ===\n' "$role" "$2" "$(date -u +%FT%TZ)" >> "$log"
   mark=$(wc -c < "$log" | tr -d ' ')
   WORKER_ENV=()
   worker_start "$role" 0 "$3" "$log" "$4" || { log "worker command: no argv from harness ${HARNESS}"; exit 66; }
-  MY_HANDLES="${MY_HANDLES}${WORKER_HANDLE} "
-  worker_wait "$WORKER_HANDLE" "$AGENT_TIMEOUT"
-  forget_handle "$WORKER_HANDLE"
-  AGENT_OUT=$(tail -c "+$((mark + 1))" "$log" | python3 -c "$AGENT_JSON_PY" "$5")
+  AGENT_HANDLE="$WORKER_HANDLE"
+  write_lock "$INFLIGHT_DIR/$AGENT_LOCK_NAME" "HANDLE=${AGENT_HANDLE}
+LANE=${role}
+"
+  worker_wait "$AGENT_HANDLE" "$AGENT_TIMEOUT"
+  rm -f "$INFLIGHT_DIR/$AGENT_LOCK_NAME"
+  AGENT_HANDLE=""
+  AGENT_OUT=$(tail -c "+$((mark + 1))" "$log" | python3 -c "$AGENT_JSON_PY" "$5" "$AGENT_RESULT_KEY" 2>/dev/null) || AGENT_OUT=""
 }
 
-PF_CLEARED=" "   # Ready cards the latest pre-flight batch cleared, not yet dispatched
+PF_TTL="${DROVER_PF_TTL:-3}"   # ticks a pre-flight clearance holds; a later build re-checks
+PF_CLEARED=" "    # "<issue>:<tick>" the latest pre-flight batch cleared, not yet dispatched
+PF_SKIPS=" "      # "<issue>:<no-verdict count>:<retry tick>" for cards the pre-flight gave no verdict
+PF_MAX_SKIPS=3
+pf_entry() {
+  # $1 = list, $2 = issue: prints the entry's fields after "<issue>:", or nothing.
+  case "$1" in *" $2:"*) local e="${1#* $2:}"; echo "${e%% *}" ;; esac
+}
+pf_drop() {
+  # Removes issue $2's entry from the list named $1.
+  local v="${!1}"
+  v=$(printf '%s' "$v" | sed "s/ $2:[0-9:]* / /")
+  eval "$1=\$v"
+}
+pf_waiting() {
+  # 0 while Ready card $1 waits out a no-verdict backoff.
+  local e; e=$(pf_entry "$PF_SKIPS" "$1")
+  [ -n "$e" ] && [ "$TICK" -lt "${e#*:}" ]
+}
+pf_cleared() {
+  # 0 when card $1 holds a clearance from the last PF_TTL ticks and is still Ready.
+  local t; t=$(pf_entry "$PF_CLEARED" "$1")
+  [ -n "$t" ] || return 1
+  if [ "$((TICK - t))" -ge "$PF_TTL" ] || [ "$(issue_status "$1")" != Ready ]; then
+    pf_drop PF_CLEARED "$1"; return 1
+  fi
+}
+
 preflight_ok() {
   # FR-RUN-5: 0 when the latest pre-flight batch cleared Ready card $1 for a builder. Otherwise
   # one agent judges $1 and up to 4 more free Ready build cards; held and sequenced cards go to
-  # Blocked, a card with no verdict is not built this tick. The batch's builders may run side
-  # by side (FR-RUN-2).
-  local first="$1" batch n inflight prompt v verdict tag detail by summary="" reason
-  case "$PF_CLEARED" in *" $first "*) return 0 ;; esac
+  # Blocked. A card with no verdict is not built: it is asked again after a 2-tick backoff, and
+  # after PF_MAX_SKIPS such answers it goes to Blocked [blocked:unclear]. The batch's builders
+  # may run side by side (FR-RUN-2).
+  local first="$1" batch n inflight prompt v verdict tag detail by summary="" reason e count
+  pf_cleared "$first" && return 0
   PF_CLEARED=" "
   batch="$first"
   for n in $(echo "$PROJECT_ITEMS_JSON" | jq -r --argjson f "$first" '
@@ -897,6 +964,7 @@ preflight_ok() {
     [ "$(echo "$batch" | tr ',' '\n' | grep -c .)" -lt 5 ] || break
     case "$TICK_SEEN$CLOSED_MOVED" in *" $n "*) continue ;; esac
     [ -f "$INFLIGHT_DIR/$n" ] && continue
+    pf_waiting "$n" && continue
     [ "$(card_lane "$n")" = build ] || continue
     [ "$(echo "$DEPS_JSON" | jq -r --arg n "$n" '.[$n].runnable // false')" = true ] || continue
     local rc=0; issue_is_open "$n" || rc=$?
@@ -907,8 +975,8 @@ preflight_ok() {
   echo "$PROJECT_ITEMS_JSON" | jq '[.items[] | select(.content.type == "Issue")
     | select(.status as $s | ["Ready","Building","QA","Review"] | index($s))
     | {number: .content.number, title: (.content.title // ""), status}]' > "$inflight"
-  prompt="Builder pre-flight for issues $(echo "$batch" | sed 's/^/#/; s/,/, #/g') for drover run. Config: ${CONFIG_PATH}.
-Read ${DROVER_HOME}/skills/drover/references/run.md → \"Builder pre-flight\" and judge each card as it says. You write no code and make no GitHub writes: drover moves held and sequenced cards and posts their Block comments.
+  prompt="Builder pre-flight for issues $(echo "$batch" | sed 's/^/#/; s/,/, #/g') for the board runner. Config: ${CONFIG_PATH}.
+Read ${DROVER_HOME}/skills/drover/references/run.md → \"Builder pre-flight\" and judge each card as it says. You write no code and make no GitHub writes: the runner moves held and sequenced cards and posts their Block comments.
 Run once for the whole batch: drover preflight --repo ${REPO_SLUG} --issues ${batch} --inflight ${PWD}/${inflight}. Then judge its candidates semantically, and add too-big: likely over ${AUTO_MAX_LINES} changed lines, or spans many areas.
 Two Ready cards overlapping each other with no open PR: the lower-numbered one proceeds; sequence only the other, blockedBy [the lower]. Never both.
 Required GitHub reads use drover github-read; exit 79 means verdict halted for every card.
@@ -916,28 +984,29 @@ End your reply with one line of JSON and nothing after it, one verdict per issue
 {\"verdicts\":[{\"number\":N,\"verdict\":\"proceed|hold|sequence|halted\",\"tag\":\"done|in-progress|unclear|too-big|overlap|clean\",\"blockedBy\":[M],\"detail\":\"one line\"}]}"
   run_agent preflight "${batch%%,*}" "$prompt" "$([ "$MODEL_TIER" = low ] && echo haiku || echo sonnet)" verdicts
   for n in ${batch//,/ }; do
-    v=$(printf '%s' "${AGENT_OUT:-"{}"}" | jq -c --argjson n "$n" '[(.verdicts // [])[] | select(.number == $n)][0] // {}' 2>/dev/null || echo '{}')
-    verdict=$(echo "$v" | jq -r '.verdict // "skipped"')
-    tag=$(echo "$v" | jq -r '.tag // ""')
-    detail=$(echo "$v" | jq -r '.detail // "" | gsub("[\n\t]"; " ")')
-    by=$(echo "$v" | jq -r '(.blockedBy // []) | map(tostring) | join(", ")')
+    # Any field of any shape: a bad answer reads as no verdict, never as a runner failure.
+    v=$(printf '%s' "${AGENT_OUT:-"{}"}" | jq -c --argjson n "$n" '[(.verdicts // [])[]? | objects | select(.number == $n)][0] // {}' 2>/dev/null) || v='{}'
+    verdict=$(echo "$v" | jq -r '.verdict // "skipped" | strings' 2>/dev/null) || verdict=skipped
+    tag=$(echo "$v" | jq -r '.tag // "" | strings' 2>/dev/null) || tag=""
+    detail=$(echo "$v" | jq -r '.detail // "" | tostring | gsub("[\n\t]"; " ")' 2>/dev/null) || detail=""
+    by=$(echo "$v" | jq -r '[(.blockedBy // [])[]? | numbers | floor | tostring] | join(", ")' 2>/dev/null) || by=""
     reason=""
     case "$verdict" in
       halted)
         log "preflight batch $(echo "$batch" | sed 's/^/#/; s/,/ #/g'): halted #${n} (${detail:-required GitHub read failed})"
         exit 79 ;;
-      proceed) PF_CLEARED="${PF_CLEARED}${n} " ;;
+      proceed) PF_CLEARED="${PF_CLEARED}${n}:${TICK} " ;;
       sequence)
         if [ -z "$by" ]; then
           # Nothing to wait on: it builds, and the merge gate rebases (run.md → Builder pre-flight).
-          verdict=proceed; PF_CLEARED="${PF_CLEARED}${n} "
+          verdict=proceed; PF_CLEARED="${PF_CLEARED}${n}:${TICK} "
           gh_checkpoint
           gh_write_once issue comment "$n" --body "[orchestrator] [report] pre-flight · expected conflict
 Did: pre-flight found an overlap with nothing to wait on: ${detail}
 Done: card stays in Ready and builds
 Next: builder; the merge gate rebases" >/dev/null 2>&1 || true
         else
-          reason="$detail"; block_preflight "$n" "[blocked:sequenced]" "$detail" "$by"
+          reason="$detail"; block_preflight "$n" "[blocked:sequenced]" "$detail" "$by" || reason="${detail}; not moved"
         fi ;;
       hold)
         reason="$detail"
@@ -945,24 +1014,31 @@ Next: builder; the merge gate rebases" >/dev/null 2>&1 || true
           done|in-progress) block_preflight "$n" "[blocked:duplicate]" "$detail" "${by:--}" ;;
           too-big) block_preflight "$n" "[blocked:too-big]" "$detail" - ;;
           *) block_preflight "$n" "[blocked:unclear]" "$detail" - ;;
-        esac ;;
-      *) verdict=skipped; reason="no verdict"; TICK_SEEN="${TICK_SEEN}${n} " ;;
+        esac || reason="${detail}; not moved" ;;
+      *)
+        verdict=skipped; TICK_SEEN="${TICK_SEEN}${n} "
+        e=$(pf_entry "$PF_SKIPS" "$n"); count="${e%%:*}"; count=$(( ${count:-0} + 1 )); pf_drop PF_SKIPS "$n"
+        if [ "$count" -ge "$PF_MAX_SKIPS" ]; then
+          reason="no verdict ${count} times"
+          block_preflight "$n" "[blocked:unclear]" "pre-flight gave no verdict ${count} times" - || reason="${reason}; not moved"
+        else
+          reason="no verdict"; PF_SKIPS="${PF_SKIPS}${n}:${count}:$((TICK + 2)) "
+        fi ;;
     esac
     summary="${summary}${summary:+, }${verdict} #${n}${reason:+ (${reason})}"
   done
   log "preflight batch $(echo "$batch" | sed 's/^/#/; s/,/ #/g'): ${summary}"
-  case "$PF_CLEARED" in *" $first "*) return 0 ;; esac
-  return 1
+  pf_cleared "$first"
 }
 
 block_preflight() {
-  # $1 = issue, $2 = reason tag, $3 = the pre-flight's one line, $4 = blocked-by. Comment:
-  # block-template.md. The card waits in Blocked; the sweep frees a sequenced one.
+  # $1 = issue, $2 = reason tag, $3 = the pre-flight's one line, $4 = blocked-by. The Block comment
+  # (block-template.md) goes first, then the move; 1 when the move could not be written. The card
+  # waits in Blocked; the sweep frees a sequenced one.
   local issue="$1" tag="$2" why="$3" by="$4" item
   TICK_SEEN="${TICK_SEEN}${issue} "
+  pf_drop PF_SKIPS "$issue"
   item=$(echo "$PROJECT_ITEMS_JSON" | jq -r --argjson n "$issue" '[.items[] | select(.content.number == $n) | .id][0] // ""')
-  set_card_status "$item" Blocked || return 0
-  cache_set_status "$issue" Blocked
   gh_checkpoint
   gh_write_once issue comment "$issue" --body "[orchestrator] [blocker] blocked ${tag} ${why}
 Card:        #${issue}
@@ -978,20 +1054,30 @@ To unblock:  [ ] resolve what the reason names
 Owner:       $([ "$by" = - ] && echo owner || echo "nobody: the sweep moves it back when #${by} closes")
 Move back:   drag this card to Ready after the steps above are done
 blocked-by:  ${by}" >/dev/null 2>&1 || true
+  if ! set_card_status "$item" Blocked; then
+    log "pre-flight: could not move #${issue} to Blocked; its Block comment is posted, the card stays in Ready"
+    return 1
+  fi
+  cache_set_status "$issue" Blocked
 }
 
-CLASSES=" "   # "<issue>:<complexity>" for each Ready card classified this run
+TYPE_LABELS=""   # the routing type labels (drover-routing.json and the config's `labels`) plus qa
+CLASSES=" "      # "<issue>:<complexity>" for each Ready card classified this run
+CLASS_FAILS=" "  # "<issue>:<failed tries>"
+CLASS_TRIES=3    # a failed classification is retried on the next tick, at most twice
 classify_card() {
   # FR-RUN-7 / FR-RUN-15, before a Ready card is claimed: a fast agent picks the type when the
-  # card has none, the complexity (the model tier) and the risk labels it needs. Labels are only
-  # added, never removed, and never `qa`; one comment says why when one was added.
-  local issue="$1" labels typed out kind complexity why add="" l
+  # card has no type label, the complexity (the model tier) and the risk labels it needs. Labels
+  # are only added, never removed, and never `qa`; one comment says why when one was added.
+  # 1 when the agent gave no usable answer and the card should wait for a retry next tick.
+  local issue="$1" labels typed out kind complexity why add="" l fails
   case "$CLASSES" in *" $issue:"*) return 0 ;; esac
+  [ -n "$TYPE_LABELS" ] || TYPE_LABELS=" qa $(jq -r '.labels // {} | keys[]' "$DROVER_LIB/drover-routing.json" "$CONFIG_PATH" 2>/dev/null | tr '\n' ' ')"
   labels=$(echo "$PROJECT_ITEMS_JSON" | jq -r --argjson n "$issue" '[.items[] | select(.content.number == $n)
     | ((.labels // []) + (.content.labels // []))[] | (if type == "object" then .name else . end) | ascii_downcase] | unique | join(" ")')
   typed=""
-  for l in qa bug feature; do case " $labels " in *" $l "*) typed="$l"; break ;; esac; done
-  run_agent classify "$issue" "Classify GitHub issue #${issue} for drover run. Config: ${CONFIG_PATH}.
+  for l in $labels; do case "$TYPE_LABELS" in *" $l "*) typed="$l"; break ;; esac; done
+  run_agent classify "$issue" "Classify GitHub issue #${issue} for the board runner. Config: ${CONFIG_PATH}.
 Read its body and comments: drover github-read --kind issue -- issue view ${issue} --json number,title,body, and drover github-read --kind comments -- api repos/{owner}/{repo}/issues/${issue}/comments --paginate --slurp. You write no code and make no GitHub writes.
 kind: $([ -n "$typed" ] && echo "its label says \"${typed}\": return kind \"${typed}\"; the label routes the card." || echo "it has no type label: return feature or bug, never qa.")
 complexity: low, medium or high, by the scope of the change.
@@ -1001,12 +1087,24 @@ End your reply with one line of JSON and nothing after it:
 {\"kind\":\"feature|bug|qa\",\"complexity\":\"low|medium|high\",\"risk\":[],\"why\":\"one line\"}" \
     "$([ "$MODEL_TIER" = high ] && echo sonnet || echo haiku)" complexity
   out="${AGENT_OUT:-"{}"}"
-  kind=$(echo "$out" | jq -r '.kind // ""' 2>/dev/null || true)
-  complexity=$(echo "$out" | jq -r '.complexity // "" | select(. == "low" or . == "medium" or . == "high")' 2>/dev/null || true)
-  why=$(echo "$out" | jq -r '.why // "" | gsub("[\n\t]"; " ")' 2>/dev/null || true)
-  CLASSES="${CLASSES}${issue}:${complexity:-none} "
+  complexity=$(echo "$out" | jq -r '.complexity // "" | strings | select(. == "low" or . == "medium" or . == "high")' 2>/dev/null) || complexity=""
+  if [ -z "$complexity" ]; then
+    fails=$(( $(pf_entry "$CLASS_FAILS" "$issue" | sed 's/^$/0/') + 1 ))
+    pf_drop CLASS_FAILS "$issue"
+    if [ "$fails" -lt "$CLASS_TRIES" ]; then
+      CLASS_FAILS="${CLASS_FAILS}${issue}:${fails} "
+      say "classify #${issue}: no usable answer (try ${fails} of ${CLASS_TRIES}); asking again next tick"
+      return 1
+    fi
+    say "classify #${issue}: no usable answer after ${fails} tries; claimed unclassified"
+    CLASSES="${CLASSES}${issue}:none "
+    return 0
+  fi
+  kind=$(echo "$out" | jq -r '.kind // "" | strings' 2>/dev/null) || kind=""
+  why=$(echo "$out" | jq -r '.why // "" | tostring | gsub("[\n\t]"; " ")' 2>/dev/null) || why=""
+  CLASSES="${CLASSES}${issue}:${complexity} "
   [ -n "$typed" ] || case "$kind" in feature|bug) add="$kind" ;; esac
-  for l in $(echo "$out" | jq -r '(.risk // [])[] | strings | ascii_downcase' 2>/dev/null || true); do
+  for l in $(echo "$out" | jq -r '(.risk // [])[]? | strings | ascii_downcase' 2>/dev/null || true); do
     case "$l" in security|migration|payments|auth) ;; *) continue ;; esac
     case " $labels $add " in *" $l "*) continue ;; esac
     add="${add:+$add }$l"
@@ -1017,7 +1115,7 @@ End your reply with one line of JSON and nothing after it:
   gh issue edit "$issue" --add-label "${add// /,}" >/dev/null 2>&1 || { say "classify #${issue}: could not add label ${add// /, }"; return 0; }
   gh_checkpoint
   gh_write_once issue comment "$issue" --body "[orchestrator] [classify] added label ${add// /, }
-Did: classified as ${kind:-${typed:-unknown}}, complexity ${complexity:-unknown}
+Did: classified as ${kind:-${typed:-unknown}}, complexity ${complexity}
 Why: ${why:-no reason given}" >/dev/null 2>&1 || true
   PROJECT_ITEMS_JSON=$(echo "$PROJECT_ITEMS_JSON" | jq -c --argjson n "$issue" --arg add "$add" \
     '.items |= map(if .content.number == $n then .labels = ((.labels // []) + ($add | split(" "))) else . end)')
@@ -1032,17 +1130,20 @@ card_model() {
   case "$CLASSES" in *" $1:"*) c="${CLASSES#* $1:}"; c="${c%% *}" ;; esac
   case "${MODEL_TIER}:${c}" in
     low:low) echo haiku ;; low:medium|medium:low) echo sonnet ;;
-    low:high|medium:medium|high:*) echo opus ;;
+    low:high|medium:medium|high:low|high:medium|high:high) echo opus ;;
   esac
 }
 
 # ───────────────────────── usage pause (FR-RUN-8) ─────────────────────────
-USAGE_PAUSED=0
+USAGE_STATE=ok     # ok | pause | unknown
+USAGE_UNTIL=0      # while paused: the reset time of the window that paused the run
 USAGE_SAID=0
 usage_ok() {
   # 0 when a new worker may start. While the probe reports usage at or above usage_pause_pct,
-  # 1; running workers finish. No probe, or a probe with no reading: said once, never a pause.
-  local out rc=0 used
+  # 1; running workers finish. A paused run stays paused through readings that go blind
+  # (no snapshot, unreadable) until the pausing window's reset time, or until a fresh reading
+  # below the threshold. No probe: said once, never a pause. Each transition is logged.
+  local out rc=0 used resets reason now
   local -a probe=()
   if [ -z "$USAGE_PROBE" ]; then
     [ "$USAGE_SAID" = 1 ] || say "usage: harness ${HARNESS} has no usage probe; running without a usage pause"
@@ -1051,17 +1152,29 @@ usage_ok() {
   read -r -a probe <<< "$USAGE_PROBE"
   [ "${probe[0]}" != drover ] || probe[0]="$DROVER_HOME/bin/drover"
   out=$("${probe[@]}" --threshold "$USAGE_PCT" 2>/dev/null) || rc=$?
-  used=$(printf '%s' "$out" | jq -r '.used // 0' 2>/dev/null || echo 0)
+  used=$(printf '%s' "$out" | jq -r '.used // 0' 2>/dev/null) || used=0
+  resets=$(printf '%s' "$out" | jq -r '.resets_at // 0 | numbers | floor' 2>/dev/null) || resets=0
+  reason=$(printf '%s' "$out" | jq -r '.reason // "no output"' 2>/dev/null) || reason="no output"
+  now=$(date +%s)
   if [ "$rc" -eq 10 ]; then
-    [ "$USAGE_PAUSED" = 1 ] || log "usage pause: ${used}% >= ${USAGE_PCT}%, no new workers"
-    USAGE_PAUSED=1; return 1
+    USAGE_UNTIL="${resets:-0}"; [ "$USAGE_UNTIL" -gt "$now" ] || USAGE_UNTIL=$((now + 3600))
+    [ "$USAGE_STATE" = pause ] || log "usage pause: ${used}% >= ${USAGE_PCT}%, no new workers"
+    USAGE_STATE=pause; return 1
   fi
-  if [ "$rc" -ne 0 ] && [ "$USAGE_SAID" = 0 ]; then
-    say "usage: no reading from the usage probe ($(printf '%s' "$out" | jq -r '.reason // "no output"' 2>/dev/null || echo 'no output')); running without a usage pause"
-    USAGE_SAID=1
+  if [ "$rc" -eq 0 ]; then
+    case "$USAGE_STATE" in
+      pause) log "usage resume: ${used}%" ;;
+      unknown) say "usage: reading again (${used}%)" ;;
+    esac
+    USAGE_STATE=ok; return 0
   fi
-  [ "$USAGE_PAUSED" = 0 ] || log "usage resume: ${used}%"
-  USAGE_PAUSED=0
+  # No reading. A pause holds until its window resets; usage cannot fall inside a window.
+  if [ "$USAGE_STATE" = pause ] && [ "$now" -lt "$USAGE_UNTIL" ]; then
+    return 1
+  fi
+  [ "$USAGE_STATE" != pause ] || log "usage resume: 0%"
+  [ "$USAGE_STATE" = unknown ] || say "usage: no reading from the usage probe (${reason}); running without a usage pause"
+  USAGE_STATE=unknown
   return 0
 }
 
@@ -1083,6 +1196,18 @@ fb_outcome() {
   esac
 }
 
+fb_board() {
+  # Column-driven attempt events after each fresh board read, and FR-MET-5's "PR closed
+  # unmerged": one closed-PR list read, only while an open attempt has a linked PR. A failed
+  # read is skipped (metrics never halt a run).
+  [ "$FB_ON" = 1 ] || return 0
+  printf '%s' "$PROJECT_ITEMS_JSON" | metrics board "$RUNS_DIR/deps.json"
+  [ -n "$(metrics pr-urls)" ] || return 0
+  gh pr list --state closed --json url,mergedAt --limit 100 > "$RUNS_DIR/closed-prs.json" 2>/dev/null \
+    && metrics closed "$RUNS_DIR/closed-prs.json"
+  return 0
+}
+
 # ───────────────────────── run counters (shared state) ─────────────────────────
 DISPATCH_COUNT=0
 REAP_COUNT=0
@@ -1099,14 +1224,18 @@ fi
 # locks, worktrees, claims, and approval evidence for explicit recovery.
 halt_cleanup() {
   local rc=$? handle
+  # A short agent the runner was waiting on never outlives it (TERM, INT or any exit).
+  if [ -n "${AGENT_HANDLE:-}" ]; then worker_stop "$AGENT_HANDLE" 1; rm -f "$INFLIGHT_DIR/$AGENT_LOCK_NAME"; fi
   if [ "$rc" -eq 9 ] || [ "$rc" -eq 10 ] || ! python3 "$SB_GITHUB_READ" --check >/dev/null 2>&1; then
     for handle in $MY_HANDLES; do worker_stop "$handle" 1; done
   fi
   # Only our own runner lock: a second runner that refused to start leaves the first's alone.
   [ "${RUNNER_LOCK_OWNED:-0}" = 1 ] && rm -f "$RUNNER_LOCK"
-  return 0
+  # Keep the status that ended the run (an unbound variable or a failed command is not success).
+  exit "$rc"
 }
 trap halt_cleanup EXIT
+on_signals
 gh_checkpoint
 
 # ───────────────────────────── preconditions ─────────────────────────────
@@ -1132,6 +1261,11 @@ if [ "$ORPHANS" -gt 0 ]; then
   log "    Stop them first: drover stop"
   log "    Then re-run: drover run"
   exit 73
+fi
+# A pre-flight or classifier agent left by a runner that died: no runner owns it any more.
+if worker_lock "$INFLIGHT_DIR/$AGENT_LOCK_NAME"; then
+  worker_stop "$HANDLE" 1
+  worker_alive "$HANDLE" || rm -f "$INFLIGHT_DIR/$AGENT_LOCK_NAME"
 fi
 write_lock "$RUNNER_LOCK" "HANDLE=$(process_handle "$$")
 STARTED=$(date -u +%FT%TZ)
@@ -1218,9 +1352,7 @@ while true; do
   refresh_deps
   judge_finished_workers || exit 76
   # After the judge, so a worker's last gate lands before its card's Done ends the attempt.
-  metrics board "$RUNS_DIR/deps.json" <<EOF
-$PROJECT_ITEMS_JSON
-EOF
+  fb_board
   # A builder that exited mid-build left its card in Building, where no lane looks.
   reclaim_stranded_building
 
@@ -1263,12 +1395,13 @@ EOF
     # A build card needs the pre-flight's go first; every Ready card is classified before its claim.
     while { lane_has_room build || lane_has_room qa; } && usage_ok && top_card_in_column "Ready"; do
       LANE_FOR=$(card_lane "$TOP_ISSUE")
-      if ! lane_has_room "$LANE_FOR"; then
+      if ! lane_has_room "$LANE_FOR" || { [ "$LANE_FOR" = build ] && pf_waiting "$TOP_ISSUE"; }; then
         TICK_SEEN="${TICK_SEEN}${TOP_ISSUE} "
       elif [ "$LANE_FOR" = build ] && ! preflight_ok "$TOP_ISSUE"; then
         TICK_SEEN="${TICK_SEEN}${TOP_ISSUE} "
+      elif ! classify_card "$TOP_ISSUE"; then
+        TICK_SEEN="${TICK_SEEN}${TOP_ISSUE} "
       else
-        classify_card "$TOP_ISSUE"
         dispatch_lane "$LANE_FOR" "$TOP_ISSUE"
       fi
     done
@@ -1282,7 +1415,7 @@ EOF
   #    exists to catch is a pipeline that is 100% busy and lands nothing, and the old
   #    `AND no lane active` clause made that case unhaltable (293 ticks, 0 merges).
   # A paused tick that started nothing is not a dispatch cycle: a long pause is no runaway.
-  if [ "$USAGE_PAUSED" = 1 ] && [ "$DISPATCH_COUNT" -eq "$DISPATCHED_BEFORE" ]; then
+  if [ "$USAGE_STATE" = pause ] && [ "$DISPATCH_COUNT" -eq "$DISPATCHED_BEFORE" ]; then
     sleep "$TICK_SECONDS"
     continue
   fi
