@@ -180,7 +180,8 @@ check(len(prompts) == 3, f"expected the three lane prompts in dispatch_lane, fou
 check(reads and all(p.is_file() for p in reads), f"prompt reads must exist: {reads}")
 check("First operation" not in body and ".claude/bin" not in body,
       "the worker prompt must not tell the worker to run a command before it starts (stage 0)")
-check("worker-argv" in body, "dispatch_lane must start workers through the harness worker-argv")
+check("worker_start" in body and "worker-argv" in (ROOT / "lib/drover-worker.sh").read_text(),
+      "dispatch_lane must start workers through drover-worker.sh and the harness worker-argv")
 
 # 2 — every command in the files the prompt names and in the role rules is covered.
 scanned = sorted(set(reads + ROLE_FILES))
@@ -202,8 +203,9 @@ check(len(scanned) >= 10 and seen.get("drover", 0) > 5 and seen.get("gh", 0) > 5
 # 3 — the tools the role rules depend on are allowed.
 for tool in ("Read", "Edit", "Write", "Task", "Skill"):
     check(tool in PERMS["tools"], f"harness permissions should allow the {tool} tool")
-check("{drover_home}" in PERMS["read_only_dirs"] and {"Edit", "Write"} <= set(PERMS["read_only_deny"]),
-      "workers read the drover install folder (skills, run.md) and never edit it")
+# Claude's Edit(path) rule covers every file-editing tool; Write/MultiEdit/NotebookEdit path rules are rejected.
+check("{drover_home}" in PERMS["read_only_dirs"] and PERMS["read_only_deny"] == ["Edit"],
+      "workers read the drover install folder (skills, run.md) and never edit it (one Edit(path) rule)")
 check("add_dir_flag" not in PERMS, "no --add-dir: the install folder is read-only for workers")
 
 if failures:

@@ -123,14 +123,20 @@ def parse_manifest(text: str, today_iso: str) -> dict[str, Any]:
 
     Pure function (no I/O, no global state) so it can be unit-tested with
     hand-crafted fixtures. Returns a dict with:
-      inflight: {lane → {pid, issue, ts}}    — workers currently dispatched
+      inflight: {lane → [{pid, issue, ts}]}  — workers currently dispatched (max_workers per lane)
       recents: [{epoch, verb, issue, target, detail}, ...]
       last_tick: HH:MM:SS of the most recent `tick —` line, or None
       start_hms: HH:MM:SS of the most recent `drover run started`, or None
       exited: True if the run has logged `exiting cleanly`
       reaped_count: number of `reaped stale lock ...` lines seen
     """
-    inflight: dict[str, dict[str, str]] = {}
+    inflight: dict[str, list[dict[str, str]]] = {}
+
+    def drop(keep) -> None:
+        for lane in list(inflight):
+            inflight[lane] = [v for v in inflight[lane] if keep(lane, v)]
+            if not inflight[lane]:
+                del inflight[lane]
     recents: list[dict[str, Any]] = []
     last_tick: str | None = None
     start_hms: str | None = None
@@ -163,10 +169,10 @@ def parse_manifest(text: str, today_iso: str) -> dict[str, Any]:
             # and render as a phantom concurrent worker. A fresh dispatch into
             # a later lane for the same issue is proof the earlier lane
             # finished — drop the prior entry before recording the new one.
-            for prior in LANE_ORDER[: LANE_ORDER.index(lane)]:
-                if inflight.get(prior, {}).get("issue") == issue:
-                    del inflight[prior]
-            inflight[lane] = {"pid": pid, "issue": issue, "ts": hms}
+            # A re-dispatch in the same lane replaces that issue's older entry too.
+            upto = LANE_ORDER[: LANE_ORDER.index(lane) + 1]
+            drop(lambda l, v: not (l in upto and v["issue"] == issue))
+            inflight.setdefault(lane, []).append({"pid": pid, "issue": issue, "ts": hms})
             recents.append({
                 "epoch": ep, "verb": "dispatch",
                 "issue": f"#{issue}", "target": LANE_LABEL[lane],
@@ -184,9 +190,7 @@ def parse_manifest(text: str, today_iso: str) -> dict[str, Any]:
             reaped_count += 1
             issue, pid = rm.groups()
             if pid != "empty":
-                for lane, v in list(inflight.items()):
-                    if v["pid"] == pid:
-                        del inflight[lane]
+                drop(lambda l, v: v["pid"] != pid)
             recents.append({
                 "epoch": ep, "verb": "reap",
                 "issue": f"#{issue}", "target": "",
@@ -195,9 +199,7 @@ def parse_manifest(text: str, today_iso: str) -> dict[str, Any]:
             continue
         if zm := ZOMBIE_RE.search(rest):
             issue, pid, det = zm.groups()
-            for lane, v in list(inflight.items()):
-                if v["pid"] == pid:
-                    del inflight[lane]
+            drop(lambda l, v: v["pid"] != pid)
             recents.append({
                 "epoch": ep, "verb": "zombie",
                 "issue": f"#{issue}", "target": "", "detail": det.strip(" —"),
@@ -504,7 +506,7 @@ def main() -> int:
     cfg = json.loads(config_path.read_text())
     project_owner: str = cfg["project"]["owner"]
     project_number: int = int(cfg["project"]["number"])
-    runs_dir = "docs/drover/runs"
+    runs_dir = ".drover/runs"  # metrics.md FR-MET-3
     run_date = datetime.date.today().isoformat()
     manifest_path = Path(runs_dir) / f"{run_date}-{config_slug}.md"
 
@@ -591,8 +593,8 @@ def main() -> int:
         return next((i for i in items if i["number"] == n), None)
 
     def glyph_for_issue(n: int) -> str:
-        for lane, v in inflight.items():
-            if v["issue"] == str(n):
+        for lane, workers in inflight.items():
+            if any(v["issue"] == str(n) for v in workers):
                 return LANE_GLYPH[lane]
         return "   "
 
@@ -653,7 +655,7 @@ def main() -> int:
 
     # ── workers ──
     print()
-    active = len(inflight)
+    active = sum(len(workers) for workers in inflight.values())
     run_active = bool(last_tick) and not exited
 
     if not run_active and active == 0:
@@ -664,8 +666,7 @@ def main() -> int:
         if active == 0:
             print("   (idle)")
         else:
-            for lane in sorted(inflight, key=LANE_ORDER.index):
-                v = inflight[lane]
+            for lane, v in [(l, v) for l in sorted(inflight, key=LANE_ORDER.index) for v in inflight[l]]:
                 glyph = LANE_GLYPH[lane]
                 role = LANE_ROLE[lane]
                 item = item_by_number(int(v["issue"]))

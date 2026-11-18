@@ -41,9 +41,9 @@ def test_dispatch_line_from_real_dispatcher() -> None:
         f"DISPATCH_RE should match the dispatcher's real log line; "
         f"inflight was {state['inflight']!r}"
     )
-    assert state["inflight"]["review"]["issue"] == "25"
-    assert state["inflight"]["review"]["pid"] == "13960"
-    assert state["inflight"]["review"]["ts"] == "08:35:37"
+    assert state["inflight"]["review"][0]["issue"] == "25"
+    assert state["inflight"]["review"][0]["pid"] == "13960"
+    assert state["inflight"]["review"][0]["ts"] == "08:35:37"
     assert len(state["recents"]) == 1
     assert state["recents"][0]["verb"] == "dispatch"
     assert state["recents"][0]["target"] == "Review"
@@ -111,6 +111,18 @@ def test_reap_drops_inflight_entry_by_pid() -> None:
     assert state["reaped_count"] == 1
 
 
+def test_two_workers_in_one_lane() -> None:
+    """max_workers 2: both builders show; a reap drops only its own."""
+    manifest = (
+        "[10:00:00] dispatch lane=build issue=#7 pid=100 claim=bot\n"
+        "[10:00:01] dispatch lane=build issue=#8 pid=200 claim=bot\n"
+    )
+    state = sbs.parse_manifest(manifest, TODAY)
+    assert [v["issue"] for v in state["inflight"]["build"]] == ["7", "8"]
+    state = sbs.parse_manifest(manifest + "[10:05:00] reaped stale lock for #7 (pid=100)\n", TODAY)
+    assert [v["issue"] for v in state["inflight"]["build"]] == ["8"]
+
+
 def test_lane_handoff_drops_prior_inflight() -> None:
     """Build → QA on the same issue: the build entry must go (no zombie phantom)."""
     manifest = (
@@ -119,7 +131,7 @@ def test_lane_handoff_drops_prior_inflight() -> None:
     )
     state = sbs.parse_manifest(manifest, TODAY)
     assert "build" not in state["inflight"]
-    assert state["inflight"]["qa"]["issue"] == "7"
+    assert state["inflight"]["qa"][0]["issue"] == "7"
 
 
 def test_tick_and_exited_tracked() -> None:

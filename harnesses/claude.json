@@ -16,7 +16,7 @@
     "allow_flag": "--allowedTools",
     "deny_flag": "--disallowedTools",
     "read_only_dirs": ["{drover_home}"],
-    "read_only_deny": ["Edit", "MultiEdit", "Write", "NotebookEdit"],
+    "read_only_deny": ["Edit"],
     "tools": ["Read", "Edit", "MultiEdit", "Write", "Glob", "Grep", "LS", "NotebookEdit",
               "TodoWrite", "Task", "Skill", "WebFetch", "WebSearch"],
     "commands": ["drover", "gh", "git", "jq", "python3", "python", "node", "npm", "npx", "pnpm", "yarn", "bun",

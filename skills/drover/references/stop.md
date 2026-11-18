@@ -29,9 +29,11 @@ Nothing else. Stop is intentionally tolerant — its job is to bring the system 
 
 ## What stop reads
 
-- `.claude/drover/inflight/<issue-N>` — one file per in-flight worker. New (v1.3.0+) format: `PID=…\nLANE=…\nSTARTED=…`. Legacy single-line PID format is also supported.
-- `pgrep -f 'drover-run\.sh'` — dispatcher PID(s).
-- `pgrep -f 'claude -p .*drover'` — orphan worker scan (workers without a lock file, e.g. from a crashed dispatcher).
+- `.claude/drover/inflight/<issue-N>` — one file per in-flight worker: `HANDLE=process:<pid>:<start>\nLANE=…\nSTARTED=…\nCOLUMN=…`. Older `PID=…` and single-line PID locks are also read.
+- `.claude/drover/runner.lock` — this repo's dispatcher (`HANDLE=process:<pid>:<start>`). A pid whose start time no longer matches is dead and never signalled; an older `PID=` lock is reported, never signalled.
+
+Stop touches only these (runner.md FR-WRK-8): it never searches the process table, so another
+repo's runner and workers are left alone. Liveness and signals go through `lib/drover-worker.sh`.
 
 ## Per-worker wrap-up (run for each in-flight lock)
 
@@ -46,14 +48,15 @@ Nothing else. Stop is intentionally tolerant — its job is to bring the system 
    - Next: `drover run`.
 3. **Release the assignee mutex** on the issue (`gh issue edit --remove-assignee <bot>`).
 4. **Remove descriptive labels** (`loop:in-build`, `loop:in-qa`, `loop:in-review`) — best-effort.
-5. **SIGTERM the worker PID**, sleep 1s, SIGKILL if still alive.
+5. **SIGTERM the worker**, sleep 1s, SIGKILL if still alive (`drover worker stop`).
+
+The dispatcher named in `runner.lock` is stopped first (SIGTERM → 1s → SIGKILL), so it
+cannot start a new worker during the wrap-up.
 
 ## After the per-worker loop
 
-6. **Sweep orphan workers** — `pgrep -f 'claude -p .*drover'` catches any `claude -p` worker that wasn't in `inflight/` (defensive against crashed dispatchers).
-7. **Kill the dispatcher loop** — `pgrep -f 'drover-run\.sh'`, SIGTERM → 1s → SIGKILL.
-8. **Clear in-flight locks** — `rm -f .claude/drover/inflight/*`. The PIDs they reference are dead now.
-9. **Print summary** — workers stopped, dispatchers stopped, resume command.
+6. **Clear in-flight locks** — remove each wrapped-up lock whose worker is no longer alive; a lock whose worker survived is kept.
+7. **Print summary** — workers stopped, dispatchers stopped, resume command.
 
 ## What stop does NOT do (deliberate)
 
@@ -104,14 +107,15 @@ Per the cardinal orchestrator/worker rule:
 | `gh issue comment` fails | gh auth expired or network blip | Comments are best-effort. The kill + lock cleanup still happens. Manually note the stop in the issue later if needed. |
 | Assignee release fails (gh 403) | rate limit or auth | The next `drover run` startup runs `reap_finished_locks` which sweeps stale assignees idempotently. No manual action needed. |
 | Worker PID survives SIGKILL | extremely rare (kernel-level stuck process) | `ps aux \| grep claude -p` to confirm, then escalate via OS tools. |
-| Stop reports "nothing to stop" but `ps` shows live workers | dispatcher and workers were started by a different repo / different inflight dir | Run stop in the right repo OR `pkill -f 'drover-run\.sh'` manually + `pkill -f 'claude -p .*drover'`. |
+| Stop reports "nothing to stop" but `ps` shows live workers | dispatcher and workers were started by a different repo / different inflight dir, or have no lock | Run stop in the right repo; stop never signals a process it has no lock for. |
 
-## Lock file format (v1.3.0+)
+## Lock file format
 
 ```
-PID=12345
+HANDLE=process:12345:Tue_May_24_18:42:10_2026
 LANE=qa
 STARTED=2026-05-24T18:42:11Z
+COLUMN=QA
 ```
 
-Sourced as bash (no shell injection — the dispatcher writes only its own PID + a hardcoded lane name + a `date -u` timestamp). Legacy single-line PID files are still accepted by both the dispatcher's `read_lock` helper and the stop script's same helper, so an upgrade mid-run is safe.
+Parsed line by line, never sourced (`worker_lock` in `lib/drover-worker.sh`). Older `PID=12345` locks and single-line PID files are still read, so an upgrade mid-run is safe.

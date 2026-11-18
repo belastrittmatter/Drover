@@ -24,6 +24,8 @@ cat > "$STUB_DIR/gh" <<'STUB'
 printf '%s\n' "$*" >> "$GH_LOG"
 case "$1 ${2:-}" in
   "issue view")
+    # The closed-card check (FR-BRD-3): closed as not planned, with a comment → Done.
+    case "$*" in *stateReason*) echo '{"reason":"NOT_PLANNED","comments":1}'; exit 0 ;; esac
     for n in $CLOSED_ISSUES; do
       [ "$n" = "$3" ] && { echo "CLOSED"; exit 0; }
     done
@@ -33,6 +35,7 @@ case "$1 ${2:-}" in
   "project view")      echo '{"id":"PVT_stub"}' ;;
   "issue edit")        exit 0 ;;
   "issue comment")     exit 0 ;;
+  "api repos/"*) echo '[[]]' ;;   # no comments on any issue
   "api graphql")
     cat <<'JSON'
 {"data":{"user":{"projectV2":{"field":{"id":"PVTSSF_stub",
@@ -135,6 +138,16 @@ grep -q 'project item-edit .*opt_done' "$GH_LOG" \
   && ok "closed card reconciled to Done via a name-resolved option ID" \
   || bad "closed card reconciled to Done" "an item-edit to opt_done" "$(tr '\n' '|' < "$GH_LOG")"
 
+# The cache still shows the card in Review: a second scan this tick (the lane's worker
+# already exited) and a new tick both leave it alone. One move per run.
+: > "$GH_LOG"; TICK_SEEN=" "; CLOSED_TARGETS=" "; CLOSED_MOVED=" "
+PROJECT_ITEMS_JSON=$(board 41:Review)
+top_card_in_column "Review" >/dev/null; top_card_in_column "Review" >/dev/null
+TICK_SEEN=" "; top_card_in_column "Review" >/dev/null
+is "a closed card is moved once per run, however often its column is scanned" "1" \
+  "$(grep -c 'project item-edit --id item_41 ' "$GH_LOG")"
+CLOSED_MOVED=" "
+
 CLOSED_ISSUES=""
 PROJECT_ITEMS_JSON=$(board 55:Review)
 top_card_in_column "Review" >/dev/null
@@ -192,6 +205,53 @@ grep -q 'issue edit 22 --remove-assignee sb-bot' "$GH_LOG" \
   && ok "the leaked bot claim is released" \
   || bad "the leaked bot claim is released" "remove-assignee on #22" "$(tr '\n' '|' < "$GH_LOG")"
 rm -f "$INFLIGHT_DIR/24"; BOT_LOGIN=""
+
+echo
+echo "── judge_finished_workers (FR-RUN-13: two failures in a row, a success resets)"
+FAILS=" "
+judge() {  # $1 = the card's column now; the worker was dispatched from Review
+  PROJECT_ITEMS_JSON=$(board "5:$1")
+  JUDGE_QUEUE=" 5|review|Review|2000-01-01T00:00:00Z"
+  judge_finished_workers >/dev/null 2>&1
+}
+judge Review; is "first failure keeps running" "0" "$?"
+is "first failure is counted" " 5:1 " "$FAILS"
+judge QA; is "a moved card is a success" "0" "$?"
+is "a success resets the count" " " "$FAILS"
+judge Review; is "a failure after a success is the first again" "0" "$?"
+judge Review; is "two failures in a row halt" "1" "$?"
+
+echo
+echo "── sweep_lane_zombies (FR-WRK-10: one tick of grace, reset when the card returns)"
+sleep 60 & SLEEPER=$!
+write_lock "$INFLIGHT_DIR/31" "HANDLE=$(process_handle "$SLEEPER")
+LANE=build
+STARTED=2000-01-01T00:00:00Z
+COLUMN=Ready
+"
+LEFT_LANE=" "
+sweep_at() { TICK=$1; PROJECT_ITEMS_JSON=$(board "31:$2"); sweep_lane_zombies >/dev/null 2>&1; }
+sweep_at 1 QA;       is "out of its lane: marked, not stopped" " 31:1 " "$LEFT_LANE"
+sweep_at 2 Building; is "back in its lane: the mark is dropped" " " "$LEFT_LANE"
+sweep_at 3 QA;       is "out again: a fresh mark" " 31:3 " "$LEFT_LANE"
+kill -0 "$SLEEPER" 2>/dev/null && ok "the worker kept running through its grace" || bad "grace kept the worker" "alive" "dead"
+sweep_at 4 QA
+kill -0 "$SLEEPER" 2>/dev/null && bad "stopped after its grace tick" "dead" "alive" || ok "stopped after its grace tick"
+[ -f "$INFLIGHT_DIR/31" ] && bad "a stopped worker's lock is removed" "no lock" "lock kept" || ok "a stopped worker's lock is removed"
+wait "$SLEEPER" 2>/dev/null
+
+echo
+echo "── worker handles (a recycled pid is dead; pid 0 and 1 are never workers)"
+sleep 60 & SLEEPER=$!
+H=$(process_handle "$SLEEPER")
+worker_alive "$H"; is "a live worker with its start time is alive" "0" "$?"
+worker_alive "process:${SLEEPER}:Mon_Jan_1_00:00:00_2001"; is "the same pid with another start time is dead" "1" "$?"
+worker_stop "process:${SLEEPER}:Mon_Jan_1_00:00:00_2001"; is "a recycled pid is not signalled" "none" "$WORKER_STOPPED_BY"
+worker_stop "process:${SLEEPER}"; is "an older handle with no start time is not signalled" "refused" "$WORKER_STOPPED_BY"
+kill -0 "$SLEEPER" 2>/dev/null; is "the process survived both" "0" "$?"
+worker_alive "process:0:x"; is "pid 0 is never alive" "1" "$?"
+worker_alive "process:1"; is "pid 1 is never alive" "1" "$?"
+kill "$SLEEPER"; wait "$SLEEPER" 2>/dev/null
 
 echo
 printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"
