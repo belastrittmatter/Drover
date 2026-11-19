@@ -1208,6 +1208,31 @@ fb_board() {
   return 0
 }
 
+write_run_state() {
+  # FR-RUN-17: .drover/runs/state.json, the live snapshot a dashboard or status line reads.
+  # Built from the in-flight locks and the cached board only: no GitHub call. A card that
+  # left its lane is dropped at once, even while its worker has its grace tick.
+  # $1 = "stopped": the runner is exiting; drop pid, keep the last cards.
+  local file="$RUNS_DIR/state.json" now cards paused=null
+  now=$(date -u +%FT%TZ)
+  if [ "${1:-}" = stopped ]; then
+    [ -f "$file" ] || return 0
+    write_lock "$file" "$(jq --arg t "$now" 'del(.pid) | .stopped = true | .updated = $t' "$file")"
+    return
+  fi
+  cards=$(for issue in $(issue_locks); do
+    worker_lock "$INFLIGHT_DIR/$issue" || continue
+    cur=$(issue_status "$issue")
+    [ -z "$cur" ] || case " $(lane_columns "$LANE") ${COLUMN} " in (*" $cur "*) ;; (*) continue ;; esac
+    jq -nc --argjson issue "$issue" --arg lane "$LANE" --arg worker "$HANDLE" --arg since "$STARTED" \
+      '{issue: $issue, lane: $lane, worker: $worker, phase: null, since: $since, phases: []}'
+  done | jq -sc .)
+  [ "$USAGE_STATE" != pause ] || paused=$(jq -n --argjson t "$USAGE_UNTIL" '$t | todate')
+  write_lock "$file" "$(jq -n --arg repo "$CONFIG_SLUG" --argjson pid "$$" \
+    --argjson tick "$TICK" --arg updated "$now" --argjson paused "$paused" --argjson cards "$cards" \
+    '{repo: $repo, pid: $pid, tick: $tick, updated: $updated, paused: $paused, cards: $cards}')"
+}
+
 # ───────────────────────── run counters (shared state) ─────────────────────────
 DISPATCH_COUNT=0
 REAP_COUNT=0
@@ -1230,7 +1255,7 @@ halt_cleanup() {
     for handle in $MY_HANDLES; do worker_stop "$handle" 1; done
   fi
   # Only our own runner lock: a second runner that refused to start leaves the first's alone.
-  [ "${RUNNER_LOCK_OWNED:-0}" = 1 ] && rm -f "$RUNNER_LOCK"
+  [ "${RUNNER_LOCK_OWNED:-0}" = 1 ] && { write_run_state stopped || true; rm -f "$RUNNER_LOCK"; }
   # Keep the status that ended the run (an unbound variable or a failed command is not success).
   exit "$rc"
 }
@@ -1339,6 +1364,7 @@ while true; do
   #    forces the fetch.
   if [ "$ACTIVE_WORKERS" -ge "$MAX_WORKERS" ] && [ "$LEFT_LANE" = " " ]; then
     log "tick — cap reached (${ACTIVE_WORKERS}/${MAX_WORKERS} busy) — skipping GraphQL fetch, sleeping ${TICK_SECONDS}s"
+    write_run_state
     sleep "$TICK_SECONDS"
     continue
   fi
@@ -1416,6 +1442,7 @@ while true; do
   #    `AND no lane active` clause made that case unhaltable (293 ticks, 0 merges).
   # A paused tick that started nothing is not a dispatch cycle: a long pause is no runaway.
   if [ "$USAGE_STATE" = pause ] && [ "$DISPATCH_COUNT" -eq "$DISPATCHED_BEFORE" ]; then
+    write_run_state
     sleep "$TICK_SECONDS"
     continue
   fi
@@ -1433,6 +1460,7 @@ while true; do
     break
   fi
 
+  write_run_state
   sleep "$TICK_SECONDS"
 done
 
