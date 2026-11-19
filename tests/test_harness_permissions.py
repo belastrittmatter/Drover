@@ -243,6 +243,19 @@ for role in ("preflight", "classify", "build"):
               f"{role} must get the read-only agent profile, got {allow}")
         check(AGENT["output_flags"][0] in argv, f"{role} must get the JSON output flags")
 
+# 5 — a wrapper word from permissions.allow_commands (a global hook rewrites `git log` to
+#     `rtk git log`) is allowed in front of each agent read command, never on its own.
+with tempfile.TemporaryDirectory() as tmp:
+    cfg = Path(tmp) / "config.json"
+    cfg.write_text(json.dumps({"project": {"owner": "o", "number": 1}, "permissions": {"allow_commands": ["rtk"]}}))
+    argv = _sp.run([sys.executable, str(ROOT / "lib/drover-config.py"), "worker-argv", "classify", "p"],
+                   capture_output=True, text=True, env=dict(__import__("os").environ, DROVER_CONFIG=str(cfg))).stdout.split("\0")
+    allow = argv[argv.index(PERMS["allow_flag"]) + 1].split(",")
+    check("Bash(rtk git log:*)" in allow and "Bash(rtk ls:*)" in allow and "Bash(git log:*)" in allow,
+          f"agent profile must allow wrapped read commands: {allow}")
+    check("Bash(rtk:*)" not in allow and not any(a.startswith("Bash(rtk git commit") for a in allow),
+          f"agent profile must not allow a bare wrapper: {allow}")
+
 if failures:
     print("\n".join("FAIL: " + f for f in failures), file=sys.stderr)
     sys.exit(1)

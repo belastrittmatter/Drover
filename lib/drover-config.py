@@ -158,9 +158,14 @@ def allowed(entry, cfg):
     return list(perms.get("tools", [])) + [f"Bash({w}:*)" for w in words] + read_only(entry)[0]
 
 
-def agent_allowed(agent):
-    """The read-only agent profile's rules: its tools, one Bash rule per read command."""
-    return list(agent.get("tools", [])) + [f"Bash({c}:*)" for c in agent.get("commands", [])]
+def agent_allowed(agent, cfg=None):
+    """The read-only agent profile's rules: its tools, one Bash rule per read command, and per
+    permissions.allow_commands wrapper word w (a hook that rewrites `git log` to `w git log`)
+    one `w <read command>` rule. Never a bare `w`: that would let `w git commit` through."""
+    cmds = list(agent.get("commands", []))
+    wrappers = ((cfg or {}).get("permissions") or {}).get("allow_commands", [])
+    cmds += [f"{w} {c}" for w in wrappers for c in agent.get("commands", [])]
+    return list(agent.get("tools", [])) + [f"Bash({c}:*)" for c in cmds]
 
 
 def worker_argv(role, prompt, cwd=None, model=None):
@@ -183,7 +188,7 @@ def worker_argv(role, prompt, cwd=None, model=None):
         argv += list(agent.get("output_flags", []))
         if agent.get("mode"):
             argv += [perms["mode_flag"], agent["mode"]]
-        argv += [perms["allow_flag"], ",".join(agent_allowed(agent))]
+        argv += [perms["allow_flag"], ",".join(agent_allowed(agent, cfg))]
         if agent.get("deny"):
             argv += [perms["deny_flag"], ",".join(agent["deny"])]
         return argv

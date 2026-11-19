@@ -250,7 +250,8 @@ card. The runner does it before any build claim: one short agent (role `prefligh
 `sonnet`, `haiku` on a `low` tier) per batch of up to 5 Ready build cards, which returns one
 JSON verdict per card. The agent runs with the harness's read-only `agent` profile (read tools,
 the pre-flight script, GitHub reads through drover github-read, gh issue and pr view or list,
-git log, show and diff; no edits, no GitHub writes) and JSON output, and is stopped after 120 s. The runner posts the Block
+git log, show and diff, each also behind a `permissions.allow_commands` wrapper word;
+no edits, no GitHub writes) and JSON output, and is stopped after 120 s. The runner posts the Block
 template, then moves held and sequenced cards to Blocked, and logs one "preflight batch"
 manifest line per batch. Builders the same batch cleared may run side by side
 (`roles.build.max_workers`); a clearance lapses when the card leaves Ready or after 3 ticks,
