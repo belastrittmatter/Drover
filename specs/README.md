@@ -86,7 +86,7 @@ It is super-board cut down and made harness-independent:
 | Skills | Keep all upstream skills; remove one only for an observed reason | Remove by audit verdict up front |
 | Metrics | FactoryBench: one attempt per try at a card, lanes from the run manifest (metrics.md) | One attempt per worker; drover's own metrics store |
 | Bot account | Deferred; known issue in metrics.md | Separate GitHub login for drover in v1 |
-| Run dashboard | Deferred. v1: `/drover run` starts the runner, prints PID and log path, and ends; progress via `drover status`. Later: runner writes `.drover/runs/state.json` each tick, workers report phases (`drover phase <name>`), a Claude Code mod shows a docked pane (runs list, lanes, worker phases, log tail) plus a status-line entry, and a harness-agnostic `drover dash` terminal UI serves herdr/hc (stages 9-10) | In-session wave loop that holds the run in the chat |
+| Run dashboard | v1: `/drover run` starts the runner, prints PID and log path, and ends; progress via `drover status`. The runner writes `.drover/runs/state.json` each tick (runner.md FR-RUN-17). Deferred: workers report phases (`drover phase <name>`), a Claude Code mod shows a docked pane (runs list, lanes, worker phases, log tail) plus a status-line entry, and a harness-agnostic `drover dash` terminal UI serves herdr/hc (stages 9-10) | In-session wave loop that holds the run in the chat |
 | Domain glossary, spec links, when-to-use rule | Not in v1 | Glossary file checked by reviewer; `spec:` card links with progress; README routing rule |
 
 ## 3. Domain model

@@ -60,6 +60,13 @@ as the reference, and deleted that backend.
   dispatches in a row fail on the same card, then the system shall halt the
   run and print the last 20 lines of the latest worker log. (Upstream
   re-dispatches every tick until the runaway gate stops the run after 6.)
+- **FR-RUN-17 (new)** At the end of every tick the runner shall write
+  `.drover/runs/state.json` (temp file + rename, no GitHub call): `repo`,
+  `pid`, `tick`, `updated`, `paused` (the usage reset time, or null) and
+  one `cards` entry per in-flight worker whose card is still in its lane
+  (`issue`, `lane`, `worker` handle, `since`, `phase`, `phases`). On exit it
+  shall drop `pid`, set `"stopped": true` and keep the last cards.
+  Tested by `test-run-state.sh`.
 
 ### Worker interface
 

@@ -278,6 +278,21 @@ class RunnerRounds(RunnerCase):
                 print('  gh ' + ' '.join(a.split('\n')[0] for a in c), file=sys.stderr)
         self.assertLessEqual(len(round_), IDLE_ROUND_CALLS)
 
+    # FR-RUN-17: a real run leaves state.json with its in-flight card, marked stopped on exit.
+    def test_run_state_json_after_a_run(self):
+        self.board({'number': 7, 'status': 'Ready'})
+        self.run_board(cycles=2)
+        [pid] = self.worker_pids(expect=1)
+        state = json.loads((self.root / '.drover/runs/state.json').read_text())
+        self.assertIs(state.get('stopped'), True, state)
+        self.assertNotIn('pid', state)
+        self.assertGreaterEqual(state['tick'], 1)
+        [card] = state['cards']
+        self.assertEqual((card['issue'], card['lane']), (7, 'build'), card)
+        self.assertTrue(card['worker'].startswith('process:%d:' % pid), card)
+        self.assertRegex(card['since'], r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$')
+        self.assertEqual(list((self.root / '.drover/runs').glob('state.json.tmp.*')), [])
+
 
 if __name__ == '__main__':
     unittest.main()
