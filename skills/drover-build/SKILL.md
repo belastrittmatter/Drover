@@ -1,11 +1,11 @@
 ---
 name: drover-build
-description: Builder lane of the drover pipeline — takes a `Ready` GitHub Project card into its own per-issue git worktree, makes the smallest safe change test-first (TDD, `ponytail` simplest-first, official docs first for third-party APIs, upgrades and auth/billing), opens a draft PR and hands it to QA and Review through the board; it never merges — merges go through the Reviewer's merge gate. Inside `drover run` it runs as a lane agent in the in-session wave workflow (`workflows/drover-wave.js`, no worker cap unless `max_workers` is set); standalone headless `claude -p` dispatch is legacy opt-in. Use when the user says "Drover Build", "run the build loop", "/drover-build", or invokes the skill.
+description: Builder lane of the drover pipeline — takes a `Ready` GitHub Project card into its own per-issue git worktree, makes the smallest safe change test-first (TDD, `ponytail` simplest-first, official docs first for third-party APIs, upgrades and auth/billing), opens a draft PR and hands it to QA and Review through the board; it never merges — merges go through the Reviewer's merge gate. Inside `drover run` it runs as a headless worker the runner starts (`roles.build.max_workers` at a time, default 1); standalone headless dispatch is legacy opt-in. Use when the user says "Drover Build", "run the build loop", "/drover-build", or invokes the skill.
 ---
 
 # Drover Build — Builder lane and legacy headless GitHub-Project executor
 
-Inside `drover run`, Drover Build is the Builder lane: a lane agent in the in-session wave workflow (`workflows/drover-wave.js`) that follows "drover integration" below. Run on its own, `/drover-build` is the **legacy headless path (opt-in)**: you are the orchestrator, the source of truth is the **`Ready` column of the configured GitHub Project board**, and your job is to dispatch every issue in `Ready` (in board order) as a headless `claude -p` worker in its own git worktree, open a PR for each finished branch, and move its card to `QA` so the Tester and Reviewer take it from there. Drover Build never merges — merging happens only through the Reviewer's merge gate (`drover gate`).
+Inside `drover run`, Drover Build is the Builder lane: a headless worker the runner (`lib/drover-run.sh`) starts after pre-flight cleared its card, following "drover integration" below. Run on its own, `/drover-build` is the **legacy headless path (opt-in)**: you are the orchestrator, the source of truth is the **`Ready` column of the configured GitHub Project board**, and your job is to dispatch every issue in `Ready` (in board order) as a headless `claude -p` worker in its own git worktree, open a PR for each finished branch, and move its card to `QA` so the Tester and Reviewer take it from there. Drover Build never merges — merging happens only through the Reviewer's merge gate (`drover gate`).
 
 **Curation contract:** the human moves cards into `Ready` when they should be worked. The loop never reads `Backlog`, `In Progress`, or `Done` cards. If `Ready` is empty, the loop reports "queue empty" and exits cleanly — no error.
 
@@ -188,7 +188,7 @@ Drover Build treats acceptance criteria as the completion contract. Workers must
 
 ## Constraints
 
-- **Worker cap:** `max_workers` from the config when set, otherwise 3 on this legacy path (resource throttle). The workflow backend has no cap unless `max_workers` is set.
+- **Worker cap:** `max_workers` from the config when set, otherwise 3 on this legacy path (resource throttle). The runner uses `roles.build.max_workers` (default 1).
 - **Never auto-touch issues with `human-gated` label** (production cutover, secrets, irreversible ops).
 - **Never modify code in the main worktree** while workers are running. Only run `gh` commands and push/PR operations.
 - **Conflicts** between concurrent workers' branches are not resolved here — they surface at the merge gate, and the card comes back to the Builder for a rebuild. Don't auto-resolve.

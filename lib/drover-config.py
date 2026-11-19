@@ -158,17 +158,40 @@ def allowed(entry, cfg):
     return list(perms.get("tools", [])) + [f"Bash({w}:*)" for w in words] + read_only(entry)[0]
 
 
-def worker_argv(role, prompt, cwd=None):
+def agent_allowed(agent, cfg=None):
+    """The read-only agent profile's rules: its tools, one Bash rule per read command, and per
+    permissions.allow_commands wrapper word w (a hook that rewrites `git log` to `w git log`)
+    one `w <read command>` rule. Never a bare `w`: that would let `w git commit` through."""
+    cmds = list(agent.get("commands", []))
+    wrappers = ((cfg or {}).get("permissions") or {}).get("allow_commands", [])
+    cmds += [f"{w} {c}" for w in wrappers for c in agent.get("commands", [])]
+    return list(agent.get("tools", [])) + [f"Bash({c}:*)" for c in cmds]
+
+
+def worker_argv(role, prompt, cwd=None, model=None):
     """argv for one headless worker of `role`: the harness command, the prompt, the role's
-    model and the permissions. The runner reads it NUL-separated."""
+    model (else `model`, the runner's pick by card complexity) and the permissions. The runner
+    reads it NUL-separated."""
     p = config_path(cwd)
     cfg = json.loads(p.read_text()) if p.is_file() else {}
     rcfg = (cfg.get("roles") or {}).get(role) or {}
     entry = harness(rcfg.get("harness") or cfg.get("harness") or "claude")
     argv = list(entry["worker_command"]) + [prompt]
-    if rcfg.get("model") and entry.get("model_flag"):
-        argv += [entry["model_flag"], rcfg["model"]]
+    model = rcfg.get("model") or model
+    if model and entry.get("model_flag"):
+        argv += [entry["model_flag"], model]
     perms = entry.get("permissions", {})
+    agent = entry.get("agent") or {}
+    if role in agent.get("roles", []):
+        # The runner's short read-only agents (pre-flight, classifier): JSON output, read tools and
+        # read commands only, nothing else is approved; the runner does every write.
+        argv += list(agent.get("output_flags", []))
+        if agent.get("mode"):
+            argv += [perms["mode_flag"], agent["mode"]]
+        argv += [perms["allow_flag"], ",".join(agent_allowed(agent, cfg))]
+        if agent.get("deny"):
+            argv += [perms["deny_flag"], ",".join(agent["deny"])]
+        return argv
     if perms.get("mode"):
         argv += [perms["mode_flag"], perms["mode"]]
     argv += [perms["allow_flag"], ",".join(allowed(entry, cfg))]
@@ -219,8 +242,9 @@ def main(argv):
         return 65 if problems else 0
     elif cmd == "harness":
         print(json.dumps(harness(argv[1] if len(argv) > 1 else configured_harness()), indent=2))
-    elif cmd == "worker-argv" and len(argv) == 3:
-        sys.stdout.write("".join(a + "\0" for a in worker_argv(argv[1], argv[2])))
+    elif cmd == "worker-argv" and len(argv) in (3, 4):
+        model = argv[3] if len(argv) == 4 else None
+        sys.stdout.write("".join(a + "\0" for a in worker_argv(argv[1], argv[2], model=model)))
     elif cmd == "skills-install":
         def opt(flag):
             if flag not in argv:

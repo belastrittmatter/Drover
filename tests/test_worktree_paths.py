@@ -164,33 +164,14 @@ reclaim_stranded_building
         self.assertFalse((self.root / "moved").exists(), "do not redispatch a held card")
 
     def test_generated_lane_paths_pass_guard_and_are_cleaned(self):
-        # Execute the workflow with a stub agent and inspect its real lane prompts.
-        js = r"""
-const fs = require('fs')
-const src = fs.readFileSync(process.argv[1], 'utf8').replace(/^export const meta/m, 'const meta')
-const AsyncFunction = (async () => {}).constructor, prompts = {}
-const agent = async (prompt, opts) => {
-  if (opts.label.startsWith('preflight')) return { verdicts: [{ number: 7, verdict: 'proceed' }] }
-  if (opts.label.startsWith('classify')) return { kind: 'feature', complexity: 'low' }
-  prompts[opts.label] = prompt
-  return { status: 'advanced', column: 'next' }
-}
-const pipeline = async (items, ...stages) => Promise.all(items.map(async item => {
-  let value = item
-  for (const stage of stages) value = await stage(value, item)
-  return value
-}))
-new AsyncFunction('args','agent','pipeline','log',src)(
-  {configPath:'fixture.json',cards:[{number:7,status:'Ready',title:'fixture'}]},
-  agent,pipeline,()=>{}).then(()=>console.log(JSON.stringify(prompts)))
-"""
-        prompts = json.loads(self.run_cmd("node", "-e", js,
-                                          str(PACK / "workflows/drover-wave.js")).stdout)
+        # The worktree each lane's rules (run.md, which every runner lane prompt names) prescribe.
+        rules = (PACK / "skills/drover/references/run.md").read_text()
+        paths = dict((lane, root) for root, lane in
+                     re.findall(r"worktree = (\S+/)issue-<N>-(build|qa|review)/", rules))
         for lane in ("build", "qa", "review"):
             with self.subTest(lane=lane):
-                match = re.search(r"create your own worktree under ([^, ]+)", prompts[lane + ":#7"])
-                self.assertIsNotNone(match, "lane must prescribe its worktree location")
-                path = match[1].rstrip("/") + "/issue-7-" + lane
+                self.assertIn(lane, paths, "lane must prescribe its worktree location")
+                path = paths[lane] + "issue-7-" + lane
                 command = "git worktree add -b issue-7-" + lane + " " + shlex.quote(path) + " main"
                 payload = json.dumps({"tool_name": "Bash", "cwd": str(self.root),
                                       "tool_input": {"command": command}})

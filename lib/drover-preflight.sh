@@ -7,11 +7,11 @@
 #                           the same fingerprint or (near-)same title.
 #   2. Already in progress? an open PR from ANOTHER branch closes it or has the same
 #                           title, or another card in Building/QA/Review (or a lower-
-#                           numbered Ready peer in this wave) has the same title.
+#                           numbered Ready peer in this batch) has the same title.
 #   3. File overlap?        an open PR touches files this card names, or a lower-numbered
 #                           card in the same --issues batch names them. Not a duplicate —
 #                           a sequencing problem. The card goes behind the issue that
-#                           PR closes (blocked-by, so the wave-start sweep frees it when
+#                           PR closes (blocked-by, so the Blocked sweep frees it when
 #                           that issue closes), or, if the PR closes nothing, proceeds
 #                           with an expected-conflict note so the merge gate rebases. Two
 #                           batch peers: the lower number proceeds, the other is sequenced
@@ -27,7 +27,7 @@
 # downgrade a mechanical hold only by naming why the match is a different feature.
 #
 # Cheap by construction: the three list calls run ONCE per invocation however many
-# issues are checked (pass --issues 12,14,15 to batch a wave), plus one `gh issue
+# issues are checked (pass --issues 12,14,15 to batch cards), plus one `gh issue
 # view` per issue. The worker gh guard runs first when it is installed alongside.
 #
 # Usage:

@@ -21,8 +21,8 @@ lifecycles", plus the role skill named.
 | FR-QA-5 | A `qa` card: QA creates the branch; defects it cannot cover become new `bug` cards | `run.md` "`qa` cards", `scripts/super-qa-file-bug.sh` | `test-file-bug.sh` |
 | FR-QA-6 | QA records the exact test command for the reviewer | `run.md` reviewer 5 (`Local tests:` line) | none |
 | FR-REV-2 | Reviewer reruns QA's test command; red bounces to QA | `run.md` reviewer 5 | none |
-| FR-REV-4 | Findings classed Gap / Bug / Verification miss / Scope drift / Over-engineering, severity Blocker / Should fix / Nit; Over-engineering never blocks or bounces alone | `super-review/SKILL.md` | `test-wave-review-memory.sh` (partial) |
-| FR-REV-7 | A prior finding `not fixed` bounces to its owner without a fresh pass | `run.md` reviewer 3b | `test-wave-review-memory.sh` |
+| FR-REV-4 | Findings classed Gap / Bug / Verification miss / Scope drift / Over-engineering, severity Blocker / Should fix / Nit; Over-engineering never blocks or bounces alone | `super-review/SKILL.md` | none (stage 7; the `workflow` prompt test went with that backend) |
+| FR-REV-7 | A prior finding `not fixed` bounces to its owner without a fresh pass | `run.md` reviewer 3b | none (stage 7; the `workflow` prompt test went with that backend) |
 
 ## Contracts
 

@@ -1,7 +1,0 @@
-{
-  "version": 1,
-  "variant": "full",
-  "roles": { "build": { "max_workers": 3 }, "qa": { "max_workers": 3 }, "review": { "max_workers": 3 } },
-  "project": { "owner": "test-owner", "number": 99 },
-  "verify_commands": ["git diff --check"]
-}

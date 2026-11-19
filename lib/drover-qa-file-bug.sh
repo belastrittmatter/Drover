@@ -200,10 +200,10 @@ trap 'rm -f "$BODY_TMP"' EXIT
   echo
   echo "$BODY_RAW"
 
-  # The wave planner reads `## Blocked by` to decide whether a card may start.
+  # The runner reads `## Blocked by` to decide whether a card may start.
   # A MISSING section is not the same as `- None.`: the planner cannot tell "free"
   # from "nobody wrote it down", so it fail-safes and the card never gets picked
-  # up. Bugs filed mid-wave on 2026-08-21 all arrived without one and sat in the
+  # up. Bugs filed mid-run on 2026-08-21 all arrived without one and sat in the
   # holding column until a human added the line by hand.
   #
   # `- None.` is the honest default here: a QA finding is reproducible against
@@ -216,7 +216,7 @@ trap 'rm -f "$BODY_TMP"' EXIT
     echo
     echo "> Added by the filer. A QA finding reproduces against code that already ships, so"
     echo "> nothing gates it. Stated rather than left silent — a missing section reads as"
-    echo "> unreadable to the wave planner, not as None."
+    echo "> unreadable to the runner, not as None."
   fi
 
   echo

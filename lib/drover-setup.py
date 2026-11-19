@@ -48,7 +48,7 @@ command for this OS, for onboard to ask about.
 
 `board-migrate` is the board half (needs `gh` with project scope): adds the missing
 Status options (--prune-empty also drops unused extras such as a new board's Todo),
-creates the three labels, maps old type labels, labels every card `qa`
+creates the three type and four risk labels, maps old type labels, labels every card `qa`
 on a board that was "qa-only" (--qa-all), moves Skipped cards to Done, removes the Skipped
 option, and puts back any card status the option rewrite cleared. Before any write it saves
 all cards and conversion intent in .claude/drover/migrations/ (under --root, the config project root, or cwd).
@@ -82,6 +82,14 @@ LABELS = {
     "bug": ("d73a4a", "Something is broken; built, tested, reviewed (drover)"),
     "feature": ("1d76db", "New behaviour; built, tested, reviewed (drover)"),
 }
+# Risk labels the runner's classifier adds (specs/runner.md FR-RUN-7); they route no lane.
+RISK_LABELS = {
+    "security": ("b60205", "Touches secrets, input handling or access control (drover)"),
+    "migration": ("5319e7", "Changes a database schema or migrates data (drover)"),
+    "payments": ("fbca04", "Touches money or billing (drover)"),
+    "auth": ("c5def5", "Touches login, sessions or permissions (drover)"),
+}
+BOARD_LABELS = {**LABELS, **RISK_LABELS}
 # Type labels from older packs and common trackers → the three v3 labels.
 OLD_LABELS = {
     "build": "feature", "type:feature": "feature", "kind:feature": "feature", "enhancement": "feature",
@@ -441,6 +449,24 @@ def schema_errors(cfg):
     return dc.errors(cfg, load_json(str(dc.SCHEMA)))
 
 
+def config_repo(cfg_path):
+    """owner/name from the config's repo.remote, or None."""
+    m = re.search(r"github\.com[:/]+([^/\s]+/[^/\s]+?)(?:\.git)?/?$", (((load_json(cfg_path) or {}).get("repo") or {}).get("remote") or ""))
+    return m.group(1) if m else None
+
+
+def missing_labels(cfg_path):
+    """The board labels (type and risk) the config's repo lacks; None when it cannot be read."""
+    repo = config_repo(cfg_path) if os.path.isfile(cfg_path) else None
+    if not repo or not have("gh"):
+        return None
+    try:
+        names = {n.lower() for n in repository_labels(repo)}
+    except (RuntimeError, ValueError, OSError):
+        return None
+    return [n for n in BOARD_LABELS if n not in names]
+
+
 def check(root, pack, host="claude", home=None, catalog=None):
     claude = os.path.join(root, ".claude")
     cfg_path = os.path.join(root, ".drover", "config.json")
@@ -492,8 +518,11 @@ def check(root, pack, host="claude", home=None, catalog=None):
         ok.append("required worker skills resolved for " + host)
     if security_audit:
         ok.append("security-audit skill installed (optional, run on demand)")
+    labels_missing = missing_labels(cfg_path)
+    if labels_missing == []:
+        ok.append("board labels present (type and risk)")
     red = bool(missing or old_dirs or copies or kept_copies or old_hooks or configs or verification or host_errors or schema
-               or not git or needs or not helpers)
+               or not git or needs or not helpers or labels_missing)
     return {
         "root": root, "pack": pack, "pack_version": pack_version, "installed_version": have_v,
         "upgrade": older, "from": from_v or ("older" if older else None),
@@ -503,6 +532,7 @@ def check(root, pack, host="claude", home=None, catalog=None):
         "old_hooks": old_hooks, "configs": configs, "verification": verification,
         "host_errors": host_errors, "schema_errors": schema, "git": git, "skills_dir": skills_dir,
         "helper_skills": helpers, "security_audit": security_audit, "helper_readiness": readiness, "needs": needs, "os": fam, "ok": ok, "green": not red,
+        "labels_missing": labels_missing,
     }
 
 
@@ -670,6 +700,14 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
         else:
             notes.append("would install the optional security-audit skill")
 
+    if before.get("labels_missing"):
+        repo = config_repo(cfg_path)
+        if not dry:
+            for name in before["labels_missing"]:
+                color, desc = BOARD_LABELS[name]
+                run(["gh", "label", "create", name, "--repo", repo, "--color", color, "--description", desc])
+        fixed.append("labels created: " + ", ".join(before["labels_missing"]))
+
     if not dry:
         up = os.path.join(claude, "drover", "upgrade.json")
         if os.path.exists(up):
@@ -809,6 +847,8 @@ def text_report(res):
         lines.append("  ✗ " + res["helper_readiness"]["error"])
     for path, error in {**res.get("verification", {}), **res.get("host_errors", {})}.items():
         lines.append(f"  ✗ {path}: {error}")
+    if res.get("labels_missing"):
+        lines.append("  ✗ board labels missing: " + ", ".join(res["labels_missing"]) + " (fix creates them)")
     for path, errors in res.get("schema_errors", {}).items():
         lines += [f"  ✗ {path}: {e}" for e in errors]
     if res.get("error"):
@@ -1180,7 +1220,7 @@ def prepare_migration(binding, url, qa_all, prune_empty):
         if before != issue['want'] and issue['repo'].lower() != binding['repo'].lower():
             raise RuntimeError('Board has an issue from another repository needing label conversion; migrate it in its own repository first')
     labels = repository_labels(binding['repo'])
-    result['labels_created'] = [n for n in LABELS if n not in {s.lower() for s in labels}]
+    result['labels_created'] = [n for n in BOARD_LABELS if n not in {s.lower() for s in labels}]
     return {'version': 1, 'qa_all': qa_all, 'prune_empty': prune_empty, 'binding': binding, 'field': field['id'], 'options': opts, 'desired': desired,
             'items': items, 'result': result, 'options_started': False, 'options_done': False,
             'labels_done': [], 'statuses_done': [], 'complete': False}
@@ -1201,7 +1241,7 @@ def resume_migration(saved, path):
     repo, pid, fid = saved['binding']['repo'], saved['binding']['project'], saved['field']
     checkpoint = lambda: save_recovery(path, saved)
     # Reconcile first; a lost response never causes a blind create/edit replay.
-    for name, (color, desc) in LABELS.items():
+    for name, (color, desc) in BOARD_LABELS.items():
         if name not in {s.lower() for s in repository_labels(repo)}:
             run(['gh', 'label', 'create', name, '--repo', repo, '--color', color, '--description', desc])
             if name not in {s.lower() for s in repository_labels(repo)}:

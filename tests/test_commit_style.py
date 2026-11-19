@@ -88,8 +88,7 @@ def test_cli_reads_the_base_branch_and_prompt_has_three_subjects():
 
 
 def test_lane_prompts_carry_the_style():
-    for rel in ("lib/drover-run.sh", "lib/drover-lane.sh",
-                "skills/drover-build/scripts/drover-build-dispatch.sh", "workflows/drover-wave.js"):
+    for rel in ("lib/drover-run.sh", "skills/drover-build/scripts/drover-build-dispatch.sh"):
         assert "drover-commit-style.py" in (ROOT / rel).read_text(encoding="utf-8"), f"{rel} prompt lacks the commit style"
 
 

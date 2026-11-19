@@ -1,6 +1,6 @@
 # drover: how it works
 
-> **What it does not do:** drover installs skills, scripts, a workflow and guard hooks,
+> **What it does not do:** drover installs skills, scripts and guard hooks,
 > and onboard sets up your GitHub Project. It does not grant `gh` access on its own, add CI, or approve merges you
 > have not allowed. It is not a CI replacement: workers push branches and your CI still runs.
 > It is not a free pass on review: set `human_approves_merge: true` to keep a person on every
@@ -8,15 +8,15 @@
 
 drover watches a GitHub Project and runs Build → QA → Review for each card, merging when
 the evidence holds. The board is the only state: every agent re-reads it, so a run survives
-Ctrl-C, restarts and rate-limit pauses, and `/drover run <slug>` resumes from whatever
+Ctrl-C, restarts and rate-limit pauses, and `/drover run` resumes from whatever
 column each card is in.
 
 | | |
 |---|---|
 | **What you get** | Merged PRs with evidence: screenshots, test reruns, review findings on the PR |
-| **How you start** | `/drover run <slug>`, then drag cards into `Ready` |
+| **How you start** | `/drover run`, then drag cards into `Ready` |
 | **What holds state** | The board. Cards pick up from their column after any stop |
-| **Backend** | In-session dynamic workflow waves by default; headless `claude -p` on opt-in |
+| **Backend** | One runner in the background; headless workers per lane (`harnesses/<harness>.json`) |
 
 ## Workflow at a glance
 
@@ -75,11 +75,11 @@ card dropped on purpose is closed as not planned and moved to Done with a 🤷 c
 - Install from a checkout: `./install.sh` links `drover` into `~/.local/bin`; `drover skills install` links the skills into `~/.claude/skills`. Nothing is copied into a project: `drover onboard` writes `.drover/config.json`, the git excludes and the hooks in the untracked `.claude/settings.local.json`.
 - The board is a GitHub Project (v2) with a `Status` field: `Backlog, Ready, Building, QA, Review, Blocked, Done`. `onboard` reuses your best-matching board (adding what is missing, keeping every card) or creates one.
 - Three labels route cards: `qa` skips Building (test what exists), `bug` and `feature` are built first; no label is built too.
-- Default backend is in-session dynamic workflows: turn them on in `/config`. The headless runner is `drover run` in a shell (or `/drover run --headless`).
+- `/drover run` starts the runner (`drover run`) in the background and ends the turn; `drover status` shows progress.
 - Set `verify_commands` in the config. Without them the merge gate cannot prove the result builds, and says so.
 - `onboard` fixes what the board needs without asking (skill links, guard hooks, old in-project copies, config keys) and asks only to install a system tool or sign in. An older drover is upgraded in place.
-- `onboard` asks once what the robot may do: auto-merge normal changes up to 400 changed lines (money, auth, destructive schema like DROP/TRUNCATE/RENAME, and bigger PRs wait for you; additive migrations run only on the databases you allow, never live), protect main, and which databases it may migrate (default test + staging). Anything only you may run lands in Blocked tagged 🙋 with the exact command; comment `done` and the next wave merges.
-- In-session runs need `Bash(drover:*)` in your allowlist; `onboard` offers it as a diff. Headless workers get their permissions from `harnesses/claude.json`.
+- `onboard` asks once what the robot may do: auto-merge normal changes up to 400 changed lines (money, auth, destructive schema like DROP/TRUNCATE/RENAME, and bigger PRs wait for you; additive migrations run only on the databases you allow, never live), protect main, and which databases it may migrate (default test + staging). Anything only you may run lands in Blocked tagged 🙋 with the exact command; comment `done` and the next round merges.
+- The session that starts runs needs `Bash(drover:*)` in your allowlist; `onboard` offers it as a diff. Headless workers get their permissions from `harnesses/claude.json`.
 - Bug sources take any extra source in onboard — a link, app name, API URL, MCP server or command — proven readable (read-only) before it is saved; `/drover-collect` runs it like the built-ins.
 - Testing a live site with no repo is not a board: `/drover-qa <url>` runs on its own.
 - To enable the usage check, add `printf '%s' "$input" | drover usage record` to your status-line script.
@@ -89,7 +89,7 @@ card dropped on purpose is closed as not planned and moved to Done with a 🤷 c
 
 | Skill | Use it for |
 | --- | --- |
-| `/drover` | Orchestrator. Validates preconditions, plans waves, launches them. Holds no product context, writes no code. |
+| `/drover` | Orchestrator. Validates preconditions and starts the runner. Holds no product context, writes no code. |
 | `/drover-build` | `Ready` → `QA`. Worktree, smallest safe change, draft PR. |
 | `/drover-qa` | `QA` → `Review`. Tests per AC, test-gap check, screenshots/logs/HARs on the PR, or a bounce with a rebuild label. Off-ticket findings file as `source:qa` cards. |
 | `/drover-review` | `Review` → `Done`. Re-runs the Tester's tests, adversarial truth-check, merges through the gate or hands to a human. On a re-review it first checks every finding from its last report. Shape problems are filed to `Backlog`, never blocked on. |
@@ -98,34 +98,38 @@ card dropped on purpose is closed as not planned and moved to Done with a 🤷 c
 | `/git-sync` | Secondary helper: commit per logical change, merge-pull, push without force. |
 | `/visual` | Secondary helper: a visual recap or plan. Merged-worktree cleanup is a hook (`hooks/cleanup-wt.py`): the merge gate runs it after each merge and SessionStart runs it when a base moved. |
 
-## Backends
+## The runner
 
-Lane lifecycles are identical in both.
-
-| | `workflow` (default of `/drover run`) | headless runner (`drover run`) |
-|---|---|---|
-| Runs as | in-session dynamic workflow waves | headless `claude -p` workers |
-| Needs | dynamic workflows on in `/config` | `harnesses/<harness>.json` (permissions passed at worker start) |
-| Reference | `skills/drover/references/run-workflow.md` | `lib/drover-run.sh` |
-
+`/drover run` starts `drover run` (`lib/drover-run.sh`) in the background, prints its PID and
+manifest path, and ends the turn; `drover run` in a shell is the same runner. It is a shell loop
+that re-reads the board every tick and starts headless workers with the command, model flag and
+permissions in `harnesses/<harness>.json`. Progress: `drover status`; the log is the manifest in
+`.drover/runs/`.
 
 **Stop and resume.** `/drover stop` posts a "stopped mid-flight" comment on every in-flight
 issue and PR (lane, last commit, resume hint), releases the assignee mutex, and kills workers and
-the dispatcher. Resume with `/drover run <slug>`. A card stranded in `Building` by a stopped
-wave goes back to `Ready`; its branch is kept and the next Builder continues on it.
+the runner. Resume with `/drover run`. A card stranded in `Building` by a stopped
+run goes back to `Ready`; its branch is kept and the next Builder continues on it.
 
-## How a wave runs
+## How a round runs
 
-**Waves are sized by your dependency graph, not by a worker count.** Before each wave the planner
-reads every card's `## Blocked by` section and dispatches every Ready card whose blockers have all
-closed: 3 on a chained board, 19 on a wide one. It also **sweeps `Blocked`**: a card parked on an
-issue that has since closed comes back to `Ready` on its own. A dependency line it cannot read
+**The dependency graph decides what may start.** Every board read with a `Ready` or `Blocked`
+card also reads each open issue's `blocked-by:` line or `## Blocked by` section. A Ready card is
+claimed only when its blockers have all closed. A `Blocked` card parked on issues that have since
+closed comes back to `Ready` on its own, and an owner's `done` on a `[needs-you]` merge request
+for the current PR head sends the card back to Review. A dependency line it cannot read
 confidently is never treated as free; it is flagged for a human.
 
-**Usage guard.** Before each wave the orchestrator runs `drover-usage.sh check`. At or over
-`usage_pause_pct` (default 95) of the 5-hour or weekly window it launches no new wave, lets the
-running one finish and posts a resume note. It needs the status line to record usage (pack README
-→ Setup notes), works on Pro/Max only, and an unknown reading never halts a run.
+**Pre-flight and classifier.** Before a Builder claims a card, one cheap agent checks up to 5
+Ready cards at once: already merged, already in progress, overlapping an open PR, unclear or too
+big go to Blocked with the reason. A fast classifier adds a missing `feature`/`bug` label and the
+risk labels `security`, `migration`, `payments`, `auth`, with one comment saying why, and its
+complexity grade picks the Builder's model from `model_tier`.
+
+**Usage pause.** Before each dispatch the runner asks the harness's usage probe. At or over
+`usage_pause_pct` (default 95) of the 5-hour or weekly window it starts no new worker, lets the
+running ones finish, and resumes when usage drops. It needs the status line to record usage
+(Setup notes), works on Pro/Max only, and an unknown reading never halts a run.
 
 **Nothing merges on GitHub's word.** `mergeable: CLEAN` only means the text does not conflict. The
 merge gate takes a lock, checks the PR head is still the commit the Reviewer reviewed, merges the
@@ -156,25 +160,25 @@ needed a human before the loop started.
 ## The six agentic patterns, mapped
 
 ```
-  workflows/drover-wave.js   the conductor: owns the patterns
-  skills/drover-{build,qa,review}  the sheet music: one lane agent each
+  lib/drover-run.sh               the conductor: owns the patterns
+  skills/drover-{build,qa,review}  the sheet music: one lane worker each
   the prompt it spawns            "Run drover-build on #N, follow run.md exactly"
 ```
 
 | Pattern | When |
 |---|---|
-| **Routing** | `Ready` cards only: a cheap classify agent (haiku; sonnet on `--high`) picks the model tier per card |
-| **Prompt chaining** | Every card: each lane runs only if the previous returned `advanced` |
+| **Routing** | `Ready` cards only: a cheap classify agent (haiku; sonnet on `model_tier: high`) picks the model tier per card |
+| **Prompt chaining** | Every card: each lane starts from the column the previous lane moved it to |
 | **Parallelization** | Always: card A can be in Review while card B builds |
-| **Evaluator–optimizer** | QA/Review judge the Builder's work; a fail bounces the card and the next wave rebuilds with the comments as context |
-| **Orchestrator–workers** | Every wave: your session never codes; lane agents do all product work |
-| **Autonomous loop** | The wave loop repeats until the board is drained or a halt gate fires |
+| **Evaluator–optimizer** | QA/Review judge the Builder's work; a fail bounces the card and the next round rebuilds with the comments as context |
+| **Orchestrator–workers** | Always: your session never codes; the runner's workers do all product work |
+| **Autonomous loop** | The runner's tick loop repeats until the board is drained or a halt gate fires |
 
-A wave of three cards:
+Three cards in flight:
 
 ```
- ORCHESTRATOR (your session)            ← orchestrator–workers
-   │ plan wave → claim → launch
+ RUNNER (background)                    ← orchestrator–workers
+   │ read board → pre-flight → classify → claim → start worker
    ▼
  #47: classify → build → qa → review    ┐
  #51:            qa → review            ├ parallelization (cards overlap)
@@ -189,22 +193,19 @@ Review run in parallel.
 ## Safety controls
 
 **Worker storms**, 30 `Ready` cards starting 30 Builders, were the failure that bit early users of
-the headless backend. On `claude-p`, six gates stand in the way before any spawn:
+the headless backend. Six gates stand in the way before any spawn:
 
 ```
   1  orphan scan ........... workers alive from a crashed run?  → refuse to start
   2  in-flight lockfile .... .claude/drover/inflight/<N>   → skip (survives restart)
   3  assignee claim ........ atomic, BEFORE spawn               → skip (closes the cold-start race)
-  4  worker cap ............ max_workers (default 3)            → wait
+  4  worker cap ............ roles.<role>.max_workers (default 1) → wait
   5  GraphQL quota <200 .... sleep until reset                  → wait
   6  tick not elapsed? ..... tick_seconds, 120s floor           → wait
 ```
 
 The 120-second tick holds ProjectsV2 query cost (~103 GraphQL points per tick) to about 3.1k/hr
-against a 5k budget; raise `tick_seconds` if you have headroom. The workflow backend has its own
-equivalents: a wave lock that keeps the two backends from running at once, assignee claims, a
-crash-recovery sweep of leaked assignees, the rate guard and the usage guard
-(`references/run-workflow.md`).
+against a 5k budget; raise `tick_seconds` if you have headroom.
 
 Guard hooks, wired by `drover onboard` unless `--no-hooks`: worktrees only under
 `.drover/worktrees/`, no reading of secret files, no API keys written into source, no deleting
@@ -226,7 +227,7 @@ to the base branch is on by default, and `guard-merge.py` keeps every merge insi
   additive migrations, target env allowed      migrate,    Done
                                                merge (0)
   migrations for live (not allowed), a failed  exit 8      Blocked 🙋 — exact commands;
-    migrate command, a `needs-you:` step                   comment `done` → next wave merges
+    migrate command, a `needs-you:` step                   comment `done` → next round merges
 ```
 
 In plain words: only **destructive** schema changes (DROP / TRUNCATE / RENAME, or a `schema`
@@ -260,7 +261,8 @@ Minimal config at `.drover/config.json` (one per repo; schema: `skills/drover/re
   rebuild_cap           bounces allowed before a card goes Blocked
   roles.<role>.max_workers  workers per role, default 1
   tick_seconds          headless runner GraphQL budget floor, default 120
-  usage_pause_pct       pause new waves at this % of the Claude usage window, default 95
+  usage_pause_pct       start no new worker at this % of the Claude usage window, default 95
+  model_tier            low | medium | high: the Builder's model ladder by card complexity
   refine, collect       optional blocks for ui-refine-loop and drover-collect (collect.custom = extra sources)
 ```
 
@@ -317,8 +319,7 @@ Missing, unreadable or stale evidence is a hold for a person, never a pass.
 ## Limits
 
 - `gh` auth and CI come from you. Onboard reuses or creates the board and its columns and labels; it never signs in or installs a system tool without your OK.
-- The workflow backend needs dynamic workflows enabled in Claude Code.
-- The usage guard reads only what an interactive status line recorded; headless runs see no usage.
+- The usage pause reads only what an interactive status line recorded; headless workers record no usage.
 - `verify_commands` are only as good as your test suite. Without them the gate says it proved nothing.
 - Lanes call [mattpocock/skills](https://github.com/mattpocock/skills) by name; without that pack a worker fails when it reaches for one.
 - The Tester (QA lane) runs the bundled `pr-security-review` on every PR, and a finding fails QA; it reports only high-confidence findings, so it is not a full audit. Cloudflare's `security-audit` (added by onboard) covers the whole repo, and only runs when you ask.
@@ -328,7 +329,7 @@ Missing, unreadable or stale evidence is a hold for a person, never a pass.
 
 ```
   skills/<name>/   SKILL.md (agent prompt) · README.md · references/ · scripts/
-  workflows/       drover-wave.js, ui-refine-loop.js
+  workflows/       ui-refine-loop.js
   bin/drover       the entry point: drover <command> runs lib/drover-<command>
   lib/             dispatcher, planner, merge gate, usage check, filers, config
   harnesses/       one file per worker harness (claude)

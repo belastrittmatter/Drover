@@ -26,7 +26,7 @@ class Dispatch(unittest.TestCase):
                         SB_GITHUB_HALT_FILE=str(self.base / 'halt.json'), CALL_LOG=str(self.base / 'calls.jsonl'))
         subprocess.run(['git','init','-q',str(self.root)], check=True)
         self.config = self.base / 'config.json'
-        self.config.write_text('{"max_workers":1,"verify_commands":["git diff --check"],"usage_fallback":"codex"}')
+        self.config.write_text('{"max_workers":1,"verify_commands":["git diff --check"],}')
         self.tool('gh', '''import json,os,sys
 args=sys.argv[1:]
 with open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps({'tool':'gh','args':args})+'\\n')
@@ -36,20 +36,6 @@ if args[:2]==['issue','view']:
     elif fields=='labels': print('{"labels":[]}')
     else: print(json.dumps({'number':int(args[2]),'title':'fixture','body':os.environ.get('ISSUE_BODY','')}))
 else: sys.exit('unexpected GitHub mutation/read: '+str(args))
-''')
-        self.tool('codex', '''import json,os,re,sys
-from pathlib import Path
-args=sys.argv[1:];prompt=sys.stdin.read()
-with open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps({'tool':'codex','prompt':prompt})+'\\n')
-output=Path(args[args.index('--output-last-message')+1])
-if 'Grade complexity' in prompt:
-    if os.environ.get('REMOVE_AFTER_GRADE'):Path(os.environ['REMOVE_AFTER_GRADE']).unlink()
-    result={'complexity':'low'}
-else:
-    card=json.loads(re.search(r'^Card: (.+)$',prompt,re.M).group(1))
-    lane=re.search(r'Run drover-(build|qa|review)',prompt).group(1)
-    result={'status':'advanced','column':{'build':'QA','qa':'Review','review':'Done'}[lane], 'detail':'fixture','prUrl':None,'branch':None,'priorFindings':None}
-output.write_text(json.dumps(result))
 ''')
         self.tool('claude', "import json,os\nwith open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps({'tool':'claude'})+'\\n')\n")
         self.tool('npx', "import json,os,sys\nwith open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps({'tool':'npx','args':sys.argv[1:]})+'\\n')\n")
@@ -64,7 +50,7 @@ output.write_text(json.dumps(result))
         compile(source, name, 'exec')
         path=self.bin/name;path.write_text('#!/usr/bin/env python3\n'+source);path.chmod(0o755)
 
-    def full(self,host='codex'):
+    def full(self,host='claude'):
         for name in NAMES:
             for surface in ['.agents/skills'] if host=='codex' else ['.claude/skills']:
                 path=self.root/surface/name/'SKILL.md';path.parent.mkdir(parents=True,exist_ok=True);path.write_text('fixture skill instructions')
@@ -80,53 +66,6 @@ output.write_text(json.dumps(result))
         self.assertEqual((self.state/'inflight/99').read_text(),'PID=99999\nLANE=review\n')
         self.assertEqual((self.state/'approval.json').read_text(),'{"human":"existing"}')
         self.assertEqual((self.root/'.drover/worktrees/preserved/user.txt').read_text(),'existing work')
-        self.assertFalse((self.state/'codex-wave.pid').exists())
-
-    def test_missing_all_remaining_chains_halt_before_router_or_marker(self):
-        for status,labels in [('Ready',[]),('Ready',['qa']),('QA',[]),('Review',[])]:
-            with self.subTest(status=status,labels=labels):
-                result=self.invoke('drover-codex-wave.sh','--config',str(self.config),'--cards',json.dumps([dict(number=1,status=status,labels=labels)]),'--codex')
-                self.assertEqual(result.returncode,10,result.stderr)
-                output=json.loads(result.stdout)
-                self.assertTrue(output['halted']);self.assertEqual(output['cards'][0]['column'],status)
-                self.assertTrue(output['cards'][0]['detail'].startswith('skills-readiness:'))
-                self.assertFalse(any(c['tool']=='codex' for c in self.calls()))
-                self.assertTrue(all(c['args'][:2]==['issue','view'] for c in self.calls()))
-                self.assertEqual(sorted(p.name for p in (self.state/'inflight').iterdir()),['99'])
-                self.preserved()
-
-    def test_passing_wave_progresses_all_lanes_and_hydrates_body(self):
-        self.full()
-        result=self.invoke('drover-codex-wave.sh','--config',str(self.config),'--cards','[{"number":1,"status":"Ready"}]','--codex=fixture')
-        self.assertEqual(result.returncode,0,result.stderr)
-        self.assertEqual(json.loads(result.stdout)['cards'][0]['column'],'Done')
-        host=[c for c in self.calls() if c['tool']=='codex']
-        self.assertEqual(len(host),3)
-        self.assertTrue(all('Resolved skill report:' in c['prompt'] for c in host))
-        self.preserved()
-
-    def test_removed_skill_after_wave_check_halts_before_worker(self):
-        self.full()
-        self.env['REMOVE_AFTER_GRADE']=str(self.root/'.agents/skills/code-review/SKILL.md')
-        result=self.invoke('drover-codex-wave.sh','--config',str(self.config),'--cards','[{"number":1,"status":"Ready","body":""}]','--codex')
-        self.assertEqual(result.returncode,10,result.stderr)
-        calls=[c for c in self.calls() if c['tool']=='codex']
-        self.assertEqual(len(calls),1);self.assertIn('Grade complexity',calls[0]['prompt'])
-        self.assertEqual(sorted(p.name for p in (self.state/'inflight').iterdir()),['99'])
-        self.preserved()
-
-    def test_codex_fallback_and_override_cannot_use_claude_only_files(self):
-        self.full('claude')
-        card=dict(number=1,status='Ready',body='Skills: custom')
-        result=self.invoke('drover-codex-lane.sh','--config',str(self.config),'--card',json.dumps(card),'--lane','build')
-        self.assertEqual(result.returncode,10,result.stderr)
-        self.assertFalse(any(c['tool']=='codex' for c in self.calls()))
-        self.full()
-        result=self.invoke('drover-codex-lane.sh','--config',str(self.config),'--card',json.dumps(card),'--lane','build')
-        self.assertEqual(result.returncode,10,result.stderr)
-        path=self.root/'.agents/skills/custom/SKILL.md';path.parent.mkdir(parents=True);path.write_text('custom')
-        result=self.invoke('drover-codex-lane.sh','--config',str(self.config),'--card',json.dumps(card),'--lane','build')
-        self.assertEqual(result.returncode,0,result.stderr)
 
     def test_legacy_dispatch_missing_skills_stops_before_claim(self):
         body='''export SB_LIB_ONLY=1
@@ -220,7 +159,7 @@ dispatch_lane build 1
         (self.root / '.drover').mkdir(exist_ok=True)
         (self.root / '.drover/config.json').write_text(json.dumps(dict(project=dict(owner='fixture',number=1),
             base_branch='main',notifications=dict(bot_identity='bot'),
-            verify_commands=['git diff --check'],tick_seconds=1)))
+            verify_commands=['git diff --check'],tick_seconds=1,repo=dict(remote='https://github.com/fixture/app'))))
         self.tool('pgrep', 'import sys; sys.exit(1)')
         self.env['ROOT_FIXTURE'] = str(self.root)
         self.tool('claude', """import json,os,signal,time
