@@ -102,7 +102,9 @@ class RunnerRounds(RunnerCase):
         self.env['FAKE_CLAUDE'] = 'exit'
         self.board({'number': 5, 'status': 'Review',
                     'reports': ['[reviewer] [report] awaiting owner · merge needs approval']})
-        self.run_board(cycles=4)
+        # Ends on a state, not a tick count: the run stops at the second dispatch, however long a
+        # loaded machine takes the first worker to exit (no_progress_cycles is only a ceiling).
+        self.run_board(cycles=10000, max_dispatches=2)
         manifest = self.manifest()
         self.assertGreaterEqual(manifest.count('dispatch lane=review issue=#5 pid='), 2, manifest)
         self.assertNotIn('failed dispatch', manifest)
