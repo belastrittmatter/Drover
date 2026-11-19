@@ -1,0 +1,107 @@
+{
+  "project": {
+    "owner": "belastrittmatter",
+    "number": 9,
+    "title": "Drover Factory"
+  },
+  "harness": "claude",
+  "base_branch": "main",
+  "verify_commands": [
+    "bash tests/run-safety.sh"
+  ],
+  "commit_style": "conventional",
+  "evidence": {
+    "mode": "branch",
+    "branch": "drover-evidence"
+  },
+  "roles": {
+    "build": {
+      "skills": [
+        "ponytail:ponytail",
+        "mattpocock-skills:code-review"
+      ],
+      "max_workers": 2
+    },
+    "qa": {
+      "skills": [
+        "mattpocock-skills:tdd",
+        "mattpocock-skills:diagnosing-bugs",
+        "mattpocock-skills:code-review",
+        "pr-security-review"
+      ]
+    },
+    "review": {
+      "skills": [
+        "mattpocock-skills:code-review",
+        "mattpocock-skills:codebase-design",
+        "ponytail:ponytail-review"
+      ]
+    }
+  },
+  "labels": {
+    "bug": {
+      "build": [
+        "mattpocock-skills:diagnosing-bugs",
+        "mattpocock-skills:tdd"
+      ]
+    },
+    "feature": {
+      "build": [
+        "mattpocock-skills:implement",
+        "mattpocock-skills:tdd",
+        "mattpocock-skills:codebase-design"
+      ]
+    },
+    "ux": {
+      "build": [
+        "mattpocock-skills:implement",
+        "mattpocock-skills:tdd"
+      ]
+    },
+    "refactor": {
+      "build": [
+        "mattpocock-skills:codebase-design",
+        "mattpocock-skills:tdd"
+      ]
+    },
+    "tech-debt": {
+      "build": [
+        "mattpocock-skills:codebase-design",
+        "mattpocock-skills:tdd"
+      ]
+    },
+    "tests": {
+      "build": [
+        "mattpocock-skills:tdd"
+      ]
+    },
+    "docs": {
+      "build": []
+    }
+  },
+  "columns": [
+    "Backlog",
+    "Ready",
+    "Building",
+    "QA",
+    "Review",
+    "Blocked",
+    "Done"
+  ],
+  "merge_policy": {
+    "default": "human"
+  },
+  "migrations": {
+    "allowed_envs": [
+      "test",
+      "staging"
+    ],
+    "target_env": "live"
+  },
+  "timezone": "Asia/Ho_Chi_Minh",
+  "permissions": {
+    "allow_commands": [
+      "rtk"
+    ]
+  }
+}
