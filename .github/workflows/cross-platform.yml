@@ -44,12 +44,14 @@ jobs:
 
       # Step 2 — exercise the "no .drover/config.json" path of
       # drover-status.py. Documented to exit 64.
-      # Runs in the repo root, where no `.drover/config.json` exists.
+      # Runs in an empty git repo: this repo has its own .drover/config.json.
       - name: status — no-config path exits 64
         shell: bash
         run: |
+          status="$PWD/lib/drover-status.py"
+          cd "$(mktemp -d)" && git init -q
           set +e
-          python lib/drover-status.py
+          python "$status"
           ec=$?
           set -e
           if [ "$ec" -ne 64 ]; then
