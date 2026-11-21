@@ -633,7 +633,10 @@ def main() -> int:
 
     # ── header ──
     proj = cfg["project"]
-    mode_label = "human-approves" if cfg.get("human_approves_merge") else "auto-merge"
+    policy = (cfg.get("merge_policy") or {}).get("default")
+    human = cfg.get("human_approves_merge") is True or policy == "human" or (
+        policy is None and (cfg.get("harness") or cfg.get("host") or "claude") != "claude")
+    mode_label = "human-approves" if human else "auto-merge"
     tg = cfg.get("truth_gate", "off")
     tt = cfg.get("truth_threshold", 70)
     gate_label = {"off": "off", "always": "always"}.get(tg, f"non-trivial (≥{tt})")

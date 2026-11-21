@@ -99,7 +99,9 @@ fi
 PROJECT_OWNER=$(jq -r '.project.owner' "$CONFIG_PATH")
 PROJECT_NUMBER=$(jq -r '.project.number' "$CONFIG_PATH")
 BASE_BRANCH=$(jq -r '.base_branch // "main"' "$CONFIG_PATH")
-HUMAN_APPROVES=$(jq -r '.human_approves_merge // false' "$CONFIG_PATH")
+# Same rule as the gate (lib/drover-merge-policy.py): "human" by default for a non-Claude harness.
+HUMAN_APPROVES=$(jq -r 'if .human_approves_merge == true or .merge_policy.default == "human"
+  or (.merge_policy.default == null and (.harness // .host // "claude") != "claude") then "true" else "false" end' "$CONFIG_PATH")
 REBUILD_CAP=$(jq -r '.rebuild_cap // 2' "$CONFIG_PATH")
 BLOCK_ALERT_PCT=$(jq -r '.block_rate_alert_pct // 30' "$CONFIG_PATH")
 TICK_SECONDS=$(jq -r '.tick_seconds // 120' "$CONFIG_PATH")

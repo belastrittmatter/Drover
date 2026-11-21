@@ -103,5 +103,6 @@
     "allow_commands": [
       "rtk"
     ]
-  }
+  },
+  "no_progress_cycles": 30
 }
