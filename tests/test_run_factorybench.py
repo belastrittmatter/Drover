@@ -4,12 +4,13 @@
 Fakes: tests/runner_fixture.py."""
 import json
 from pathlib import Path
+import subprocess
 import sys
 import time
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from runner_fixture import FAKE_FACTORYBENCH, RunnerCase  # noqa: E402
+from runner_fixture import FAKE_FACTORYBENCH, KIT, RunnerCase  # noqa: E402
 
 
 def block(tag, by):
@@ -26,7 +27,7 @@ class FactoryBench(RunnerCase):
         path = self.base / 'fb.jsonl'
         return [json.loads(l) for l in path.read_text().splitlines()] if path.exists() else []
 
-    ORDER = ['started', 'resumed', 'waiting', 'pr', 'gate', 'finished']
+    ORDER = ['started', 'resumed', 'waiting', 'pr', 'gate', 'send_back', 'finished']
 
     def emits(self, count):
         # Emits run in the background (fire and forget): wait for them, then order them by the
@@ -67,8 +68,8 @@ class FactoryBench(RunnerCase):
             self.assertEqual(env['GIT_AUTHOR_EMAIL'], 'drover@example.com')
             self.assertFalse({'OTEL_LOG_USER_PROMPTS', 'OTEL_LOG_TOOL_DETAILS', 'OTEL_LOG_RAW_API_BODIES'} & set(env))
             phases.append(env['OTEL_RESOURCE_ATTRIBUTES'])
-        self.assertEqual(sorted(phases), sorted('factorybench.attempt=%s,factorybench.phase=%s' % (attempt, p)
-                                                for p in ('implement', 'verify', 'review')))
+        self.assertEqual(sorted(phases), sorted('factorybench.attempt=%s,factorybench.phase=%s,factorybench.step=%s' % (attempt, p, l)
+                                                for p, l in (('implement', 'build'), ('verify', 'qa'), ('review', 'review'))))
         self.assertEqual(json.loads((self.root / '.drover/runs/attempts.json').read_text()), {})
 
     # FR-MET-5: a stop with the card in flight waits the attempt; the next claim resumes it.
@@ -120,6 +121,19 @@ class FactoryBench(RunnerCase):
         self.wait_for(lambda: any(e[1] == 'attempt.finished' for e in self.events()))
         finished = [json.loads(e[7]) for e in self.events() if e[1] == 'attempt.finished']
         self.assertEqual(finished[0], {'status': 'failed', 'reason': 'PR closed unmerged'})
+
+    # FR-MET-5/9: a bounce is a failed gate plus a send_back with a fixed key per round.
+    def test_factorybench_send_back(self):
+        self.factorybench()
+        run = lambda *a: subprocess.run([sys.executable, str(KIT / 'lib/drover-metrics.py'), *a], cwd=self.root,
+                                        env=self.env, capture_output=True, text=True, check=True).stdout
+        attempt = run('claim', '7', 'o/r', 'feature', '', 'v').strip()
+        run('send-back', '7', 'qa', 'build', 'bounced to Ready')
+        run('send-back', '7', 'review', 'qa', 'bounced to QA')
+        backs = [e for e in self.emits(3) if e[1] == 'send_back']
+        self.assertEqual([(e[3], e[5]) for e in backs], [(attempt, 'send_back:1'), (attempt, 'send_back:2')])
+        self.assertEqual(json.loads(backs[0][7]), {'from': 'qa', 'to': 'build', 'kind': 'fix-attempt', 'reason': 'bounced to Ready'})
+        self.assertEqual(json.loads(backs[1][7])['to'], 'qa')
 
     # FR-MET-4: without FACTORYBENCH_URL nothing is sent and nothing is said about it.
     def test_factorybench_silent_without_url(self):

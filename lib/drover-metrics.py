@@ -7,6 +7,7 @@
   drover metrics env ISSUE ROLE                   print the worker's OTLP variables, one per line
   drover metrics pr ISSUE URL                     pr.linked, once per attempt
   drover metrics gate ISSUE NAME true|false WHY   gate result; rounds count per name
+  drover metrics send-back ISSUE FROM TO WHY      send_back: a lane sent the card back to an earlier one
   drover metrics waiting ISSUE REASON             human.waiting
   drover metrics finish ISSUE STATUS [WHY]        attempt.finished; the next claim starts anew
   drover metrics board [DEPS_FILE] < ITEMS        column-driven events for every open attempt
@@ -115,7 +116,7 @@ def finish(state, issue, status, why=""):
 
 def main(argv):
     cmd, args = (argv[0] if argv else ""), argv[1:]
-    if cmd not in ("enabled", "config-version", "claim", "env", "pr", "gate", "waiting", "finish",
+    if cmd not in ("enabled", "config-version", "claim", "env", "pr", "gate", "send-back", "waiting", "finish",
                    "board", "pr-urls", "closed", "flush"):
         print(__doc__, file=sys.stderr)
         return 64
@@ -149,7 +150,8 @@ def main(argv):
         a = state.get(issue)
         if a:
             url = os.environ["FACTORYBENCH_URL"].rstrip("/")
-            attrs = "factorybench.attempt=%s,factorybench.phase=%s" % (a["id"], PHASE.get(role, "implement"))
+            attrs = "factorybench.attempt=%s,factorybench.phase=%s,factorybench.step=%s" % (
+                a["id"], PHASE.get(role, "implement"), role)
             print("CLAUDE_CODE_ENABLE_TELEMETRY=1\nOTEL_LOGS_EXPORTER=otlp\nOTEL_EXPORTER_OTLP_PROTOCOL=http/json")
             print("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=%s/v1/logs" % url)
             if os.environ.get("FACTORYBENCH_TOKEN"):
@@ -169,6 +171,13 @@ def main(argv):
             rounds[name] = rounds.get(name, 0) + 1
             emit("gate", a["id"], "gate:%s:%d" % (name, rounds[name]),
                  {"name": name, "passed": passed == "true", "reason": why})
+    elif cmd == "send-back":
+        issue, src, dst, why = args
+        a = state.get(issue)
+        if a:
+            a["send_backs"] = a.get("send_backs", 0) + 1
+            emit("send_back", a["id"], "send_back:%d" % a["send_backs"],
+                 {"from": src, "to": dst, "kind": "fix-attempt", "reason": why})
     elif cmd == "pr-urls":
         for a in state.values():
             if a.get("pr"):
@@ -204,7 +213,7 @@ def main(argv):
                 waiting(state, issue, (deps.get(issue) or {}).get("reasonTag") or "blocked")
             elif col and state[issue].get("waiting") not in (None, "stopped"):
                 resumed(state, issue)  # a stopped card resumes at its next claim
-    if cmd in ("pr", "gate", "waiting", "finish", "board", "closed"):
+    if cmd in ("pr", "gate", "send-back", "waiting", "finish", "board", "closed"):
         save(state)
     return 0
 
