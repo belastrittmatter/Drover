@@ -76,6 +76,8 @@ It is super-board cut down and made harness-independent:
 | Reviewer extras | Inline history check; no extra reviewer subagents, no score | Code-grounder + historian subagents with confidence threshold |
 | Reviewer model | The one reviewer of a PR runs on a different model than its builder: `roles.review.model` (default `sonnet`), `roles.review.alt_model` (default `opus`) when that equals the builder's model; `roles.review.harness` for another model family (roles.md FR-REV-13). Applies to every PR. Owner decision, stage 7 | A second-opinion reviewer on risky cards (`second_opinion`, `second_opinion_model`) |
 | Review memory | Enforced by `drover review-report put` and the gate | Prompt only |
+| Review report marker | Keep the marker the skills, collect and open PRs already use, `<!-- drover-review:report -->`, with `head=<sha>` added inside it (stage 7) | Rename to `<!-- drover:review-report -->` and lose earlier reports |
+| Builder model record | Local runner state, `.drover/runs/models/<issue>`, like `attempts.json`; lost state means the reviewer runs on `roles.review.model` | A PR comment or commit trailer per build |
 | Test-first | Bugs only, via the builder's reproduction test | Separate test-writing stage for every card |
 | Role context | Context packs built by the CLI (roles.md FR-CTX) | Agents load their own context |
 | QA crawl mode | Own branch and PR per iteration, through the gate | Direct commits to the active branch |
