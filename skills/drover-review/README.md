@@ -32,4 +32,4 @@ on a `merge-ready` report for the head it merges. Findings keep stable ids (`R1`
 
 ## Install
 
-Part of the drover pack: `drover skills install` links it into `~/.claude/skills`. Set `human_approves_merge: true` in the config to keep a person on every merge. Lane details: `skills/drover/references/run.md` → Reviewer.
+Part of the drover pack: `drover skills install` links it into `~/.claude/skills`. Set `human_approves_merge: true` in the config to keep a person on every merge. Lane details: `skills/drover/references/rules/review.md`, via `drover context review <issue>`.

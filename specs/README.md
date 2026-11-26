@@ -79,7 +79,7 @@ It is super-board cut down and made harness-independent:
 | Review report marker | Keep the marker the skills, collect and open PRs already use, `<!-- drover-review:report -->`, with `head=<sha>` added inside it (stage 7) | Rename to `<!-- drover:review-report -->` and lose earlier reports |
 | Builder model record | Local runner state, `.drover/runs/models/<issue>`, like `attempts.json`; lost state means the reviewer runs on `roles.review.model` | A PR comment or commit trailer per build |
 | Test-first | Bugs only, via the builder's reproduction test | Separate test-writing stage for every card |
-| Role context | Context packs built by the CLI (roles.md FR-CTX) | Agents load their own context |
+| Role context | Context packs built by the CLI (roles.md FR-CTX); the worker runs `drover context` as its first step, pointed there by the lane prompt | Agents load their own context; the runner building the pack into the prompt (large diffs in argv, GitHub reads on the runner) |
 | QA crawl mode | Own branch and PR per iteration, through the gate | Direct commits to the active branch |
 | Test locking | Deferred; revisit when FR-REV-12 shows builders editing QA tests | Hook + gate exit 10 |
 | Hidden checks | Deferred; needs storage that keeps FR-BRD-1 | Local hidden tests per card |

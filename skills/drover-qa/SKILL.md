@@ -652,11 +652,11 @@ When invoked by drover (env `DROVER_RUN=1` or invocation contains "drover run"):
 
 ### Card types
 - **Built card (`feature`, `bug`, no label):** worktree at `.drover/worktrees/issue-<N>-qa/` checked out at Builder's branch tip.
-- **`qa` card (skipped Building):** move it Ready → QA yourself, create `issue-<N>-<slug>` from the base branch, test what is already there (run.md → "qa cards").
+- **`qa` card (skipped Building):** move it Ready → QA yourself, create `issue-<N>-<slug>` from the base branch, test what is already there (run.md → Lanes and label routing, "`qa` cards").
 - **A live URL with no repo** is not a board card: `/drover-qa <url>` runs standalone.
 
 ### Lifecycle (Tester, first pass)
-See `~/.claude/skills/drover/references/run.md` → Tester (first pass — repo-backed). Summary:
+Start from `drover context qa <N>`: it prints the lane rules (`~/.claude/skills/drover/references/rules/qa.md` → Tester (first pass — repo-backed), and `rules/shared.md`) with the card's issue, diff, `[qa]` threads, the builder report and your open review findings. Summary:
 1. Pull latest of base; checkout `issue-<N>-<slug>` into worktree (a `qa` card: create it from the base).
 2. Read issue + PR + Builder's handoff.
 3. Build issue-scoped test plan: ONE observable test per AC.
@@ -698,7 +698,7 @@ This is non-optional. Reviewer re-runs this command; red → bounce back to QA.
 
 The Tester's issue comment is the user's primary visibility into "is this actually fixed." A bare directory path is not sufficient — the user wants to *see* the proof on the issue page.
 
-**The canonical template lives in `~/.claude/skills/drover/references/run.md` → "Screenshot embed format" (right after Tester first pass).** Do not duplicate it here; both lanes (drover Tester + standalone drover-qa) follow that exact format. Summary of rules workers must obey:
+**The canonical template lives in `~/.claude/skills/drover/references/rules/qa.md` → "Screenshot embed format" (right after Tester first pass).** Do not duplicate it here; both lanes (drover Tester + standalone drover-qa) follow that exact format. Summary of rules workers must obey:
 
 - Capture screenshots at the standard viewports for UI ACs: **desktop 1920×1080, tablet 1024×768, mobile 375×667**.
 - Commit the screenshots to the issue branch and push *before* writing the comment — inline image URLs won't render unless the file is on GitHub.

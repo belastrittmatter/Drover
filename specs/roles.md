@@ -116,8 +116,12 @@ Upstream gives each worker a one-line prompt and lets it load its own
 context, about 1,900 lines for the reviewer, most of it other roles' steps.
 
 - **FR-CTX-1** `drover context <role> <issue>` shall build each worker's
-  context deterministically and pass it as the worker's first input. No role
-  shall be told to load the whole pipeline document.
+  context deterministically; the runner's lane prompt makes it the worker's
+  first step (the worker runs it, so its GitHub reads count against the
+  worker, and the reviewer can run `--claims` later). No role shall be told
+  to load the whole pipeline document: the lane rules live in
+  `skills/drover/references/rules/<role>.md` and `rules/shared.md`; `run.md`
+  keeps the runner and orchestrator sections.
 - **FR-CTX-2** Packs shall contain exactly:
 
   | Content | build | qa | review |

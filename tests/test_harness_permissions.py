@@ -35,7 +35,8 @@ ROLE_FILES = sorted(
     + [p for r in ("build", "qa", "review") for p in (ROOT / f"skills/drover-{r}/references").glob("*.md")]
     + [ROOT / "skills/pr-security-review/SKILL.md"]
     + [ROOT / f"skills/drover/references/{n}.md" for n in
-       ("writing-standard", "rate-limit-etiquette", "block-template", "pr-author-notes")])
+       ("writing-standard", "rate-limit-etiquette", "block-template", "pr-author-notes")]
+    + sorted((ROOT / "skills/drover/references/rules").glob("*.md")))
 # A first word is command-shaped when it is a lower-case word or a script path; capitalised
 # words, placeholders (`<test command>`, `$VAR`), flags and numbers are prose. Every
 # command-shaped first word must be allowed by the harness or be in NON_COMMANDS: words

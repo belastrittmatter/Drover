@@ -16,7 +16,8 @@
     "models_line": "Models: ",
     "test_edits_line": "Test edits since QA pass: ",
     "qa_head_line": "QA head: ",
-    "repro_line": "Repro test: "
+    "repro_line": "Repro test: ",
+    "hypotheses_line": "Hypotheses: "
   },
   "gate_lines": {
     "human_gate": "human-gate: ",

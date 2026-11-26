@@ -311,7 +311,7 @@ When invoked by drover (env `DROVER_RUN=1` or invocation contains "drover run"):
 - **`qa` card:** review the QA report quality and any test diff; there is no product-code diff.
 
 ### Lifecycle (Reviewer)
-See `~/.claude/skills/drover/references/run.md` → Reviewer. Summary of the sub-steps:
+Start from `drover context review <N>`: the lane rules (`~/.claude/skills/drover/references/rules/review.md` → Reviewer, and `rules/shared.md`), the issue, the diff and the last review report — no builder or QA account yet. Check each prior finding and write 2-4 hypotheses, `put` the report with a `Hypotheses:` line for this head (state `unverified` until you decide), then run `drover context review <N> --claims` for the builder and QA reports, the test command and every unresolved thread; it refuses until those hypotheses are recorded (FR-CTX-3). Summary of the sub-steps:
 
 1. Worktree from current state of `issue-<N>-<slug>`.
 2. **Gate 1 — thread scan.** Read threads and replies. [PR author notes](../drover/references/pr-author-notes.md)
@@ -400,7 +400,7 @@ two complete builds. In order, no shortcuts:
    **Exit 79 — required GitHub evidence unavailable:** stop the current run. Leave
    the card, approval, claims, and worktree intact. Report the local halt reason;
    do not classify missing data as safe, bounce it to Build, or post a new approval
-   request. Explicit recovery is in run.md → Required GitHub reads can pause a run.
+   request. Explicit recovery is in rules/shared.md → Required GitHub reads can pause a run.
 
    `gh pr view <PR> --json state,mergeCommit` must report `MERGED` plus a commit sha,
    and that sha must be an ancestor of the base branch

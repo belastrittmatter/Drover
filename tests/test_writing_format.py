@@ -20,6 +20,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 REF = ROOT / "skills" / "drover" / "references"
 STANDARD = (REF / "writing-standard.md").read_text(encoding="utf-8")
+# run.md (the runner) plus the lane rules split out of it (rules/*.md, specs/roles.md FR-CTX).
+RUN_RULES = "\n".join(p.read_text(encoding="utf-8") for p in [REF / "run.md", *sorted((REF / "rules").glob("*.md"))])
 
 TYPES = "feat|fix|chore|refactor|test|perf|docs|ci|ui|security|revert|wip"
 # One subject regex per commit_style (writing-standard.md § 1). `other` copies the repo's examples.
@@ -229,9 +231,9 @@ def test_comment_header_regex():
 
 def test_comment_examples_follow_the_header():
     """Lane comments have headers; author notes use three labels without a routing prefix."""
-    machine = re.compile(r"^(Local tests|QA head|Repro test|Models|Test edits since QA pass|gh-quota-on-exit|blocked-by|"
+    machine = re.compile(r"^(Local tests|QA head|Repro test|Models|Hypotheses|Test edits since QA pass|gh-quota-on-exit|blocked-by|"
                          r"root-cause-hash):|^\||^$|^<!--")
-    run_md = (REF / "run.md").read_text(encoding="utf-8")
+    run_md = RUN_RULES
     checked = 0
     author_notes = 0
     for text in (STANDARD, run_md):
@@ -343,7 +345,7 @@ def test_pr_body_markers():
                          capture_output=True, text=True, check=True).stdout
     for b in PR_BLOCKS:
         assert f"<!-- sb:{b} -->" in out and f"<!-- /sb:{b} -->" in out, f"skeleton lacks {b}"
-    run_md = (REF / "run.md").read_text(encoding="utf-8")
+    run_md = RUN_RULES
     for b in ["status", "problem", "solution", "ac", "history", "risk"]:
         assert f"<!-- sb:{b} -->" in run_md and f"<!-- /sb:{b} -->" in run_md, f"run.md PR template lacks {b}"
     assert "## Not verified" not in run_md and "**Status:**" not in run_md
@@ -351,7 +353,7 @@ def test_pr_body_markers():
 
 def test_history_is_folded_and_needs_you_sits_in_the_status_alert():
     """From the pr-skill template: history folds in <details>; a human step can ride the status alert."""
-    run_md = (REF / "run.md").read_text(encoding="utf-8")
+    run_md = RUN_RULES
     for name, text in (("writing-standard.md", STANDARD), ("run.md", run_md)):
         hist = text[text.index("<!-- sb:history -->"):text.index("<!-- /sb:history -->")] if "<!-- sb:history -->\n" in text else \
             next(b for b in fenced(text) if "Iteration history" in b)
@@ -362,7 +364,7 @@ def test_history_is_folded_and_needs_you_sits_in_the_status_alert():
 
 def test_risk_names_door_and_blast_radius():
     """Risk carries the merge danger: a two-way or one-way door and a blast radius."""
-    run_md = (REF / "run.md").read_text(encoding="utf-8")
+    run_md = RUN_RULES
     std_risk = next(b for b in fenced(STANDARD) if b.startswith("## Risk\n**Low**"))
     run_risk = run_md[run_md.index("<!-- sb:risk -->\n## Risk"):run_md.index("<!-- /sb:risk -->")]
     for name, risk in (("writing-standard.md", std_risk), ("run.md", run_risk)):

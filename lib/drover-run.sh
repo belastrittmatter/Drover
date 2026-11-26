@@ -483,9 +483,9 @@ EOF
   fi
   [ -z "$COMMIT_EMAIL" ] || WORKER_ENV+=("GIT_AUTHOR_EMAIL=$COMMIT_EMAIL" "GIT_COMMITTER_EMAIL=$COMMIT_EMAIL")
   case "$lane" in
-    build)  prompt="Run drover-build on issue #${issue} for drover run. Read ${DROVER_HOME}/skills/drover/references/run.md → Builder lifecycle. Config: ${CONFIG_PATH}." ;;
-    qa)     prompt="Run drover-qa on issue #${issue} for drover run. Read ${DROVER_HOME}/skills/drover/references/run.md → Tester lifecycle. Config: ${CONFIG_PATH}." ;;
-    review) prompt="Run drover-review on issue #${issue} for drover run. Read ${DROVER_HOME}/skills/drover/references/run.md → Reviewer lifecycle. Config: ${CONFIG_PATH}." ;;
+    build)  prompt="Run drover-build on issue #${issue} for drover run. Start from your context pack: drover context build ${issue} prints your rules (Read ${DROVER_HOME}/skills/drover/references/rules/build.md and shared.md if it cannot run) and this card's issue, diff, threads and findings. Config: ${CONFIG_PATH}." ;;
+    qa)     prompt="Run drover-qa on issue #${issue} for drover run. Start from your context pack: drover context qa ${issue} prints your rules (Read ${DROVER_HOME}/skills/drover/references/rules/qa.md and shared.md if it cannot run) and this card's issue, diff, threads, builder report and findings. Config: ${CONFIG_PATH}." ;;
+    review) prompt="Run drover-review on issue #${issue} for drover run. Start from your context pack: drover context review ${issue} prints your rules (Read ${DROVER_HOME}/skills/drover/references/rules/review.md and shared.md if it cannot run), the issue, the diff and the last review report; the builder and QA reports come from drover context review ${issue} --claims after you record your hypotheses. Config: ${CONFIG_PATH}." ;;
     *) log "unknown lane: $lane"; return 1 ;;
   esac
   # FR-CNV-2: the repo's commit style and three real subjects ride in every lane prompt.

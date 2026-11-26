@@ -369,8 +369,10 @@ Next: <who acts next>
 Header regex: `^\[(builder|qa|reviewer|collect|orchestrator)\] \[(blocker|issue|suggestion|nit|question|praise|report)\] \S`
 
 - ≤ 8 lines of prose. Evidence before adjectives: the command, the sha, the file:line.
-- Machine lines (`Local tests:`, `QA head:`, `Repro test:`, `Models:`, `Test edits since QA pass:`,
-  `gh-quota-on-exit:`, `blocked-by:`, `root-cause-hash:`) go last and do not count toward the 8.
+- Machine lines (`Local tests:`, `QA head:`, `Repro test:`, `Models:`, `Hypotheses:`,
+  `Test edits since QA pass:`, `gh-quota-on-exit:`, `blocked-by:`, `root-cause-hash:`) go last and do
+  not count toward the 8. `Hypotheses: H1 <...>; H2 <...>` is the reviewer's own pass for the reviewed
+  head, recorded before `drover context review <N> --claims` shows the builder's and QA's account.
   `QA head: <sha>` ends every `[qa] [report] pass` (the head QA passed); `Repro test: <command>`
   ends a `bug` card's `[builder] [report]` (the reproduction test, roles.md FR-BLD-7).
 - Screenshots (QA) go below, as an embedded table. They do not count either.
