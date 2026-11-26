@@ -58,7 +58,7 @@ class ReviewReport(unittest.TestCase):
         self.store.write_text("[]")
         self.repo = self.tmp / "repo"
         self.repo.mkdir()
-        self.env = dict(os.environ, PATH=f"{self.tmp}/bin:{os.environ['PATH']}", FAKE_COMMENTS=str(self.store),
+        self.env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PATH=f"{self.tmp}/bin:{os.environ['PATH']}", FAKE_COMMENTS=str(self.store),
                         FAKE_LOG=str(self.tmp / "gh.log"), SB_GITHUB_HALT_FILE=str(self.tmp / "halt.json"),
                         SB_GITHUB_RETRY_DELAY="0", GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t",
                         GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
