@@ -50,6 +50,10 @@ import argparse
 import json
 import re
 import sys
+from pathlib import Path
+
+# The `needs-you:` prefix, defined once in drover-markers.json (FR-CNV-4).
+NEEDS_YOU = json.loads(Path(__file__).with_name("drover-markers.json").read_text(encoding="utf-8"))["gate_lines"]["needs_you"].strip()
 
 DEFAULT_ALWAYS_HUMAN = {
     "money": {
@@ -196,7 +200,7 @@ def main() -> int:
                 needs.append(f"{cmd or '<your ' + target + ' migrate command>'}   # {target}: the base deploys here and it is not in allowed_envs")
         needs += [str(s) for s in mig.get("human_steps") or []]
     for line in body.splitlines():
-        m = re.match(r"^\s*(?:>\s*)?(?:[-*]\s*)?needs-you:\s*(.+?)\s*$", line, re.I)
+        m = re.match(r"^\s*(?:>\s*)?(?:[-*]\s*)?" + re.escape(NEEDS_YOU) + r"\s*(.+?)\s*$", line, re.I)
         if m and m.group(1).lower() != "done":
             needs.append(m.group(1).strip("`"))
 

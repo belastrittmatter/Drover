@@ -20,7 +20,7 @@ _reader_spec = importlib.util.spec_from_file_location("github_read", Path(__file
 github_read = importlib.util.module_from_spec(_reader_spec)
 _reader_spec.loader.exec_module(github_read)
 
-PREFIX = "approval-request: "
+PREFIX = json.loads(Path(__file__).with_name("drover-markers.json").read_text(encoding="utf-8"))["gate_lines"]["approval_request"]
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 SCOPE = re.compile(r"[0-9a-f]{64}\Z")
 NEEDS_YOU = json.loads(Path(__file__).with_name("drover-reasons.json").read_text(encoding="utf-8"))["needs_you"]
