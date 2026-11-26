@@ -102,7 +102,7 @@ lifecycles", plus the role skill named.
   than the builder that wrote it. The runner shall record the model each
   build worker of a card starts on (`.drover/runs/models/<issue>`) and, at
   review dispatch, start the reviewer on `roles.review.model` (default
-  `sonnet`); when that equals the card's builder model, on
+  `sonnet`); when that is in the card's builder model's family (sonnet, opus, haiku, fable; else the exact id), on
   `roles.review.alt_model` (default `opus`). If both equal the builder
   model, then the runner shall halt with a config error. Where
   `roles.review.harness` names another harness, the reviewer runs there (a
