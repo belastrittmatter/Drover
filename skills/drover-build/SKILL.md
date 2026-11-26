@@ -235,6 +235,10 @@ When invoked by drover (env `DROVER_RUN=1` set by the runner, or invocation cont
 - Read context from: issue body + ALL issue comments + linked PR description + PR comments + PR review threads. NEVER from local state files for inter-lane coordination.
 - Respect the worktree path drover hands you (typically `.drover/worktrees/issue-<N>-build/`). Don't create your own.
 - Respect the single branch drover hands you (`issue-<N>-<slug>`). Don't create alternate branches.
+- Report each main step as it starts with `drover phase <name>`: `plan` (reading the issue,
+  docs check), `tests` (writing the failing test), `implement`, `verify` (verify commands,
+  code-review), `pr` (push, PR body, author notes), `handoff` (comments, card move). It records
+  the phase for the runner's `state.json`; a failed call never stops the build.
 
 ### Lifecycle (Builder, first pass)
 Follow spec `~/.claude/skills/drover/references/run.md` → Builder (first pass). Summary:
