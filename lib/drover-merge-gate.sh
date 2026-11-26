@@ -73,8 +73,10 @@
 #   3  PR is closed without a merge; no merge attempted
 #   4  could not take the lock within the timeout
 #   5  the base could not be merged in (real conflict) — needs a rebase pass
-#   6  the PR head is not the commit that was reviewed — review evidence is void,
-#      the card goes back to Review (not Blocked, not a rebase pass)
+#   6  the PR head is not the commit that was reviewed, or the latest review report
+#      (drover review-report check) does not name this head, is not merge-ready, or
+#      has an open Blocker — review evidence is void, the card goes back to Review
+#      (not Blocked, not a rebase pass)
 #   7  merge policy says a human merges this one (money / auth / destructive
 #      schema, a diff over auto_max_lines — default 400, "big PR — please
 #      review" — or merge_policy.default "human"). Stdout lists each
@@ -227,6 +229,13 @@ if [ -n "$EXPECT_HEAD" ]; then
   esac
 else
   say "WARNING: no --expect-head; pinning the head read now (${HEAD_SHA}), not the reviewed one"
+fi
+# ---- the review report (FR-REV-8) -----------------------------------------
+# The latest review report must name this head, say merge-ready and hold no open Blocker.
+RR=0; python3 "$HERE/drover-review-report.py" check --pr "$PR" ${REPO:+--repo "$REPO"} --head "$HEAD_SHA" || RR=$?
+if [ "$RR" -ne 0 ]; then
+  [ "$RR" -eq 6 ] && say "the review report does not clear ${HEAD_SHA} — send the card back to Review"
+  exit "$RR"
 fi
 
 # ---- merge policy + migration plan ----------------------------------------

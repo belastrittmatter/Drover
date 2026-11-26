@@ -1,0 +1,26 @@
+{
+  "_doc": "The one definition of drover's machine-read markers (specs/conventions.md FR-CNV-4). Reason tags are in drover-reasons.json. Writers and readers: drover-review-report.py (report), drover-merge-gate.sh and drover-approval.py (gate lines), drover-collect's collect_prs.py (report marker), writing-standard.md (the human-readable form). Change a marker here only.",
+  "thread_prefixes": {
+    "[builder]": "Ready",
+    "[qa]": "QA",
+    "[reviewer]": "Review"
+  },
+  "review_report": {
+    "marker": "<!-- drover-review:report",
+    "states": ["merge-ready", "bounced", "blocked", "human-gated", "unverified", "merged"],
+    "owners": ["builder", "qa", "ui", "owner"],
+    "classes": ["Gap", "Bug", "Verification miss", "Scope drift", "Over-engineering"],
+    "severities": ["Blocker", "Should fix", "Nit"],
+    "statuses": ["open", "fixed", "not fixed", "no longer applies"],
+    "columns": ["ID", "Owner", "Class", "Severity", "Where", "Finding", "Status"],
+    "models_line": "Models: ",
+    "test_edits_line": "Test edits since QA pass: ",
+    "qa_head_line": "QA head: ",
+    "repro_line": "Repro test: "
+  },
+  "gate_lines": {
+    "human_gate": "human-gate: ",
+    "needs_you": "needs-you: ",
+    "approval_request": "approval-request: "
+  }
+}
