@@ -21,6 +21,15 @@ IDLE_ROUND_CALLS = 4
 
 class RunnerRounds(RunnerCase):
     # FR-WRK-1: a worker's lock is removed only when the worker is not alive.
+    def test_production_guard_reads_merge_policy(self):
+        # A deploy-on-main repo: auto-merge refuses (exit 75); merge_policy "human" starts.
+        (self.root / 'vercel.json').write_text('{}')
+        self.board()
+        out = self.run_board(1, rc=75, human_approves_merge=False)
+        self.assertIn('would auto-merge to production main', out)
+        out = self.run_board(1, human_approves_merge=False, merge_policy=dict(default='human'))
+        self.assertNotIn('would auto-merge', out)
+
     def test_live_worker_lock_survives_a_round(self):
         self.board({'number': 7, 'status': 'Ready'})
         self.run_board(cycles=2)  # round 1 dispatches, round 2 sees the lock
