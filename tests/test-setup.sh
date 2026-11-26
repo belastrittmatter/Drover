@@ -112,6 +112,7 @@ echo "$OUT" | q '.notes | any(test("removed roles.review keys: second_opinion, s
 python3 "$PACK/lib/drover-config.py" validate "$C" || fail "a migrated config must pass the schema"
 echo '{"project":{"owner":"o","number":1},"roles":{"review":{"alt_model":"opus","second_opinion":"risky"}}}' > "$T/so.json"
 SO=$(python3 "$PACK/lib/drover-config.py" validate "$T/so.json" 2>&1 || true)
+echo "$SO" | grep -q "run \`drover setup fix\`" || fail "an unknown key must point at drover setup fix: $SO"
 echo "$SO" | grep -q "roles.review.second_opinion: unknown key" || fail "a new config must not accept roles.review.second_opinion"
 [ ! -e "$T/.claude/drover/upgrade.json" ] || fail "upgrade.json should be cleared once the upgrade is done"
 TXT=$(python3 "$SETUP" check --root "$T" --text || true)

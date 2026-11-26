@@ -170,6 +170,13 @@ def agent_allowed(agent, cfg=None):
 
 
 REVIEW_MODEL, REVIEW_ALT = "sonnet", "opus"
+FAMILIES = ("sonnet", "opus", "haiku", "fable")
+
+
+def family(model):
+    """A model's family, so "claude-sonnet-5-5" and "sonnet" count as the same; else the raw id."""
+    m = (model or "").lower()
+    return next((f for f in FAMILIES if f in m), m)
 
 
 def role_model(cfg, role, pick=None, builder=None):
@@ -181,9 +188,9 @@ def role_model(cfg, role, pick=None, builder=None):
     if role != "review":
         return rcfg.get("model") or pick or ""
     model = rcfg.get("model") or REVIEW_MODEL
-    if builder and model == builder:
+    if builder and family(model) == family(builder):
         model = rcfg.get("alt_model") or REVIEW_ALT
-        if model == builder:
+        if family(model) == family(builder):
             print(f"drover: roles.review.model and roles.review.alt_model both equal the builder's model "
                   f"{builder!r}; set roles.review.alt_model to another model", file=sys.stderr)
             raise SystemExit(65)
@@ -265,6 +272,9 @@ def main(argv):
         problems = validate(path)
         for p in problems:
             print(f"drover: invalid config {path}: {p}", file=sys.stderr)
+        if any(p.endswith(": unknown key") for p in problems):
+            print("drover: a removed key (truth_gate, roles.review.second_opinion, ...)? run `drover setup fix` to drop it",
+                  file=sys.stderr)
         return 65 if problems else 0
     elif cmd == "harness":
         print(json.dumps(harness(argv[1] if len(argv) > 1 else configured_harness()), indent=2))
