@@ -1,6 +1,6 @@
 ---
 name: drover-review
-description: Reviewer lane of the drover pipeline and standalone PR/branch readiness review — forms its own hypotheses before reading the builder's summary, remembers prior findings and re-checks each with file:line proof, runs an adversarial truth-check on non-trivial diffs, and classes every finding (Gap, Bug, Verification miss, Scope drift, Over-engineering via `ponytail:ponytail-review`). Merges only through `drover-merge-gate.sh`, pinned to the reviewed head SHA, and routes other fixes to Drover Build or Drover QA via the board. Use when the user says "Drover Review", "review this branch", "review loop", "make sure this is merge-ready", "PR review", or asks for code, architecture, security, QA evidence, or release-readiness judgment.
+description: Reviewer lane of the drover pipeline and standalone PR/branch readiness review — forms its own hypotheses before reading the builder's summary, remembers prior findings and re-checks each with file:line proof (enforced by `drover review-report`), checks the history of the changed lines, runs on a model other than the builder's, and classes every finding (Gap, Bug, Verification miss, Scope drift, Over-engineering via `ponytail:ponytail-review`). Merges only through `drover-merge-gate.sh`, pinned to the reviewed head SHA, and routes other fixes to Drover Build or Drover QA via the board. Use when the user says "Drover Review", "review this branch", "review loop", "make sure this is merge-ready", "PR review", or asks for code, architecture, security, QA evidence, or release-readiness judgment.
 ---
 
 
@@ -61,6 +61,12 @@ If the input is ambiguous, default to reviewing the current branch against its u
    - Then read their claims and check each one against the code and test output, the same
      way you check your own hypotheses. A claim is a lead, not evidence.
    - Read the diff and the affected modules.
+   - **History check** (FR-REV-3) — yourself, no sub-agent. For each changed hunk run
+     `git log -L <start>,<end>:<file> --oneline origin/<base>` (or `git blame -w origin/<base> -- <file>`)
+     and read the commits it names: a revert, an earlier attempt at the same fix, or a commit
+     message that links a decision (ADR, issue) is a lead. A diff that re-adds what a revert
+     removed, or repeats an attempt that was reverted, is a finding unless the PR says why
+     this time differs. Prefer local git; it costs no GitHub calls.
    - Load `mattpocock-skills:codebase-design` and read the diff through its vocabulary
      — **module**, **interface**, **depth**, **seam**, **adapter**, **leverage**,
      **locality**. Ask the shape question the diff raises: does this land behind a
@@ -139,30 +145,35 @@ If the input is ambiguous, default to reviewing the current branch against its u
 
 The report follows writing-standard.md § 4: a comment header, ≤ 8 lines, then one findings
 table. In a drover run it is ONE PR comment, **edited in place** every round (see "Review
-remembers"); R-ids never change.
+remembers"); R-ids never change. Write it to a file **without** the marker:
+`drover review-report put` adds the marker with the reviewed head and the
+`Test edits since QA pass:` line.
 
 ```markdown
-<!-- drover-review:report -->
 [reviewer] [report] <merge-ready | bounced | blocked | human-gated | unverified> · round <N>
 Did: <scope reviewed · base · verification command + result>
-Done: <prior findings fixed, hypotheses that held — each with file:line or command>
+Done: <prior findings fixed, hypotheses that held, refactors filed — each with file:line, command or #issue>
 Not done: <open findings by id, or what you could not verify and why>   (omit when nothing)
 Next: <builder | qa | owner | none>
+Models: builder <model> · reviewer <model>
 
-| ID | Owner | Class | Where | Finding | Status |
-|---|---|---|---|---|---|
-| R1 | builder | Bug | `src/cart.py:12` | <finding> | fixed |
-| R2 | builder | Bug | `src/cart.py:31` | <finding> | not fixed |
-| R3 | qa | Verification miss | `tests/test_cart.py:8` | <finding> · blocker | open |
-| R4 | builder | Over-engineering | `src/fmt.py:1` | <what it builds> → <smaller thing> · should fix, never blocks alone | open |
+| ID | Owner | Class | Severity | Where | Finding | Status |
+|---|---|---|---|---|---|---|
+| R1 | builder | Bug | Blocker | `src/cart.py:12` | <finding> | fixed |
+| R2 | builder | Bug | Should fix | `src/cart.py:31` | <finding> | not fixed |
+| R3 | qa | Verification miss | Blocker | `tests/test_cart.py:8` | <finding> | open |
+| R4 | builder | Over-engineering | Should fix | `src/fmt.py:1` | <what it builds> → <smaller thing>, never blocks alone | open |
 ```
 
 - Owner: `builder` (Drover Build) · `qa` (Drover QA) · `ui` (UI ticket; a human runs
   `/ui-refine-loop`) · `owner` (human gate).
-- Mark `blocker` or `should fix` in the Finding cell. Over-engineering is always `should fix`.
-- Deepening opportunities filed with `drover-review-file-refactor.sh` get a row with Status
-  `filed #<issue>`.
-- Human gates: the header says `human-gated` and `Next: owner`; the decision goes in a row.
+- Severity: `Blocker` · `Should fix` · `Nit`. Over-engineering is always `Should fix`.
+- `Models:` is the line your prompt gives (the runner picked a reviewer model that differs from
+  the builder's); copy it as it is. Outside a run, name the models you know.
+- Deepening opportunities filed with `drover review-file-refactor` go on the `Done:` line as
+  `filed #<issue>`, not in the table.
+- Human gates: the header says `human-gated` and `Next: owner`; the decision goes in a row with
+  owner `owner`.
 
 For short summaries (run reports), keep it phone-friendly:
 
@@ -191,17 +202,15 @@ A re-review starts from the last one. Without it, a rebuilt card gets a fresh re
 re-litigates settled points, misses that a finding was "resolved" without a fix, and can
 bounce forever on a moving target.
 
-**Lookup — one call, by marker.** Every report starts with `<!-- drover-review:report -->`.
-`prior_report` is the newest PR comment carrying it:
+**Lookup — one call.** `drover review-report get --pr <PR>` prints the newest report as JSON
+(`head`, `state`, `rows`, `body`), or `{}` on a first review. That is `prior_report`.
 
-```bash
-gh pr view <PR> --json comments \
-  --jq '[.comments[] | select(.body | contains("<!-- drover-review:report -->"))] | last | {url, body} // {}'
-```
-
-The number after `#issuecomment-` in `url` is the comment id. Write this round's report over it:
-`gh api -X PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@report.md`. One report per
-PR, edited in place, so the table carries every round's status.
+**Write — one call.** `drover review-report put --pr <PR> --head <sha you reviewed> --file report.md`
+edits the report in place (or posts the first one). It refuses (exit 65, one line per problem)
+a report that drops a prior id, uses a word outside the fixed lists, leaves a prior row `open`
+on a new head, marks a row `fixed` without a `file:line` in a file that changed since the last
+reviewed head, says `merge-ready` with an open or `not fixed` Blocker, or has no `Models:` line.
+Fix the report, never the rule. Never write the report with `gh api` or `gh pr comment`.
 
 Outside drover (no PR), `prior_report` is whatever earlier review the caller hands you.
 
@@ -318,6 +327,12 @@ See `~/.claude/skills/drover/references/run.md` → Reviewer. Summary of the sub
    Check the Risk block against the diff: is the Door right (one-way: DROP, rename, data rewrite, public API, sent email) and the Blast radius honest? Fix it with `drover pr-body --block risk`; a one-way door is never Low.
    **3b. Prior-report check** — load `prior_report` (see "Review remembers"); if present, round 1 checks each prior finding; any `not fixed` → re-open its thread, bounce by prefix, post the report, exit.
 4. Review code + tests.
+4b. **Bug cards — reproduction test at base (FR-BLD-7).** A `bug` card's first commit is the
+   builder's reproduction test; its command is the `Repro test:` line of the `[builder] [report]`.
+   Run `drover review-report repro --base origin/<base> --cmd "<that command>"`. Exit 0: the test
+   fails at base, as it must. Exit 1: it passes at base, so it reproduces nothing — record a
+   `builder` · Verification miss · Blocker row and bounce the card to Ready. No `Repro test:`
+   line on a bug card is the same Verification miss.
 5. **Reviewer-side test rerun (always — closes Tester self-verification gap):**
    - Pull `issue-<N>-<slug>` into review worktree.
    - Re-run the EXACT command from Tester's PR `Local tests:` line.
@@ -327,17 +342,17 @@ See `~/.claude/skills/drover/references/run.md` → Reviewer. Summary of the sub
      rerun the same scenario/config and pinned versions into new review evidence,
      check hashes/revisions and performance AC budgets. Never infer a speed win
      from exit 0 or an inconclusive result. Runtime checks supplement local tests.
-6. **Adversarial mode** (per `config.truth_gate` — `off` / `non-trivial` / `always`, default `non-trivial`): see section below.
+6. History check of the changed hunks (Review flow step 2), if not done yet.
 7. Decide per finding. First apply the Over-engineering rule to every finding collected —
-   yours, `ponytail:ponytail-review`'s and the truth-check sub-agents': Over-engineering is
+   yours and `ponytail:ponytail-review`'s: Over-engineering is
    Should fix, never Blocker, and never on its own a reason to bounce or block. Then:
    - **Deepening opportunity** → `drover review-file-refactor`, then keep going. It is not a finding for merge purposes and never bounces a card.
-   - **No findings (Over-engineering aside) + threads clean + truth ≥ threshold + tests green** → run the **merge protocol** (below). Never move a card to Done any other way.
+   - **No findings (Over-engineering aside) + threads clean + tests green** → put the report `merge-ready` on the head you reviewed, then run the **merge protocol** (below). Never move a card to Done any other way.
    - **Over-engineering only** (from `ponytail:ponytail-review`, see drover-review step 3) → list it in the report, open no thread, and carry on to the merge decision; it never bounces a card alone. When the card bounces for another finding anyway, open a `[builder]` thread for each Over-engineering finding too, so the rebuild trims it.
    - **Code-side new finding** → new `[builder]`-prefixed thread, move card Review → Ready (`loop:rebuild-N`).
    - **Test-side new finding** → new `[qa]`-prefixed thread, move card Review → QA (`loop:rebuild-N`).
    - **Blocker finding (destructive schema, contract, money, auth, live-DB migration) or rebuild cap hit** → full §4 Block template, move card Review → Blocked. A *clean* PR that merely touches money, auth or schema is not a finding: run the merge protocol, and the gate's `merge_policy` hands it to a human (exit 7 → Blocked `[needs-you]`).
-8. Write the Reviewer report (marker `<!-- drover-review:report -->`, ids on every finding) — edit the existing report comment in place, post a new one only on the first review. It is the next re-review's `prior_report`.
+8. Write the Reviewer report with `drover review-report put` (ids on every finding); it edits the existing report in place. It is the next re-review's `prior_report`. After a gate exit 7 or 8 the report stays `merge-ready`: the hold is on the card, not on the review.
 9. Clean up worktree.
 
 ### Merge protocol — Done means merged
@@ -352,7 +367,8 @@ two complete builds. In order, no shortcuts:
    record `gh pr view <PR> --json headRefOid` when review passes, then
    `drover-merge-gate.sh --config <cfg> --pr <PR> --expect-head <sha> --subject "<PR title>"
    --body-file <msg.md>` (it merges with `--match-head-commit`; the message is the PR title plus the
-   commit bullets and `Closes #N` — writing-standard.md § 1). Exit 6 = the head moved after review → your evidence is void;
+   commit bullets and `Closes #N` — writing-standard.md § 1). Exit 6 = the head moved after review, or the
+   latest report does not clear this head (not `merge-ready`, another head, an open Blocker) → your evidence is void;
    leave the card in **Review** with a `[reviewer]` comment naming both shas.
    The gate owns the merge decision (config `merge_policy`, `migrations`):
    - **Exit 9 — verification-readiness.** Halt the run; preserve card, approval, claims, and worktree. Configure `verify_commands` with the owning project's real checks and restart explicitly. No bounce to Build, rebase retry, approval request, or bare merge.
@@ -383,8 +399,8 @@ two complete builds. In order, no shortcuts:
    `gh pr view <PR> --json state,mergeCommit` must report `MERGED` plus a commit sha,
    and that sha must be an ancestor of the base branch
    (`git merge-base --is-ancestor <sha> origin/<base>`).
-4. Only then: close the issue, move card Review → **Done**, post the `[reviewer] [report] merged` comment citing
-   the merge commit sha.
+4. Only then: close the issue, move card Review → **Done**, and `put` the report as `[reviewer] [report] merged`
+   on the same head, citing the merge commit sha on its `Done:` line.
 5. Merge refused (failing checks, conflicts, branch protection) → card Review →
    **Blocked** with the §4 Block template naming the blocker. Never leave it in Review;
    a card left in Review gets re-picked and re-reviewed indefinitely.
@@ -397,56 +413,6 @@ without a confirmed merge makes a runaway look like a healthy run.
 - Every new review thread Reviewer writes MUST start with its owner lane — `[builder]`, `[qa]`, or `[reviewer]` — then a label: `[blocker]`, `[issue]`, `[suggestion]`, `[nit]`, `[question]`, `[praise]` (writing-standard.md § 4). Older PRs may carry `[QA]` / `[review]`; read them as `[qa]` / `[reviewer]`.
 - Unprefixed **top-level** human PR comments → treat as a `[blocked:review]` Block reason. Move card Review → Blocked with the full §4 template.
 - Inline human review-thread replies → context only, no Block.
-
-### `super-truth` is folded into drover-review
-The standalone `super-truth` skill is removed (spec §10 item 8.9). The adversarial pattern is now built in — see next section.
-
-## Adversarial mode (folded from super-truth)
-
-Activated per `config.truth_gate`:
-- `off` — never adversarial.
-- `non-trivial` (default) — diff ≥10 lines OR labels in `{security, migration, payments, auth}` trigger adversarial.
-- `always` — every card.
-
-When activated, spawn 2 sub-agents in parallel:
-- **Code-grounder.** Verify cited file:line still exists and matches claims.
-- **Historian.** `git blame` the changed lines; check for ADRs / prior incidents.
-
-**Use this brief verbatim.** Fill the `<…>` slots; do not reword, add or drop lines. A
-reviewer that wrote its own brief once told the sub-agents over-engineering was blocking,
-and a correct PR was held for it.
-
-```
-You are the <Code-grounder | Historian> in an adversarial truth-check of PR #<P>.
-Job: <Code-grounder: verify every file:line the PR cites still exists and does what the PR
-claims. | Historian: git blame the changed lines; look for ADRs, prior incidents, reverted
-attempts.>
-Read the issue ACs and the diff first and form your own hypotheses. Only then read the
-builder's summary below, as claims to check, not as the frame.
-ACs: <paste>
-Diff: <merge-base diff or path to it>
-Builder's summary (claims): <paste>
-Budget: at most 50 gh calls; prefer local git. Over budget: confidence "insufficient_data".
-Class every finding: Gap / Bug / Verification miss / Scope drift / Over-engineering / No issue.
-Severity: Blocker / Should fix / Nit.
-Over-engineering is ALWAYS Should fix and NEVER Blocker on its own. It does not lower your
-confidence score.
-Confidence 0-100 = how sure you are the PR's claims are true and the code does what the ACs
-ask. Design taste and over-building do not count against it.
-Return: findings (class, severity, file:line, one line each) and confidence.
-```
-
-**After collecting, the Reviewer re-applies the rules itself.** Whatever a sub-agent wrote:
-reclass any Over-engineering finding marked Blocker to Should fix, and ignore it when
-deciding merge or bounce (step 7). A sub-agent that lowered its confidence only because of
-over-engineering is re-scored without it. The merge decision is the Reviewer's, not the
-sub-agents'.
-
-**Aggregation rule: take the MINIMUM of the two scores.** Rationale: one strong skeptic should be enough to block.
-
-Compare aggregate to `config.truth_threshold` (default `70`):
-- **Below threshold** → Reviewer MUST NOT approve. Open `[reviewer]`-prefixed PR thread quoting the lowest-confidence sub-agent finding. Write the full §4 Block template comment. Move card Review → Blocked with reason `[blocked:review]` truth-check failed (confidence X/100). The bot's "Why I cannot decide" line names the specific sub-agent finding it could not confirm.
-- **Above threshold** → continue to approval decision.
 
 ### Block/Skip exits use the §4 mandatory template
 Same rule as drover-build/drover-qa.

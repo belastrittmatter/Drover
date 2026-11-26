@@ -319,7 +319,11 @@ then it is claimed unclassified. The runner then:
   `Did: classified as <type>, complexity <tier>` and `Why: <one line>`; no comment otherwise;
 - picks the Builder's (or a `qa` card's Tester's) model from `model_tier` and the complexity:
   `low` haiku / sonnet / opus, `medium` (default) sonnet / opus / harness default, `high` opus.
-  A role's `model` in the config wins. The Reviewer always runs on the role or harness default.
+  A role's `model` in the config wins. The runner records the model each build worker starts on
+  (`.drover/runs/models/<issue>`). The Reviewer runs on `roles.review.model` (default `sonnet`), or
+  on `roles.review.alt_model` (default `opus`) when that equals the card's builder model, so the
+  reviewer of a PR never runs on the model that built it (roles.md FR-REV-13); `roles.review.harness`
+  moves it to another model family. Its prompt carries the `Models:` line for the report.
 
 ### Builder (first pass)
 
@@ -337,9 +341,10 @@ then it is claimed unclassified. The runner then:
 5. Commit + push (always). Commits follow writing-standard.md § 1: the subject in the repo's
    `commit_style` (your prompt gives the style and three real subjects) + short bullets. The last
    commit of a finished build ends its body with `Drover: done #<N>`; partial work with
-   `Drover: partial #<N>`.
+   `Drover: partial #<N>`. On a `bug` card the FIRST commit is the reproduction test alone, red
+   before the fix (roles.md FR-BLD-7).
 6. Open draft PR linked to the issue with the PR description template (title in `commit_style`, every block filled).
-7. Follow [PR author notes](pr-author-notes.md), then post the `[builder] [report]` PR comment (see "Commenting cadence").
+7. Follow [PR author notes](pr-author-notes.md), then post the `[builder] [report]` PR comment (see "Commenting cadence"). On a `bug` card it ends with the machine line `Repro test: <command that runs the reproduction test>`.
 8. Post a short status comment on the issue with the PR URL.
 9. Clean up worktree. Keep branch + PR open.
 10. Move card Building → QA.
@@ -350,7 +355,7 @@ then it is claimed unclassified. The runner then:
 2. Read PR review threads on this branch's PR; filter `[builder]` prefix.
 3. For each unresolved `[builder]` thread: read file:line + suggested fix, apply, resolve thread via graphql mutation.
 4. Address any new failure feedback from Tester's latest `[qa] [report] failing` comment.
-   (A Reviewer bounce reaches you as those same `[builder]` threads, listed in the latest `<!-- drover-review:report -->` comment. A finding the Reviewer re-opened as `not fixed` was resolved without a fix last time — fix the code, not just the thread.)
+   (A Reviewer bounce reaches you as those same `[builder]` threads, listed in the latest review report (`drover review-report get --pr <PR>`). A finding the Reviewer re-opened as `not fixed` was resolved without a fix last time — fix the code, not just the thread.)
 5. Commit + push to same branch.
 6. Verify ALL `[builder]` threads are resolved. If not, return to step 3.
 7. Refresh [PR author notes](pr-author-notes.md), rewrite `status`, `solution`, `history` blocks; post `[builder] [report]` PR + issue comments. Move Building → QA. Clean up worktree.
@@ -368,7 +373,7 @@ Record uncovered/stale optional coverage alongside ordinary issue AC checks.
 4b. **Test-gap check** (drover-qa → "Test-gap check (after build)"): map every AC to unit / component / e2e tests, hunt edge cases, write the High gaps red-first. A High gap that needs app code changed → Fail (step 7) with the gap list. Medium/Low go in the handoff under `Test gaps (not written)`.
 4c. **Security pass** (drover-qa → "Security pass (every PR)"): run `pr-security-review` on the PR's diff against its base. Each kept finding is a failing check → Fail (step 7) with a `[builder]` thread on its file:line. Skill missing → Block.
 5. Run the tests. Capture evidence to `docs/drover/runs/issue-<N>-qa-v<N>/`. For UI/visual ACs, capture screenshots at the standard viewports (1920×1080 desktop, 1024×768 tablet, 375×667 mobile). Commit the screenshots to the issue branch BEFORE writing the comment (the markdown image URLs depend on the files being present on the branch).
-6. **Pass** → commit test files + screenshots to same branch + push → tick the `ac` block with proof lines, write `visual` for UI, append a `history` row, rewrite `status` → `[qa] [report] pass` PR comment with results + evidence path **+ inline screenshot embeds** (see "Screenshot embed format" below) → issue comment with the SAME inline screenshot embeds → move card QA → Review. Clean up worktree.
+6. **Pass** → commit test files + screenshots to same branch + push → tick the `ac` block with proof lines, write `visual` for UI, append a `history` row, rewrite `status` → `[qa] [report] pass` PR comment with results + evidence path, ending with the machine line `QA head: <the head sha you passed>` (the Reviewer lists test edits made after it, FR-REV-12) **+ inline screenshot embeds** (see "Screenshot embed format" below) → issue comment with the SAME inline screenshot embeds → move card QA → Review. Clean up worktree.
 7. **Fail** → leave failing ACs unchecked with the reason, append a `history` row, rewrite `status` → `[qa] [report] failing` PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" **+ inline screenshot embeds of the broken state** → issue comment with the same inline screenshots (showing what's wrong) → increment rebuild counter → move card QA → Ready (label `loop:rebuild-N`). Clean up worktree.
 
 #### Screenshot embed format (mandatory on every QA exit — added 2026-05-22)
@@ -416,55 +421,44 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
    - Both open → bounce to whichever is older; the other gets picked up later.
    - Clean up worktree, exit.
 3. Read the issue ACs and the raw diff (code + test files) FIRST and write 2–4 hypotheses of your own — what must hold, where it would break. Only then read the PR description, the `[builder] [report]` comment and Tester's handoff, and check each claim like a hypothesis. Spot-check Tester's evidence (one screenshot at least), read CLAUDE.md / AGENTS.md.
-3b. **Prior-report check (review remembers — added 2.5.0).** Load the last Reviewer report on this PR as `prior_report`. One call:
-   ```
-   gh pr view <PR> --json comments \
-     --jq '[.comments[] | select(.body | contains("<!-- drover-review:report -->"))] | last | {url, body} // {}'
-   ```
+3b. **Prior-report check (review remembers — added 2.5.0).** Load the last Reviewer report on this PR as `prior_report`. One call: `drover review-report get --pr <PR>` (JSON with `head`, `state`, `rows`; `{}` on a first review).
    - Empty → first review of this card. Skip to step 4; behave exactly as before.
    - Non-empty → the card was bounced and rebuilt. **Round 1** walks every finding in `prior_report` and marks each one `fixed` / `not fixed` / `no longer applies` (code it pointed at is gone or the AC changed), citing the file:line that proves it. A resolved thread is not proof — check the code.
    - Any `not fixed` → bounce again now: re-open one thread per unfixed finding with its original prefix (`[builder]` → Ready, `[qa]` → QA, both → `[builder]` first), `loop:rebuild-N`, and update the Reviewer report: those rows go to `not fixed`. Skip the fresh pass; it would review code that is about to change.
    - An unfixed **Over-engineering** finding alone does not bounce; carry it into the new report's Findings.
    - All `fixed` / `no longer applies` → continue to step 4 for a fresh pass. Do not re-raise a prior finding marked `no longer applies`.
 4. Review the code (logic, conventions). Review the tests (right thing tested? testable assertions? meaningful coverage?).
+4b. **Bug cards** (FR-BLD-7): `drover review-report repro --base origin/<base> --cmd "<the builder's Repro test: command>"`. Exit 1 = the reproduction test passes at base and proves nothing → `builder` · Verification miss · Blocker row, `[builder]` thread, move Review → Ready (`loop:rebuild-N`). A bug card with no `Repro test:` line is the same finding.
 5. **Reviewer-side test rerun** (always — closes the Tester self-verification gap):
    - Pull `issue-<N>-<slug>` into the review worktree.
    - Re-run the test command Tester used (recorded in Tester's PR handoff comment as `Local tests:` line).
    - Tests green → continue to step 6.
    - Tests red → open new `[qa]`-prefixed PR thread quoting the failure output, move card Review → QA with `loop:rebuild-N`, exit. Tester wrote a broken suite; QA owns the fix.
-6. **Adversarial mode** (per `truth_gate`): when triggered, spawn 2 sub-agents in parallel:
-   - **Code-grounder** — verify cited file:line still exists and matches claims.
-   - **Historian** — `git blame` the changed lines, check for ADRs / prior incidents.
-   - **Budget cap (added 2026-05-22): each sub-agent ≤50 gh calls.** Prefer local `git blame` / `git log` over `gh api graphql`. If a sub-agent needs >50 calls to reach confidence, it returns `confidence: "insufficient_data"` and the Reviewer flags the card as `[blocked:review]` truth-check inconclusive instead of burning the shared quota. See `rate-limit-etiquette.md`.
-   - **Brief:** use the fixed sub-agent brief in drover-review → "Adversarial mode" verbatim. Never write your own. It states that Over-engineering is Should fix, never Blocker on its own, and never lowers confidence.
-   - Aggregate into a confidence score (0-100). Compare against `config.truth_threshold` (default 70).
-   - **Below threshold** — Reviewer MUST NOT approve. Open a `[reviewer]`-prefixed PR thread quoting the lowest-confidence sub-agent finding, write the full Block template comment (see §4 Block/Skip), move card Review → Blocked with reason tag `[blocked:review]` truth-check failed (confidence X/100). The card stays Blocked until human review; the bot's "Why I cannot decide" line names the specific sub-agent finding it could not confirm.
-   - **Above threshold** — continue to step 7.
-   - **No Reproducer needed** — Tester's tests were re-run in step 5.
+6. **History check** (drover-review → Review flow step 2): `git log -L` / `git blame` on each changed hunk against `origin/<base>`, yourself, no sub-agent. A diff that re-adds what a revert removed, or repeats a reverted attempt, is a finding unless the PR says why this time differs. Local git only; no GitHub calls.
 7. Decide per finding. First re-apply the Over-engineering rule to every collected finding, whatever a sub-agent wrote: Should fix, never Blocker, never on its own a bounce or block. Then:
-   - **No findings (Over-engineering aside) + threads clean + truth ≥ threshold + tests green** → run the **merge protocol** below. Do not move the card to Done any other way.
+   - **No findings (Over-engineering aside) + threads clean + tests green** → `put` the report `merge-ready` on the head you reviewed, then run the **merge protocol** below. Do not move the card to Done any other way.
    - **Over-engineering only** (from `ponytail:ponytail-review`, see drover-review step 3) → list it in the report, open no thread, and carry on to the merge decision; it never bounces a card alone. When the card bounces for another finding anyway, open a `[builder]` thread for each Over-engineering finding too, so the rebuild trims it.
    - **Code-side new finding** → open new `[builder]`-prefixed PR thread, comment, move card Review → Ready (label `loop:rebuild-N`).
    - **Test-side new finding** → open new `[qa]`-prefixed PR thread, comment, move card Review → QA (label `loop:rebuild-N`).
-   - **CI-budget block (`[blocked:ci]`, added 2026-05-22)** — if remote CI jobs `failed_to_start` due to `Actions budget` AND `config.auto_merge_on_ci_budget_block` is true AND local-evidence is strong (truth ≥ threshold, Tester suite green on rerun in step 5, all `[builder]`/`[qa]` threads clean) → **squash-merge anyway** on local evidence; do NOT move to Blocked. Write the PR's `redcheck` block (`> [!WARNING]` · `Merged with a failing check: <check> · CI budget block`) and a `[reviewer] [report] merged · CI-budget bypass` comment on the PR and the issue citing: (a) the failed CI run ID, (b) the Tester pass-count, (c) the truth-gate score. Reason: CI failure-to-start ≠ test failure; with strong local evidence, parking the card wastes pipeline time. This bypass is ONLY for `[blocked:quota]` — never for `` truth-fail, `[blocked:creds]` missing creds, or `[blocked:review]` human-only decisions.
+   - **CI-budget block (`[blocked:ci]`, added 2026-05-22)** — if remote CI jobs `failed_to_start` due to `Actions budget` AND `config.auto_merge_on_ci_budget_block` is true AND local-evidence is strong (no findings, Tester suite green on rerun in step 5, all `[builder]`/`[qa]` threads clean) → **squash-merge anyway** on local evidence; do NOT move to Blocked. Write the PR's `redcheck` block (`> [!WARNING]` · `Merged with a failing check: <check> · CI budget block`) and a `[reviewer] [report] merged · CI-budget bypass` comment on the PR and the issue citing: (a) the failed CI run ID, (b) the Tester pass-count, (c) the reviewed head. Reason: CI failure-to-start ≠ test failure; with strong local evidence, parking the card wastes pipeline time. This bypass is ONLY for `[blocked:quota]` — never for `[blocked:creds]` missing creds, or `[blocked:review]` human-only decisions.
    - **Human-gate / Blocker finding (destructive schema, API contract, money, auth, live-DB migration) / rebuild cap hit (config.rebuild_cap)** → write the full Block template (see §4), move card Review → Blocked. A clean PR that only *touches* money, auth or schema is not a blocker — run the merge protocol; the gate's `merge_policy` routes it to a human (exit 7 → Blocked `[needs-you]`).
-8. Write the **Reviewer report** on every exit from step 3b on — bounce, block, human gate, merge (a Gate 1 thread bounce reviews nothing and writes none). It is ONE comment per PR, **edited in place** each round: find it by the marker (step 3b's lookup, plus `.url` — the number after `#issuecomment-` is its id) and `gh api -X PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`; post a new comment only when none exists. It is what step 3b reads next time, so the first line is the stable marker and every finding keeps its id (writing-standard.md § 4):
+8. Write the **Reviewer report** on every exit from step 3b on — bounce, block, human gate, merge (a Gate 1 thread bounce reviews nothing and writes none). It is ONE comment per PR, **edited in place** each round, written only with `drover review-report put --pr <PR> --head <reviewed sha> --file <report.md>` (writing-standard.md § 4 has the format; put adds the marker with the reviewed head, refuses a report that breaks the review-memory rules, exit 65, and edits the comment in place). It is what step 3b reads next time:
 
    ```
-   <!-- drover-review:report -->
    [reviewer] [report] bounced · round 2
    Did: checked R1–R2 against the code; fresh pass skipped (R2 open)
    Done: R1 fixed `src/api/stream.ts:54`
    Not done: R2 not fixed `e2e/streaming/ttfb.spec.ts:18`
    Next: builder
+   Models: builder opus · reviewer sonnet
 
-   | ID | Owner | Class | Where | Finding | Status |
-   |---|---|---|---|---|---|
-   | R1 | builder | Bug | `src/api/stream.ts:54` | <one line> | fixed |
-   | R2 | qa | Verification miss | `e2e/streaming/ttfb.spec.ts:18` | <one line> | not fixed |
-   | R3 | builder | Over-engineering | `src/api/retry.ts:1` | <what it builds → smaller thing> (should fix, not blocking) | open |
+   | ID | Owner | Class | Severity | Where | Finding | Status |
+   |---|---|---|---|---|---|---|
+   | R1 | builder | Bug | Blocker | `src/api/stream.ts:54` | <one line> | fixed |
+   | R2 | qa | Verification miss | Blocker | `e2e/streaming/ttfb.spec.ts:18` | <one line> | not fixed |
+   | R3 | builder | Over-engineering | Should fix | `src/api/retry.ts:1` | <what it builds → smaller thing>, not blocking | open |
    ```
-   Status words in the header: `merge-ready` · `bounced` · `blocked` · `human-gated` · `merged`. Keep every row across rounds; update its Status (`open` · `fixed` · `not fixed` · `no longer applies`). New findings take the next free id. Every finding names its class — Gap / Bug / Verification miss / Scope drift / Over-engineering (drover-review → "Classify findings"); a checked hypothesis that held is not a finding, it goes on the `Done:` line.
+   Status words in the header: `merge-ready` · `bounced` · `blocked` · `human-gated` · `unverified` · `merged`. Keep every row across rounds; update its Status (`open` · `fixed` · `not fixed` · `no longer applies`). New findings take the next free id. Every finding names its class — Gap / Bug / Verification miss / Scope drift / Over-engineering (drover-review → "Classify findings") — and its severity — Blocker / Should fix / Nit; a checked hypothesis that held is not a finding, it goes on the `Done:` line. The gate merges only when the latest report names the head it merges, says `merge-ready` and has no open or `not fixed` Blocker (exit 6 otherwise); after a gate exit 7 or 8 the report stays `merge-ready`.
 9. Clean up worktree.
 
 ### Merge protocol (Reviewer only — added 2026-08-06, issue #9)
@@ -599,7 +593,7 @@ Reviewer merge (issue):
 
 ```
 [reviewer] [report] merged · `ef67890` on staging
-Did: path Build, QA fail v1, Build, QA pass v2, Review pass · truth 95/100
+Did: path Build, QA fail v1, Build, QA pass v2, Review pass · builder opus, reviewer sonnet
 Next: none
 ```
 
@@ -823,7 +817,7 @@ Workers share the dispatcher's gh-auth token bucket. The dispatcher's `gh_rate_g
 
 - Run `drover gh-guard check 200` at worker start.
 - Run `drover gh-guard check 200` before any burst of gh calls (thread reads, sub-agent spawn, exit verification).
-- Adversarial sub-agents are capped at 50 gh calls each — prefer `git blame` (local) over `gh api graphql`.
+- Sub-agents are capped at 50 gh calls each — prefer `git blame` (local) over `gh api graphql`.
 - Final PR handoff comment MUST include `gh-quota-on-exit: graphql=<n>/5000 rest=<n>/5000` (use `drover gh-guard summary`).
 - On 403 / secondary-rate-limit: sleep 60s, re-check at threshold 500, then resume.
 

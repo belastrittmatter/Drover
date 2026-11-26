@@ -62,7 +62,7 @@ A script can instead source `lib/drover-gh-guard.sh` from the drover install fol
 Call it before:
 
 - Reading or resolving PR review threads (Builder rebuild, Tester rebuild, Reviewer).
-- Spawning adversarial sub-agents.
+- Spawning sub-agents.
 - Final self-check verification on exit.
 
 It's a no-op if quota is healthy. It sleeps to reset only if remaining is below threshold. Cheap to call.
@@ -75,11 +75,13 @@ The Worker self-check item "Card column move re-read and verified" previously re
 - If it returned non-zero, re-try once with `drover gh-guard check 200` first.
 - If still non-zero, write the halt comment and exit. Do not re-query the whole board.
 
-## 4. Adversarial mode — sub-agent gh-call cap
+## 4. Sub-agent gh-call cap
 
-When `truth_gate` triggers adversarial mode, each sub-agent (Code-grounder, Historian) MUST stay within `SB_GH_GUARD_SUBAGENT_BUDGET` (default 50) gh calls. The Reviewer passes this budget to each sub-agent via prompt:
+Any sub-agent a worker spawns MUST stay within `SB_GH_GUARD_SUBAGENT_BUDGET` (default 50) gh calls. The worker passes this budget to each sub-agent via prompt:
 
-> Adversarial sub-agent budget: ≤50 gh calls total. Prefer `git blame` (local) over `gh api graphql` (remote). If you need more than 50 calls to reach a confidence score, return `confidence: "insufficient_data"` and let the Reviewer flag the card as `[blocked:review]` truth-check inconclusive — do NOT burn through quota.
+> Sub-agent budget: ≤50 gh calls total. Prefer `git blame` / `git log` (local) over `gh api graphql` (remote). If you need more than 50 calls, return `confidence: "insufficient_data"` with what you found — do NOT burn through quota.
+
+The Reviewer's history check runs on local git and needs no sub-agent.
 
 ## 5. Backoff on 403 / secondary rate limit
 

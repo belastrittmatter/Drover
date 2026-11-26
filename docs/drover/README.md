@@ -92,7 +92,7 @@ card dropped on purpose is closed as not planned and moved to Done with a 🤷 c
 | `/drover` | Orchestrator. Validates preconditions and starts the runner. Holds no product context, writes no code. |
 | `/drover-build` | `Ready` → `QA`. Worktree, smallest safe change, draft PR. |
 | `/drover-qa` | `QA` → `Review`. Tests per AC, test-gap check, screenshots/logs/HARs on the PR, or a bounce with a rebuild label. Off-ticket findings file as `source:qa` cards. |
-| `/drover-review` | `Review` → `Done`. Re-runs the Tester's tests, adversarial truth-check, merges through the gate or hands to a human. On a re-review it first checks every finding from its last report. Shape problems are filed to `Backlog`, never blocked on. |
+| `/drover-review` | `Review` → `Done`. Re-runs the Tester's tests, checks the changed lines' history, runs on a model other than the builder's, merges through the gate or hands to a human. On a re-review it first checks every finding from its last report. Shape problems are filed to `Backlog`, never blocked on. |
 | `/drover-collect` | Finding problems in Sentry, PostHog, unboarded issues, recurring PR problems and architecture, each checked by one verifier, then one findings doc for `/to-spec` and `/to-tickets` (1–5 tickets → `/implement-spec`, 6+ → `Backlog`). |
 | `/ui-refine-loop` | Polishing one page or component, standalone: Impeccable check → fix rounds ending in a draft PR. The board never runs it. |
 | `/git-sync` | Secondary helper: commit per logical change, merge-pull, push without force. |
