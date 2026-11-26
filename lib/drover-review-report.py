@@ -12,13 +12,15 @@ FR-REV-5, 6, 8, 12, FR-BLD-7; specs/gate.md exit 6).
         the gate's check: the latest report names SHA, is merge-ready, and has no
         Blocker row that is open or not fixed
     drover review-report repro --base REF --cmd "<test command>" [--commit SHA]
-        bug cards: run the builder's reproduction test (the first commit after REF, or
-        SHA) at that commit's parent
+        bug cards: run the builder's reproduction test (the test files of the first commit
+        after REF, or of SHA) in this worktree with every other file the branch changed put
+        back to that commit's parent, so installed dependencies and build output stay
 
 Run from the PR's worktree: put and repro read local git. The marker, lists and machine
-lines come from drover-markers.json (FR-CNV-4).
-Exit: 0 ok · 1 repro passes at base (bounce) · 6 check refused · 64 usage · 65 report
-rejected · 79 GitHub reads halted.
+lines come from drover-markers.json (FR-CNV-4). Only comments by an author with write access
+to the repo count as the report or a QA pass (the trust rule of drover-approval.py).
+Exit: 0 ok · 1 repro passes at base (bounce) · 3 repro could not run (no evidence either
+way) · 6 check refused · 64 usage · 65 report rejected · 79 GitHub reads halted.
 """
 from __future__ import annotations
 
@@ -36,6 +38,10 @@ HERE = Path(__file__).resolve().parent
 _spec = importlib.util.spec_from_file_location("github_read", HERE / "drover-github-read.py")
 github_read = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(github_read)
+_spec = importlib.util.spec_from_file_location("approval", HERE / "drover-approval.py")
+approval = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(approval)
+approval.github_read = github_read  # one reader, so its ReadHalted is the one caught below
 
 M = json.loads((HERE / "drover-markers.json").read_text(encoding="utf-8"))["review_report"]
 SHA = re.compile(r"[0-9a-f]{40}\Z")
@@ -47,6 +53,10 @@ TEST_PATH = re.compile(r"(^|/)(tests?|__tests__|spec|e2e)/|[._-](test|spec)\.[A-
 
 class Rejected(Exception):
     pass
+
+
+class CannotRun(Exception):
+    """repro could not set up or run the test: no evidence either way (exit 3)."""
 
 
 def git(*args, check=True):
@@ -80,9 +90,20 @@ def parse(body):
     return {"head": m.group(1), "state": state, "rows": rows, "lines": lines}
 
 
+def trusted(comment, permission):
+    """The author may write to the repo (drover-approval.py's rule): anyone else can comment a
+    look-alike report or QA pass, and it must not count."""
+    user = comment.get("user") or {}
+    return (bool(user.get("login")) and user.get("type") in ("User", "Bot")
+            and permission(user["login"]) in ("write", "maintain", "admin"))
+
+
 class PR:
     def __init__(self, pr, repo):
-        self.pr, self.repo = pr, repo or "{owner}/{repo}"
+        if not repo:
+            repo = github_read.read(["repo", "view", "--json", "nameWithOwner"], "object")[1]["nameWithOwner"]
+        self.pr, self.repo = pr, repo
+        self.gh = approval.GitHub(repo)
 
     def comments(self):
         _, pages = github_read.read(["api", "--paginate", "--slurp",
@@ -91,7 +112,7 @@ class PR:
 
     def latest(self, comments):
         found = [(c, parse(c["body"])) for c in comments]
-        found = [(c, r) for c, r in found if r]
+        found = [(c, r) for c, r in found if r and trusted(c, self.gh.permission)]
         return found[-1] if found else (None, None)
 
     def write(self, comment, body):
@@ -134,9 +155,10 @@ def validate(new, prev, head):
     out += [f"{r['id']}: dropped (rows are never deleted)" for r in prev["rows"] if r["id"] not in by_id]
     if prev["head"] == head:
         return out  # same head: an in-round update (merged, a header change)
-    changed = None
+    changed, deleted = None, set()
     if prev["head"] and git("cat-file", "-e", prev["head"] + "^{commit}", check=False).returncode == 0:
         changed = set(git("diff", "--name-only", prev["head"], head).stdout.split())
+        deleted = set(git("diff", "--name-only", "--diff-filter=D", prev["head"], head).stdout.split())
     elif prev["head"]:
         # shortcut: a previous head gone from local git (a force push) skips the changed-file check.
         print(f"review-report: previous head {prev['head']} is not in local git; changed-file check skipped",
@@ -154,6 +176,8 @@ def validate(new, prev, head):
             out.append(f"{row['id']}: fixed needs a file:line in Where, got {row.get('where')!r}")
             continue
         path, line = w.group(1), int(w.group(2))
+        if path in deleted:
+            continue  # the fix removed the cited file
         shown = git("show", f"{head}:{path}", check=False)
         if shown.returncode or not 1 <= line <= max(1, len(shown.stdout.splitlines())):
             out.append(f"{row['id']}: fixed cites {path}:{line}, which is not in the reviewed head")
@@ -162,13 +186,13 @@ def validate(new, prev, head):
     return out
 
 
-def test_edits(comments, head):
+def test_edits(comments, head, permission):
     """The `Test edits since QA pass:` line (FR-REV-12): test files changed by commits after the
     head QA last passed (the QA head line of the latest `[qa] [report] pass` comment)."""
     qa = None
     for c in comments:
         lines = c["body"].splitlines()
-        if lines and lines[0].startswith("[qa] [report] pass"):
+        if lines and lines[0].startswith("[qa] [report] pass") and trusted(c, permission):
             qa = next((l[len(M["qa_head_line"]):].strip() for l in lines if l.startswith(M["qa_head_line"])), qa)
     if not qa or git("cat-file", "-e", qa + "^{commit}", check=False).returncode:
         return M["test_edits_line"] + "unknown (no QA head recorded)"
@@ -189,7 +213,7 @@ def put(args):
              if not MARKER.match(l.strip()) and not l.startswith(M["test_edits_line"])]
     pr = PR(args.pr, args.repo)
     comments = pr.comments()
-    body = "\n".join([f"{M['marker']} head={head} -->", *lines, "", test_edits(comments, head)]) + "\n"
+    body = "\n".join([f"{M['marker']} head={head} -->", *lines, "", test_edits(comments, head, pr.gh.permission)]) + "\n"
     new = parse(body)
     comment, prev = pr.latest(comments)
     problems = validate(new, prev, head)
@@ -200,7 +224,8 @@ def put(args):
 
 
 def check(args):
-    _, rep = PR(args.pr, args.repo).latest(PR(args.pr, args.repo).comments())
+    pr = PR(args.pr, args.repo)
+    _, rep = pr.latest(pr.comments())
     why = []
     if not rep:
         why.append("no review report on this PR")
@@ -217,24 +242,50 @@ def check(args):
 
 
 def repro(args):
-    commit = args.commit or (git("rev-list", "--reverse", "--first-parent", f"{args.base}..HEAD").stdout.split() or [""])[0]
+    """Run the reproduction test with the branch's other changes taken back to base, in this
+    worktree, so dependencies and build output a fresh checkout lacks are still there."""
+    def run(*a):
+        r = subprocess.run(["git", *a], capture_output=True, text=True)
+        if r.returncode:
+            raise CannotRun(f"git {' '.join(a)} failed: {r.stderr.strip()}")
+        return r.stdout
+    if run("status", "--porcelain", "--untracked-files=normal").strip():
+        raise CannotRun("the worktree has uncommitted changes; commit or clean them first")
+    commit = args.commit or (run("rev-list", "--reverse", "--first-parent", f"{args.base}..HEAD").split() or [""])[0]
     if not commit:
-        raise Rejected(f"no commit after {args.base}")
-    base = git("rev-parse", f"{commit}^").stdout.strip()
-    files = git("diff", "--name-only", base, commit).stdout.split()
-    scratch = tempfile.mkdtemp()
+        raise CannotRun(f"no commit after {args.base}")
+    base = run("rev-parse", f"{commit}^").strip()
+    tests = [f for f in run("diff", "--name-only", "--diff-filter=AM", base, commit).split() if TEST_PATH.search(f)]
+    if not tests:
+        raise CannotRun(f"the first commit {commit[:12]} adds or changes no test file")
+    others = [f for f in run("diff", "--name-only", base, "HEAD").split() if f not in tests]
+    at_base = set(run("ls-tree", "-r", "--name-only", base, "--", *others).split()) if others else set()
+    at_head = set(run("ls-tree", "-r", "--name-only", "HEAD", "--", *others, *tests).split())
     try:
-        git("worktree", "add", "--detach", "--quiet", scratch, base)
-        if files:
-            subprocess.run(["git", "-C", scratch, "checkout", commit, "--", *files], check=True, capture_output=True)
-        rc = subprocess.run(args.cmd, shell=True, cwd=scratch, capture_output=True).returncode
+        run("checkout", commit, "--", *tests)
+        if at_base:
+            run("checkout", base, "--", *sorted(at_base))
+        for f in others:
+            if f not in at_base and os.path.exists(f):
+                os.remove(f)
+        r = subprocess.run(args.cmd, shell=True, capture_output=True, text=True)
     finally:
-        git("worktree", "remove", "--force", scratch, check=False)
-    if rc == 0:
+        back = sorted(at_head)
+        if back:
+            run("checkout", "HEAD", "--", *back)
+        gone = sorted((at_base | set(tests)) - at_head)  # brought back, but deleted on the branch
+        if gone:
+            run("rm", "-q", "-f", "--", *gone)
+    tail = "\n".join((r.stdout + r.stderr).strip().splitlines()[-20:])
+    print(f"repro: `{args.cmd}` exit {r.returncode}, last lines:\n{tail}")
+    if r.returncode in (126, 127):
+        raise CannotRun("the test command could not start (exit %d): that is no evidence either way" % r.returncode)
+    if r.returncode == 0:
         print(f"repro: the reproduction test from {commit[:12]} passes at base {base[:12]}: "
               f"Verification miss for the builder, bounce the card")
         return 1
-    print(f"repro: the reproduction test from {commit[:12]} fails at base {base[:12]} (exit {rc}), as it should")
+    print(f"repro: the reproduction test from {commit[:12]} fails at base {base[:12]} (exit {r.returncode}). "
+          f"Read the lines above: a failure from missing tooling or a broken setup is not evidence")
     return 0
 
 
@@ -274,9 +325,9 @@ def main(argv):
     except Rejected as e:
         print("review-report: rejected:\n" + "\n".join("  " + l for l in str(e).splitlines()), file=sys.stderr)
         return 65
-    except subprocess.CalledProcessError as e:
-        print(f"review-report: {e}", file=sys.stderr)
-        return 64
+    except CannotRun as e:
+        print(f"review-report: repro could not run: {e}", file=sys.stderr)
+        return 3
     except ValueError as e:  # a malformed read the reader refused
         print(f"review-report: {e}", file=sys.stderr)
         return 65 if args.action == "put" else 6

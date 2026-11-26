@@ -428,7 +428,7 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
    - An unfixed **Over-engineering** finding alone does not bounce; carry it into the new report's Findings.
    - All `fixed` / `no longer applies` → continue to step 4 for a fresh pass. Do not re-raise a prior finding marked `no longer applies`.
 4. Review the code (logic, conventions). Review the tests (right thing tested? testable assertions? meaningful coverage?).
-4b. **Bug cards** (FR-BLD-7): `drover review-report repro --base origin/<base> --cmd "<the builder's Repro test: command>"`. Exit 1 = the reproduction test passes at base and proves nothing → `builder` · Verification miss · Blocker row, `[builder]` thread, move Review → Ready (`loop:rebuild-N`). A bug card with no `Repro test:` line is the same finding.
+4b. **Bug cards** (FR-BLD-7): `drover review-report repro --base origin/<base> --cmd "<the builder's Repro test: command>"`. Run it from the clean review worktree with dependencies installed; it keeps them and restores the worktree after. Exit 1 = the reproduction test passes at base and proves nothing → `builder` · Verification miss · Blocker row, `[builder]` thread, move Review → Ready (`loop:rebuild-N`). Exit 0 = it fails at base; read the printed last lines, since a failure from missing tooling or a broken setup is not evidence. Exit 3 = it could not run: no evidence either way. A bug card with no `Repro test:` line is the same finding.
 5. **Reviewer-side test rerun** (always — closes the Tester self-verification gap):
    - Pull `issue-<N>-<slug>` into the review worktree.
    - Re-run the test command Tester used (recorded in Tester's PR handoff comment as `Local tests:` line).

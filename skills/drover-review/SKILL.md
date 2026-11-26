@@ -329,10 +329,16 @@ See `~/.claude/skills/drover/references/run.md` → Reviewer. Summary of the sub
 4. Review code + tests.
 4b. **Bug cards — reproduction test at base (FR-BLD-7).** A `bug` card's first commit is the
    builder's reproduction test; its command is the `Repro test:` line of the `[builder] [report]`.
-   Run `drover review-report repro --base origin/<base> --cmd "<that command>"`. Exit 0: the test
-   fails at base, as it must. Exit 1: it passes at base, so it reproduces nothing — record a
-   `builder` · Verification miss · Blocker row and bounce the card to Ready. No `Repro test:`
-   line on a bug card is the same Verification miss.
+   From the clean review worktree (dependencies installed, build done), run
+   `drover review-report repro --base origin/<base> --cmd "<that command>"`. It puts the branch's
+   other files back to base for the run, keeps installed dependencies and build output, restores
+   the worktree after, and prints the test's last 20 lines. Exit 0: the test fails at base, as it
+   must — read those lines: a failure from missing tooling, an import error or a broken setup is
+   not evidence; fix the setup and run it again. Exit 1: it passes at base, so it reproduces
+   nothing — record a `builder` · Verification miss · Blocker row and bounce the card to Ready.
+   Exit 3: it could not run (dirty worktree, no test file in the first commit, a command that does
+   not start) — no evidence either way; say so in `Not done:`. No `Repro test:` line on a bug
+   card is the same Verification miss.
 5. **Reviewer-side test rerun (always — closes Tester self-verification gap):**
    - Pull `issue-<N>-<slug>` into review worktree.
    - Re-run the EXACT command from Tester's PR `Local tests:` line.

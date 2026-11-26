@@ -36,7 +36,9 @@ lifecycles", plus the role skill named.
   Scope drift, Over-engineering. Severities: Blocker, Should fix, Nit.
   Statuses: `open`, `fixed`, `not fixed`, `no longer applies`. Header
   states: `merge-ready`, `bounced`, `blocked`, `human-gated`, `unverified`,
-  `merged`. The lists live in `lib/drover-markers.json` (FR-CNV-4).
+  `merged`. The lists live in `lib/drover-markers.json` (FR-CNV-4). Only a
+  comment whose author has write access to the repo (the trust rule of
+  `lib/drover-approval.py`) counts as the report or as a QA pass.
 - Thread prefixes `[builder]`, `[qa]`, `[reviewer]` route findings: an open
   `[builder]` thread sends the card to Ready, `[qa]` to QA.
 
@@ -48,10 +50,13 @@ lifecycles", plus the role skill named.
   shall be a reproduction test, and the `[builder] [report]` comment shall
   carry its command as the machine line `Repro test: <command>`. The
   reviewer shall run that test at the base commit with `drover review-report
-  repro`, which checks out the merge base, takes the test files from the
-  first commit and runs the command; if it passes there (exit 1), then the
-  reviewer shall record a Verification miss for the builder and bounce the
-  card.
+  repro`, which, in the review worktree (so installed dependencies and build
+  output stay), takes the test files the first commit added or changed and
+  puts every other file the branch changed back to the first commit's
+  parent, runs the command, prints its last 20 lines and restores the
+  worktree. If it passes there (exit 1), then the reviewer shall record a
+  Verification miss for the builder and bounce the card. If it cannot run
+  (exit 3), it is no evidence either way.
 
 ### QA
 
