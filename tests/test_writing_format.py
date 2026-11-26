@@ -229,7 +229,8 @@ def test_comment_header_regex():
 
 def test_comment_examples_follow_the_header():
     """Lane comments have headers; author notes use three labels without a routing prefix."""
-    machine = re.compile(r"^(Local tests|gh-quota-on-exit|blocked-by|root-cause-hash):|^\||^$|^<!--")
+    machine = re.compile(r"^(Local tests|QA head|Repro test|Models|Test edits since QA pass|gh-quota-on-exit|blocked-by|"
+                         r"root-cause-hash):|^\||^$|^<!--")
     run_md = (REF / "run.md").read_text(encoding="utf-8")
     checked = 0
     author_notes = 0
@@ -286,6 +287,38 @@ def test_reason_tags_are_defined_once():
     for script in ("drover-status.py", "drover-approval.py", "drover-deps.sh"):
         src = (ROOT / "lib" / script).read_text(encoding="utf-8")
         assert "drover-reasons.json" in src, f"{script} must read the tags from drover-reasons.json"
+
+
+MARKERS = json.loads((ROOT / "lib" / "drover-markers.json").read_text(encoding="utf-8"))
+
+
+def test_review_report_example_is_what_put_accepts():
+    """The report in the standard is the shape `drover review-report put` parses and accepts (FR-CNV-4)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("rr", ROOT / "lib" / "drover-review-report.py")
+    rr = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rr)
+    [example] = [b for b in fenced(STANDARD) if b.startswith("[reviewer] [report]")]
+    head = "a" * 40
+    parsed = rr.parse(f"{MARKERS['review_report']['marker']} head={head} -->\n" + example)
+    assert parsed and parsed["state"] == "bounced" and [r["id"] for r in parsed["rows"]] == ["R1", "R2"], parsed
+    assert rr.validate(parsed, None, head) == [], rr.validate(parsed, None, head)
+    cols = "| " + " | ".join(MARKERS["review_report"]["columns"]) + " |"
+    assert cols in example, f"the example table must use the columns in drover-markers.json: {cols}"
+
+
+def test_markers_are_defined_once():
+    """Gate lines and the report marker come from drover-markers.json, not literals (FR-CNV-4)."""
+    gate = (ROOT / "lib" / "drover-merge-gate.sh").read_text(encoding="utf-8")
+    assert "drover-markers.json" in gate and not re.search(r'echo "(human-gate|needs-you): ', gate), \
+        "the gate must write its human-gate and needs-you lines from drover-markers.json"
+    for script in ("lib/drover-approval.py", "lib/drover-merge-policy.py", "lib/drover-review-report.py",
+                   "skills/drover-collect/scripts/collect_prs.py"):
+        src = (ROOT / script).read_text(encoding="utf-8")
+        assert "drover-markers.json" in src, f"{script} must read its markers from drover-markers.json"
+    for script in ("lib/drover-approval.py", "skills/drover-collect/scripts/collect_prs.py"):
+        src = (ROOT / script).read_text(encoding="utf-8")
+        assert '= "approval-request: "' not in src and '= "<!-- drover-review:report' not in src, script
 
 
 def test_needs_you_comment_is_checklist_first():
