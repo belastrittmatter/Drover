@@ -1,0 +1,4 @@
+head: 9a516aadc400a63ba2c8ea1bfeb61b5ee79cf41e
+PASS: phase
+PASS: run state
+PASS: test_harness_permissions.py (14 files, 435 commands, 156 distinct: [, a, add, against, all, ambiguous, and, ask., 

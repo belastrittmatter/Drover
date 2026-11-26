@@ -1,0 +1,1399 @@
+ok tests/test-collect-fetchers.sh 0s
+ok tests/test-env-check.sh 0s
+ok tests/test-collect-custom.sh 0s
+ok tests/test-deps.sh 1s
+ok tests/test-phase.sh 0s
+ok tests/test-install.sh 3s
+ok tests/test-card.sh 4s
+ok tests/test-pr-body.sh 4s
+ok tests/test-run-state.sh 0s
+ok tests/test-safety-runner.sh 1s
+ok tests/test-settings.sh 0s
+ok tests/test-preflight.sh 4s
+ok tests/test-run-gates.sh 6s
+ok tests/test-guard-hooks.sh 10s
+ok tests/test-ui-refine-loop-workflow.sh 0s
+ok tests/test-usage.sh 1s
+ok tests/test_collect_baseline.py 0s
+ok tests/test_collect_custom.py 1s
+ok tests/test_collect_fetchers.py 0s
+ok tests/test_collect_handoff.py 1s
+ok tests/test_approval.py 2s
+ok tests/test-ui-refine-loop-setup.sh 7s
+ok tests/test_commit_style.py 1s
+ok tests/test-cleanup-wt.sh 15s
+ok tests/test_harness_permissions.py 0s
+ok tests/test_no_emoji.py 1s
+ok tests/test-file-refactor.sh 17s
+ok tests/test_project_verifier.py 3s
+ok tests/test-file-bug.sh 19s
+ok tests/test-setup.sh 20s
+ok tests/test-collect-file.sh 34s
+ok tests/test_github_reads.py 20s
+ok tests/test-collect-baseline.sh 35s
+ok tests/test_status_parse.py 0s
+ok tests/test_skills_readiness.py 8s
+ok tests/test_verification_readiness.py 2s
+ok tests/test_visual_chrome_cleanup.py 1s
+ok tests/test_visual_details.py 0s
+ok tests/test_visual_families.py 0s
+ok tests/test_visual_interactions.py 0s
+ok tests/test_visual_lanes.py 0s
+ok tests/test_visual_main_steps.py 0s
+ok tests/test_visual_source_base.py 0s
+ok tests/test_runtime_compare.py 21s
+ok tests/test_writing_format.py 0s
+ok tests/test_collect_intake_safety.py 38s
+FAIL tests/test_skill_dispatch.py 17s
+ok tests/test_worktree_paths.py 6s
+ok tests/test_collect_windows.py 46s
+ok tests/test_upgrade_recovery.py 24s
+ok tests/test_run_factorybench.py 71s
+ok tests/test-merge-gate.sh 103s
+ok tests/test_run_rounds.py 105s
+ok tests/test_run_ports.py 130s
+::group::tests/test-card.sh
+  ✅ cold move = 2 reads + 1 mutation, this board's item
+  ✅ warm move = 1 mutation
+  ✅ cache holds ids, ignores itself
+  ✅ stale option id → one re-read, one retry
+  ✅ unknown Status refused
+  ✅ status = 1 live read
+  ✅ issue not on this board → 3
+  ✅ items in gh item-list shape
+  ✅ incomplete board read refused
+  ✅ cache stays inside its own repo (normal + submodule)
+PASS: 10 card-helper checks
+::endgroup::
+::group::tests/test-cleanup-wt.sh
+PASS: test-cleanup-wt.sh
+::endgroup::
+::group::tests/test-collect-baseline.sh
+── the fixtures themselves are valid tickets
+  ✅ BUG fixture plans as would-file
+  ✅ BUG fixture files with --yes
+  ✅ GAP fixture plans as would-file
+  ✅ GAP fixture files with --yes
+  ✅ FIX fixture plans as would-file
+  ✅ FIX fixture files with --yes
+── dedupe: open hit → 'Seen again' comment, never a second card
+  ✅ dry-run plans a duplicate
+  ✅ --yes returns the existing issue
+  ✅ comments on #301
+  ✅ comment opens with 'Seen again' and the source
+  ✅ comment carries the new evidence
+  ✅ no issue create
+  ✅ no labels or board moves on a duplicate
+  ✅ open beats closed when both exist
+  ✅ dedupe paginates repo-wide all-state history
+  ✅ history read requests complete pages
+── dedupe: closed-only hit → recurrence, filed again naming the closed issue
+  ✅ dry-run plans a recurrence
+  ✅ --yes files a new issue
+  ✅ body names the closed issue
+  ✅ body keeps the same fingerprint
+  ✅ no comment on the closed issue
+── ticket format: Problem · Context · Fix · Acceptance Criteria · Risk
+  ✅ feature without Risk is refused
+  ✅ …and the error names the section
+  ✅ feature without Context is refused
+  ✅ Acceptance Criteria must be a checklist
+  ✅ prs fix without Evidence is refused
+  ✅ refactor without Fix is refused
+  ✅ bug without Context is refused on --yes (QA filer)
+  ✅ …and nothing is created
+  ✅ bug without Context is refused on the dry-run too
+  ✅ …and the dry-run error names the section
+  ✅ …and the dry-run writes nothing
+  ✅ bug Evidence table needs all 12 rows
+── no holding column → refused with 65, nothing written
+  ✅ board [Ready QA Done] refuses
+  ✅ board [Ready QA Done] made no writes
+  ✅ board [Ready Building Review Done] refuses
+  ✅ board [Ready Building Review Done] made no writes
+  ✅ refusal says why
+  ✅ holding column 'Backlog' is accepted
+  ✅ holding column 'Todo' is accepted
+  ✅ holding column 'To do' is accepted
+  ✅ holding column 'Triage' is accepted
+  ✅ holding column 'Inbox' is accepted
+  ✅ Backlog wins over Todo
+── PostHog tracking gap → one analytics feature ticket
+  ✅ gap plan line
+  ✅ gap files
+  ✅ routes via the QA filer as a feature
+  ✅ labels analytics
+  ✅ labels collect:posthog
+  ✅ labels source:collect
+  ✅ stamps gap fingerprint
+  ✅ stamps the source
+  ✅ lands in Backlog
+  ✅ never Ready
+  ✅ gap| needs a workflow key
+  ✅ gap| only for posthog
+── prs pattern ticket
+  ✅ prs| prefix required
+  ✅ pattern files once
+  ✅ files as tech-debt
+  ✅ labels collect:prs
+── dedupe matches the fingerprint exactly
+  ✅ Sentry 441 is not a duplicate of Sentry 4411
+── SKILL.md setup step 3: source the gh guard, then sb_gh_guard_check
+  ✅ gh guard works when sourced from zsh
+  ✅ gh guard works when sourced from bash
+
+passed: 63  failed: 0  known bugs (xfail): 0
+::endgroup::
+::group::tests/test-collect-custom.sh
+/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpu8fnnyk1/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:136: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpu8fnnyk1/cfg.json' mode='r' encoding='UTF-8'>
+  cfg = json.load(open(self.cfg))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp9y1cu0lf/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:141: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp9y1cu0lf/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["status"], "custom": [
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpbr638235/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:162: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpbr638235/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"custom": [{"name": "linear", "kind": "mcp", "target": "linear",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp4kbvyt8u/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmptp06fa3t/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:172: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmptp06fa3t/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"custom": [{"name": "gone", "kind": "cli", "target": "no-such-binary-xyz --json"}]}},
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp2tu7564f/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp5l5x8trn/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpl2qkmoqi/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpsk4hcizr/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp2z043crq/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:72: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp2z043crq/.mcp.json' mode='w' encoding='UTF-8'>
+  json.dump({"mcpServers": {"bugbase": {"command": "x"}}}, open(os.path.join(self.tmp, ".mcp.json"), "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/../skills/drover-collect/scripts/collect_custom.py:67: ResourceWarning: unclosed file <_io.TextIOWrapper name='.mcp.json' mode='r' encoding='UTF-8'>
+  data = json.load(open(path))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpnaxq_80t/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp5ajklwzi/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp2vguar0l/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpaotl5uqd/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpt3pxcr3y/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpy9uqpjxc/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp2jcy6g69/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.
+----------------------------------------------------------------------
+Ran 17 tests in 0.071s
+
+OK
+::endgroup::
+::group::tests/test-collect-fetchers.sh
+................Sentry API 429 on /api/0/organizations/acme/issues/7/; retrying in 0s
+......
+----------------------------------------------------------------------
+Ran 22 tests in 0.020s
+
+OK
+::endgroup::
+::group::tests/test-collect-file.sh
+── arg validation
+  ✅ type is an enum
+  ✅ source is an enum
+  ✅ old intake source gone
+  ✅ fp must match source
+  ✅ gap only for posthog
+  ✅ custom fp must start custom|
+  ✅ fp prefix needs a key
+  ✅ fingerprint shape accepted for sentry
+  ✅ fingerprint shape accepted for posthog
+  ✅ fingerprint shape accepted for posthog
+  ✅ fingerprint shape accepted for github
+  ✅ fingerprint shape accepted for prs
+  ✅ fingerprint shape accepted for architecture
+  ✅ fingerprint shape accepted for custom
+  ✅ fingerprint required
+  ✅ fix needs Evidence
+  ✅ fix needs an AC checklist
+── dry-run is the default
+  ✅ plans, does not file
+  ✅ no issue create on dry-run
+── holding column, never Ready
+  ✅ falls back to another holding column
+  ✅ no holding column refuses
+── dedupe
+  ✅ open hit is a duplicate
+  ✅ --yes on duplicate returns existing
+  ✅ comments instead of filing
+  ✅ no duplicate card
+  ✅ closed-only hit is a recurrence
+── filing a bug through drover-qa-file-bug.sh
+  ✅ returns the new issue
+  ✅ routes via the QA filer (source:qa label)
+  ✅ lands in Backlog
+  ✅ never Ready
+  ✅ stamps the fingerprint
+  ✅ labels source:collect
+── filing a prs fix (weak-body bypass, own section check)
+  ✅ returns the new issue
+  ✅ files as tech-debt
+  ✅ names the recurrence
+  ✅ never Ready
+── refactor with criteria still lands in Backlog (filer would pick Ready)
+  ✅ routes via the review filer
+  ✅ lands in Backlog
+  ✅ never Ready
+  ✅ labels collect:architecture
+── posthog bug with extra labels (needs-triage, ux)
+  ✅ returns the new issue
+  ✅ stamps posthog fingerprint
+  ✅ labels needs-triage
+  ✅ labels ux
+  ✅ labels collect:posthog
+  ✅ never Ready
+── adopt a user-filed issue
+  ✅ adopt dry-run
+  ✅ adopt returns the issue
+  ✅ adopt files nothing new
+  ✅ adopt places in Backlog
+── duplicate and adopt stop when the repository is paused
+  ✅ duplicate reports the paused run
+  ✅ duplicate makes no GitHub mutations while paused
+  ✅ adopt reports the paused run
+  ✅ adopt makes no GitHub mutations while paused
+── a pause discovered during a read stops the next write
+  ✅ duplicate propagates a pause after its read
+  ✅ duplicate preserves the existing issue identity after a pause
+  ✅ duplicate makes no mutations after the discovery pause
+  ✅ adopt propagates a pause after its read
+  ✅ adopt preserves the existing issue identity after a pause
+  ✅ adopt makes no mutations after the discovery pause
+── pauses during adoption stop labeling and placement
+  ✅ adoption pauses between label writes
+  ✅ mid-label pause preserves adopted issue
+  ✅ only the first pre-pause label mutation happened
+  ✅ placement pause stays exit 79
+  ✅ placement pause preserves adopted issue
+  ✅ placement pause prevents a column write
+
+── required collector duplicate read cannot fail open
+  ✅ all-state duplicate outage halts collector
+  ✅ duplicate outage makes no mutations
+passed: 68  failed: 0
+::endgroup::
+::group::tests/test-deps.sh
+PASS: test-deps.sh (18 scenarios)
+::endgroup::
+::group::tests/test-env-check.sh
+PASS: test-env-check.sh (5 scenarios)
+::endgroup::
+::group::tests/test-file-bug.sh
+── arg + enum validation
+  ✅ title required
+  ✅ body-file required
+  ✅ body-file must exist
+  ✅ kind is an enum
+  ✅ priority is an enum
+  ✅ category is an enum
+  ✅ owner is an enum
+── body guardrails
+  ✅ rejects a missing section
+  ✅ names the missing section
+  ✅ rejects <placeholder>
+  ✅ rejects TBD
+  ✅ escape hatch files it anyway
+  ✅ rejects AC without a checklist
+  ✅ says why
+  ✅ rejects Context without lettered steps
+  ✅ rejects arrows in steps
+  ✅ rejects an Evidence row missing
+  ✅ names the missing row
+  ✅ rejects an unfolded Evidence table
+  ✅ accepts a large valid body (5 runs, no broken-pipe false reject)
+── happy path
+  ✅ returns the issue number
+  ✅ board-readable title
+  ✅ labels the source
+  ✅ labels the priority
+  ✅ labels the qa category
+  ✅ labels the owner
+  ✅ lands in Bug column
+  ✅ prepends Board summary
+  ✅ appends Blocked by when absent
+  ✅ states no blocker explicitly
+  ✅ embeds the meta block
+  ✅ meta carries the spec
+── derived fingerprint is iteration-independent
+  ✅ same finding, later iter → same key
+── project resolution
+  ✅ halts when the QA project is absent
+  ✅ tells the operator what to do
+  ✅ honours DROVER_QA_PROJECT_TITLE
+  ✅ honours DROVER_QA_TARGET_OPTION_NAME
+── dedupe
+  ✅ returns the existing issue
+  ✅ comments the new sighting
+  ✅ files no duplicate card
+── uncertain placement pauses and preserves the created issue
+  ✅ number still reaches stdout
+  ✅ signals promote failure
+  ✅ says reconciliation is needed
+── required-read and uncertain-write failure
+  ✅ three failed dedupe reads halt
+  ✅ unreadable dedupe never writes
+  ✅ three dedupe attempts
+  ✅ uncertain comment outcome halts
+  ✅ comment is attempted once
+  ✅ failed comment does not report success ID
+
+49 passed, 0 failed
+::endgroup::
+::group::tests/test-file-refactor.sh
+── arg validation
+  ✅ fingerprint required
+  ✅ title required
+  ✅ config must exist
+  ✅ body-file must exist
+  ✅ strength is an enum
+── happy path
+  ✅ returns the new issue number
+  ✅ files render as a list
+  ✅ lands in Backlog, not Ready
+  ✅ labels the source
+  ✅ labels the strength
+  ✅ title in ticket format
+── a pre-formatted title is not prefixed twice (#65)
+  ✅ title: [refactor] images: one image-with-fallback component
+  ✅ title: [bug] people: buttons squeeze names
+  ✅ title: ♻️ [refactor] images: legacy emoji prefix
+  ✅ title: Map [x] fields: keep order
+  ✅ title: drop the web root-path fallbacks: after the move
+  ✅ refuses a body without Problem/Context/Fix
+── dedupe
+  ✅ returns the existing issue
+  ✅ comments instead of creating
+  ✅ no duplicate card created
+── the two machine-read sections, and where the card lands
+  ✅ appends Blocked by when absent
+  ✅ states None explicitly
+  ✅ appends a criteria placeholder
+  ✅ appends a Risk line
+  ✅ sends a bare note to the holding column
+  ✅ a card with criteria lands in Ready
+  ✅ does not duplicate a section the caller wrote
+  ✅ a bare note never falls back into Ready
+── degradation (must never fail the review)
+  ✅ still returns the issue number
+  ✅ warns about the missing column
+  ✅ says what the consequence is
+  ✅ files onto a Todo-column board
+  ✅ reports the alias it used
+  ✅ alias board places the card properly
+  ✅ files onto a To do-column board
+  ✅ reports the multi-word alias intact
+  ✅ survives a board failure
+  ✅ warns about placement
+── required-read and uncertain-write failure
+  ✅ three failed dedupe reads halt
+  ✅ unreadable dedupe never writes
+  ✅ three dedupe attempts
+  ✅ uncertain comment outcome halts
+  ✅ comment is attempted once
+  ✅ failed comment does not report success ID
+
+44 passed, 0 failed
+::endgroup::
+::group::tests/test-guard-hooks.sh
+PASS: test-guard-hooks.sh (107 cases)
+::endgroup::
+::group::tests/test-install.sh
+PASS: test-install.sh (link, no project writes, kept files, skills links, validation, gh-guard budget, edge cases)
+::endgroup::
+::group::tests/test-merge-gate.sh
+PASS: test-merge-gate.sh (merge, policy and approval scenarios)
+::endgroup::
+::group::tests/test-phase.sh
+PASS: phase
+::endgroup::
+::group::tests/test-pr-body.sh
+── replace one block, keep the rest
+  ✅ replace reports updated
+  ✅ new status written
+  ✅ old status gone
+  ✅ problem block untouched
+── idempotent
+  ✅ same content twice is a no-op
+  ✅ no edit call on a no-op
+── missing block inserted in order
+  ✅ risk inserted
+  ✅ risk lands after history
+  ✅ solution lands between problem and history
+── append a history row, once
+  ✅ row appended
+  ✅ re-append is a no-op
+  ✅ row appears once
+── a folded history keeps new rows inside the fold
+  ✅ row lands above </details>
+  ✅ blank line kept before </details>
+  ✅ folded re-append is a no-op
+── refuses when the head moved
+  ✅ moved head exits 6
+  ✅ no edit on a moved head
+  ✅ body unchanged
+── usage
+  ✅ expect-head required
+  ✅ block is an enum
+  ✅ content file required
+  ✅ dry run prints the body
+  ✅ dry run edits nothing
+── skeleton
+  ✅ skeleton has status
+  ✅ skeleton has problem
+  ✅ skeleton has solution
+  ✅ skeleton has ac
+  ✅ skeleton has history
+  ✅ skeleton has visual
+  ✅ skeleton has risk
+  ✅ skeleton folds the history
+── time in config timezone
+  ✅ time carries the zone
+
+32 passed, 0 failed
+::endgroup::
+::group::tests/test-preflight.sh
+PASS: test-preflight.sh (10 scenarios)
+::endgroup::
+::group::tests/test-run-gates.sh
+── done_signature (#8: progress = landed work)
+  ✅ counts only Done
+  ✅ Blocked is not landed work
+  ✅ nothing landed → empty signature
+
+── card_lane (v3.0.0: a qa label skips Building)
+  ✅ qa label → Tester
+  ✅ bug label → Builder
+  ✅ qa label on the content → Tester
+  ✅ no label → Builder
+
+── record_cycle_progress (#8: halt is independent of lane occupancy)
+  ✅ cycle 1 of 3 → keep running
+  ✅ cycle 2 of 3 → keep running
+  ✅ cycle 3 of 3 → HALT even though no lane state was consulted
+  ✅ no card counted as landed
+  ✅ a card reaching Done → no halt
+  ✅ counter reset after progress
+  ✅ landed count incremented
+  ✅ stall after progress still halts
+
+── dispatch_ceiling_hit (#8: bounded worst-case spend)
+  ✅ 0 disables the ceiling
+  ✅ under the ceiling → keep running
+  ✅ at the ceiling → halt
+
+── issue_is_open (#10)
+  ✅ known-closed issue reads CLOSED
+  ✅ open issue reads OPEN
+
+── top_card_in_column (#10: closed cards are reconciled, never dispatched)
+  ✅ a dispatchable card was found
+  ✅ skips the closed card, returns the next open one
+  ✅ closed card reconciled to Done via a name-resolved option ID
+  ✅ a closed card is moved once per run, however often its column is scanned
+  ✅ open card in Review is returned unchanged
+  ✅ all-closed column reports no dispatchable card (non-zero)
+  ✅ all-closed column yields no card number
+
+── dispatch_lane (#10: the guard holds at the single choke point)
+  ✅ no worker dispatched for a CLOSED issue
+  ✅ closed issue is not claimed either
+
+── status_option_id (#6 class of failure: resolve by name, fail loud)
+  ✅ resolves the live Status field id
+  ✅ resolves 'Done' by name at runtime
+  ✅ unknown option name fails loud (non-zero)
+  ✅ unknown option name emits nothing
+
+── reclaim_stranded_building (run start: Building with no live worker → Ready)
+  ✅ unassigned and bot-only Building cards move to Ready
+  ✅ a human-assigned Building card is left alone
+  ✅ a card with a live in-flight lock is left alone
+  ✅ Ready cards are untouched
+  ✅ every moved card gets a comment
+  ✅ the leaked bot claim is released
+
+── judge_finished_workers (FR-RUN-13: two failures in a row, a success resets)
+  ✅ first failure keeps running
+  ✅ first failure is counted
+  ✅ a moved card is a success
+  ✅ a success resets the count
+  ✅ a failure after a success is the first again
+  ✅ two failures in a row halt
+
+── sweep_lane_zombies (FR-WRK-10: one tick of grace, reset when the card returns)
+  ✅ out of its lane: marked, not stopped
+  ✅ back in its lane: the mark is dropped
+  ✅ out again: a fresh mark
+  ✅ the worker kept running through its grace
+  ✅ stopped after its grace tick
+  ✅ a stopped worker's lock is removed
+
+── worker handles (a recycled pid is dead; pid 0 and 1 are never workers)
+  ✅ a live worker with its start time is alive
+  ✅ the same pid with another start time is dead
+  ✅ a recycled pid is not signalled
+  ✅ an older handle with no start time is not signalled
+  ✅ the process survived both
+  ✅ pid 0 is never alive
+  ✅ pid 1 is never alive
+
+
+58 passed, 0 failed
+::endgroup::
+::group::tests/test-run-state.sh
+PASS: run state
+::endgroup::
+::group::tests/test-safety-runner.sh
+PASS: test-safety-runner.sh (empty, failure, continuation, success)
+::endgroup::
+::group::tests/test-settings.sh
+PASS: test-settings.sh (4 scenarios)
+::endgroup::
+::group::tests/test-setup.sh
+{
+ "root": "/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp.1aGmn6Cbkb/bare",
+ "pack": "/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa",
+ "pack_version": "3.3.0",
+ "installed_version": null,
+ "upgrade": false,
+ "from": null,
+ "added_skills": [],
+ "missing": [],
+ "old_dirs": [],
+ "old_copies": [],
+ "kept_copies": [],
+ "old_hooks": [],
+ "configs": {},
+ "verification": {
+  ".drover/config.json": "verification-readiness: verify_commands must be an array of project command strings. Set verify_commands in /var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp.1aGmn6Cbkb/bare/.drover/config.json to the owning project's real checks, then restart the board. No merge or dispatch was authorized."
+ },
+ "host_errors": {
+  ".drover/config.json": "harness \"codex\" has no harnesses/codex.json entry (v1 ships claude)"
+ },
+ "schema_errors": {},
+ "git": true,
+ "skills_dir": "/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp.1aGmn6Cbkb/home/.claude/skills",
+ "helper_skills": false,
+ "security_audit": false,
+ "helper_readiness": {
+  "ready": false,
+  "host": "codex",
+  "entries": [
+   {
+    "card": null,
+    "lane": "build",
+    "name": "drover",
+    "requirement": "required",
+    "source": "boundary: skills/drover-build/SKILL.md",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "build",
+    "name": "drover-build",
+    "requirement": "required",
+    "source": "boundary: skills/drover-build/SKILL.md",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "build",
+    "name": "mattpocock-skills:implement",
+    "requirement": "required",
+    "source": "config: labels.feature.build",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "build",
+    "name": "mattpocock-skills:tdd",
+    "requirement": "required",
+    "source": "config: labels.feature.build",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "build",
+    "name": "mattpocock-skills:codebase-design",
+    "requirement": "required",
+    "source": "config: labels.feature.build",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "build",
+    "name": "ponytail:ponytail",
+    "requirement": "required",
+    "source": "config: roles.build.skills",
+    "status": "fallback",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": {
+     "id": "simplest-solution-first",
+     "source": "skills/drover-build/references/decision-policy.md#simplest-solution-first"
+    }
+   },
+   {
+    "card": null,
+    "lane": "build",
+    "name": "verification-before-completion",
+    "requirement": "required",
+    "source": "config: roles.build.skills",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "build",
+    "name": "mattpocock-skills:code-review",
+    "requirement": "required",
+    "source": "config: roles.build.skills",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "qa",
+    "name": "drover",
+    "requirement": "required",
+    "source": "boundary: skills/drover-qa/SKILL.md",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "qa",
+    "name": "drover-qa",
+    "requirement": "required",
+    "source": "boundary: skills/drover-qa/SKILL.md",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "qa",
+    "name": "mattpocock-skills:tdd",
+    "requirement": "required",
+    "source": "config: roles.qa.skills",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "qa",
+    "name": "mattpocock-skills:diagnosing-bugs",
+    "requirement": "required",
+    "source": "config: roles.qa.skills",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "qa",
+    "name": "verification-before-completion",
+    "requirement": "required",
+    "source": "config: roles.qa.skills",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "qa",
+    "name": "testing-strategy",
+    "requirement": "required",
+    "source": "config: roles.qa.skills",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "qa",
+    "name": "mattpocock-skills:code-review",
+    "requirement": "required",
+    "source": "config: roles.qa.skills",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "qa",
+    "name": "pr-security-review",
+    "requirement": "required",
+    "source": "config: roles.qa.skills",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "review",
+    "name": "drover",
+    "requirement": "required",
+    "source": "boundary: skills/drover-review/SKILL.md",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "review",
+    "name": "drover-review",
+    "requirement": "required",
+    "source": "boundary: skills/drover-review/SKILL.md",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "review",
+    "name": "mattpocock-skills:code-review",
+    "requirement": "required",
+    "source": "config: roles.review.skills",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "review",
+    "name": "mattpocock-skills:codebase-design",
+    "requirement": "required",
+    "source": "config: roles.review.skills",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "review",
+    "name": "ponytail:ponytail-review",
+    "requirement": "required",
+    "source": "config: roles.review.skills",
+    "status": "fallback",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": {
+     "id": "over-engineering-ladder",
+     "source": "skills/drover-review/SKILL.md#over-engineering"
+    }
+   },
+   {
+    "card": null,
+    "lane": "setup",
+    "name": "drover",
+    "requirement": "required",
+    "source": "boundary: setup nine-skill installation",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "setup",
+    "name": "drover-build",
+    "requirement": "required",
+    "source": "boundary: setup nine-skill installation",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "setup",
+    "name": "drover-qa",
+    "requirement": "required",
+    "source": "boundary: setup nine-skill installation",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "setup",
+    "name": "drover-review",
+    "requirement": "required",
+    "source": "boundary: setup nine-skill installation",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "setup",
+    "name": "drover-collect",
+    "requirement": "required",
+    "source": "boundary: setup nine-skill installation",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "setup",
+    "name": "visual",
+    "requirement": "required",
+    "source": "boundary: setup nine-skill installation",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "setup",
+    "name": "git-sync",
+    "requirement": "required",
+    "source": "boundary: setup nine-skill installation",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "setup",
+    "name": "ui-refine-loop",
+    "requirement": "required",
+    "source": "boundary: setup nine-skill installation",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "setup",
+    "name": "pr-security-review",
+    "requirement": "required",
+    "source": "boundary: setup nine-skill installation",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   },
+   {
+    "card": null,
+    "lane": "build",
+    "name": "mattpocock-skills:diagnosing-bugs",
+    "requirement": "required",
+    "source": "config: labels.bug.build",
+    "status": "missing",
+    "resolved_path": null,
+    "visible_path": null,
+    "fallback": null
+   }
+  ],
+  "searched_surfaces": [
+   "/private/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp.1aGmn6Cbkb/bare/.agents/skills",
+   "/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp.1aGmn6Cbkb/home/.agents/skills",
+   "/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp.1aGmn6Cbkb/home/.codex/skills"
+  ],
+  "remediation": "Install the exact missing skills in a visible host surface or supply an enabled active catalog, then restart explicitly."
+ },
+ "needs": [],
+ "os": "mac",
+ "ok": [
+  "drover skills linked and safety guards on",
+  "git repo found"
+ ],
+ "green": false,
+ "labels_missing": null,
+ "upgraded": false,
+ "fixed": [
+  "config repaired: .drover/config.json"
+ ],
+ "notes": [
+  "columns added: Backlog, Ready, Building, QA, Review, Blocked, Done",
+  "harness \"codex\" added",
+  "migrations: test + staging allowed (defaults)",
+  "timezone Asia/Ho_Chi_Minh added",
+  "roles: starting skill routing added",
+  "labels: starting skill routing added"
+ ],
+ "backup": ".claude/drover/backup/20261127-002112-3/"
+}
+PASS: test-setup.sh (17 scenarios)
+::endgroup::
+::group::tests/test-ui-refine-loop-setup.sh
+  ✅ pm from lockfile
+  ✅ next gets --port
+  ✅ checks from scripts
+  ✅ env files found
+  ✅ no auth by default
+  ✅ default state
+  ✅ rubric without impeccable
+  ✅ rounds default
+  ✅ no qaHookRounds
+  ✅ missing impeccable warns in JSON
+  ✅ missing impeccable warns on stderr
+  ✅ taste default per project
+  ✅ taste not yet written
+  ✅ npm start, no flag
+  ✅ placeholder test dropped
+  ✅ npm vite port
+  ✅ verify_commands fallback
+  ✅ repo config found
+  ✅ dev_command override
+  ✅ ready_path override
+  ✅ check_commands override
+  ✅ auth_script passthrough
+  ✅ states passthrough
+  ✅ rounds override (qa_hook_rounds ignored)
+  ✅ taste_file override
+  ✅ env_files override
+  ✅ impeccable under ~
+  ✅ launcher layout
+  ✅ launcher version
+  ✅ launcher detect cmd
+  ✅ launcher context cmd
+  ✅ no warnings with impeccable
+  ✅ node layout
+  ✅ node version
+  ✅ node detect cmd
+  ✅ node context cmd
+  ✅ found in parent dir
+  ✅ launcher preferred
+  ✅ refine.impeccable → script file
+  ✅ bad refine.impeccable warns
+  ✅ bad refine.impeccable banner
+  ✅ falls back to the search
+  ✅ unknown verb exits 64
+  ✅ down without --run exits 64
+  ✅ up without --slug exits 64
+  ✅ qa-hook --worktree is gone (64)
+  ✅ shoot parseStates
+  ✅ shoot usage error exits 1
+  ✅ shoot themes + compare names
+  ✅ shots committed
+  ✅ header names both shas
+  ✅ 8 images on the branch
+  ✅ raw URL pinned to sha
+  ✅ table has mobile dark row
+  ✅ no public upload hosts
+  ✅ missing shot says not shot
+  ✅ pr-shots usage exits 64
+  ✅ non-GitHub remote exits 70
+
+test-ui-refine-loop-setup.sh: 58 passed, 0 failed
+::endgroup::
+::group::tests/test-ui-refine-loop-workflow.sh
+PASS: test-ui-refine-loop-workflow.sh (14 scenarios)
+::endgroup::
+::group::tests/test-usage.sh
+PASS: test-usage.sh (10 scenarios)
+::endgroup::
+::group::tests/test_approval.py
+..............................
+----------------------------------------------------------------------
+Ran 30 tests in 2.639s
+
+OK
+::endgroup::
+::group::tests/test_collect_baseline.py
+.....................
+----------------------------------------------------------------------
+Ran 21 tests in 0.068s
+
+OK
+::endgroup::
+::group::tests/test_collect_custom.py
+/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp3ymedr52/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:136: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp3ymedr52/cfg.json' mode='r' encoding='UTF-8'>
+  cfg = json.load(open(self.cfg))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp15_ctago/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:141: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp15_ctago/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["status"], "custom": [
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp3f95_y5b/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:162: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp3f95_y5b/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"custom": [{"name": "linear", "kind": "mcp", "target": "linear",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpjbgokn6j/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpvoi0gdl2/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:172: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpvoi0gdl2/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"custom": [{"name": "gone", "kind": "cli", "target": "no-such-binary-xyz --json"}]}},
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp8g0fbpns/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp2fam0ylq/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpuzimg0ms/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpfm7522h0/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp2owv_396/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:72: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp2owv_396/.mcp.json' mode='w' encoding='UTF-8'>
+  json.dump({"mcpServers": {"bugbase": {"command": "x"}}}, open(os.path.join(self.tmp, ".mcp.json"), "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/../skills/drover-collect/scripts/collect_custom.py:67: ResourceWarning: unclosed file <_io.TextIOWrapper name='.mcp.json' mode='r' encoding='UTF-8'>
+  data = json.load(open(path))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpkyfjt553/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpd5k2_qei/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpmlkh3aj5/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmptxhuzh09/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmp8bilwoc3/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpdtm8azzk/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_collect_custom.py:50: ResourceWarning: unclosed file <_io.TextIOWrapper name='/var/folders/gc/hbjpqskd0wz3sjqr1tz_c9w80000gp/T/tmpyfcs9wa1/cfg.json' mode='w' encoding='UTF-8'>
+  json.dump({"collect": {"sources": ["github"]}}, open(self.cfg, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.
+----------------------------------------------------------------------
+Ran 17 tests in 0.128s
+
+OK
+::endgroup::
+::group::tests/test_collect_fetchers.py
+................Sentry API 429 on /api/0/organizations/acme/issues/7/; retrying in 0s
+......
+----------------------------------------------------------------------
+Ran 22 tests in 0.015s
+
+OK
+::endgroup::
+::group::tests/test_collect_handoff.py
+..........
+----------------------------------------------------------------------
+Ran 10 tests in 1.102s
+
+OK
+::endgroup::
+::group::tests/test_collect_intake_safety.py
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 37.400s
+
+OK
+::endgroup::
+::group::tests/test_collect_windows.py
+..................
+----------------------------------------------------------------------
+Ran 18 tests in 45.551s
+
+OK
+::endgroup::
+::group::tests/test_commit_style.py
+  ok  test_case_insensitive_prefixes
+  ok  test_cli_reads_the_base_branch_and_prompt_has_three_subjects
+  ok  test_each_shape
+  ok  test_few_commits_or_no_majority_is_conventional
+  ok  test_lane_prompts_carry_the_style
+  ok  test_majority_wins
+  ok  test_merges_do_not_count
+
+7/7 passed.
+::endgroup::
+::group::tests/test_github_reads.py
+......................
+----------------------------------------------------------------------
+Ran 22 tests in 19.452s
+
+OK
+::endgroup::
+::group::tests/test_harness_permissions.py
+PASS: test_harness_permissions.py (14 files, 435 commands, 156 distinct: [, a, add, against, all, ambiguous, and, ask., async, atomic, auth, bash, blast, block, blocker, blocks, bot, branch, browse, build, builder, cannot, chat, check, chmod, citing, claims, claims., claude, cleanup-wt, closes, collect, comment, comprehensive, confidence, contains, continue, cosmetic, curl, cut, default, detail-page, diff, drains, drover, drover-qa, echo, existing, exists, expected, fail, feat, filed, fix, fixes, for, form, free, fresh, from, gh, git, grep, grid, hamburger, horizontal, human-gated, in, issue, it, itself, killing, last, level, lined, link, list-page, look, max, migrate, migrated, move, moved, needs, new, next_n, nit, no, no-staging-env, npm, npx, omit, one, one-line, openssl, or, orchestrator, orders, owner, page, page.on, parallel, pass, policy, pr-author-notes.md, praise, prefer, prior, public-page, pull_number, python3, qa, question, re-picked, re-tried, read, receipts, reconciled, repo, report, reviewed, reviewer, run, save, sb_gh_budget_init, schema, see, select, settings-tab, should, size, skipped, slug, squash, status, steady, suggestion, tail, test, the, this, thread, too, tr, tracked, true, ui, unknown, unverified, verifies, want, wip, with, worktree, writing-standard.md, zombie)
+::endgroup::
+::group::tests/test_no_emoji.py
+  ok  test_detector_catches_emoji_and_spares_arrows
+  ok  test_no_emoji_in_shipped_text
+  ok  test_scope_is_not_empty
+
+3/3 passed.
+::endgroup::
+::group::tests/test_project_verifier.py
+.........
+----------------------------------------------------------------------
+Ran 9 tests in 2.974s
+
+OK
+::endgroup::
+::group::tests/test_run_factorybench.py
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 71.119s
+
+OK
+::endgroup::
+::group::tests/test_run_ports.py
+....................
+----------------------------------------------------------------------
+Ran 20 tests in 130.180s
+
+OK
+::endgroup::
+::group::tests/test_run_rounds.py
+...
+startup: 4 gh calls
+  gh api rate_limit
+  gh api graphql -f query=query{rateLimit{limit remaining used resetAt}}
+  gh api graphql --paginate --slurp -f query=query($owner:String!,$number:Int!,$endCursor:String){ -F owner=o -F number=1
+  gh api graphql --paginate --slurp -f query=query($owner:String!,$number:Int!,$endCursor:String){ -F owner=o -F number=1
+
+idle round: 4 gh calls
+  gh api rate_limit
+  gh api graphql -f query=query{rateLimit{limit remaining used resetAt}}
+  gh api graphql --paginate --slurp -f query=query($owner:String!,$number:Int!,$endCursor:String){ -F owner=o -F number=1
+  gh api graphql --paginate --slurp -f query= -F owner=o -F repo=r
+.............
+----------------------------------------------------------------------
+Ran 16 tests in 105.355s
+
+OK
+::endgroup::
+::group::tests/test_runtime_compare.py
+............................
+----------------------------------------------------------------------
+Ran 28 tests in 20.257s
+
+OK
+::endgroup::
+::group::tests/test_skill_dispatch.py
+.FF...
+======================================================================
+FAIL: test_legacy_halt_stops_owned_worker_preserves_unrelated_and_evidence (__main__.Dispatch)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_skill_dispatch.py", line 211, in test_legacy_halt_stops_owned_worker_preserves_unrelated_and_evidence
+    self.assertTrue((self.root/'owned.stopped').exists())
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_legacy_halt_stops_owned_worker_preserves_unrelated_and_evidence (__main__.Dispatch)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/belastrittmatter/projects/drover/.drover/worktrees/issue-11-qa/tests/test_skill_dispatch.py", line 143, in require_worker_finished_before_directory_cleanup
+    self.assertTrue((self.root / 'owned.finished').exists(),
+AssertionError: False is not true : fixture directory cleanup raced the owned worker shutdown
+
+----------------------------------------------------------------------
+Ran 5 tests in 17.162s
+
+FAILED (failures=2)
+::endgroup::
+::error::tests/test_skill_dispatch.py failed (exit 1)
+::group::tests/test_skills_readiness.py
+........................
+----------------------------------------------------------------------
+Ran 24 tests in 8.567s
+
+OK
+::endgroup::
+::group::tests/test_status_parse.py
+  ok  test_dispatch_line_from_real_dispatcher
+  ok  test_dispatch_all_three_lanes
+  ok  test_unknown_lane_is_ignored
+  ok  test_reap_swept_assignee_variant
+  ok  test_reap_bare_for_variant
+  ok  test_reap_with_empty_pid
+  ok  test_reap_drops_inflight_entry_by_pid
+  ok  test_two_workers_in_one_lane
+  ok  test_lane_handoff_drops_prior_inflight
+  ok  test_tick_and_exited_tracked
+  ok  test_zombie_and_alert
+  ok  test_zombie_line_without_emoji
+  ok  test_empty_manifest_returns_defaults
+  ok  test_real_live_manifest_lines
+  ok  test_attempt_str_from_rebuild_label
+  ok  test_field_status_picks_status_select
+  ok  test_sanitize_title_strips_c0_and_del
+  ok  test_paginate_items_single_page
+  ok  test_paginate_items_multi_page
+  ok  test_paginate_items_respects_max_pages
+  ok  test_paginate_items_handles_missing_keys
+  ok  test_paginate_items_stops_when_cursor_missing
+  ok  test_board_order_matches_github_columns
+  ok  test_render_kanban_prints_boxes_in_board_order
+  ok  test_render_kanban_backlog_overflow_truncates
+  ok  test_reason_table_is_the_spec_list
+  ok  test_every_tag_parses_from_a_block_comment
+  ok  test_reason_short_names
+  ok  test_reason_line_wins_over_prose
+  ok  test_unknown_or_missing_tag_is_other
+  ok  test_block_reasons_group_by_tag
+
+31/31 passed.
+::endgroup::
+::group::tests/test_upgrade_recovery.py
+..........................
+----------------------------------------------------------------------
+Ran 26 tests in 23.818s
+
+OK
+::endgroup::
+::group::tests/test_verification_readiness.py
+....
+----------------------------------------------------------------------
+Ran 4 tests in 1.806s
+
+OK
+::endgroup::
+::group::tests/test_visual_chrome_cleanup.py
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.273s
+
+OK
+::endgroup::
+::group::tests/test_visual_details.py
+SKIP: test_visual_details.py (no Chrome)
+::endgroup::
+::group::tests/test_visual_families.py
+SKIP: test_visual_families.py (no Chrome)
+::endgroup::
+::group::tests/test_visual_interactions.py
+SKIP: test_visual_interactions.py (no Chrome)
+::endgroup::
+::group::tests/test_visual_lanes.py
+SKIP: test_visual_lanes.py (no Chrome)
+::endgroup::
+::group::tests/test_visual_main_steps.py
+PASS: test_visual_main_steps.py (148 reachable nodes, 58 views)
+::endgroup::
+::group::tests/test_visual_source_base.py
+PASS: test_visual_source_base.py
+::endgroup::
+::group::tests/test_worktree_paths.py
+..........
+----------------------------------------------------------------------
+Ran 10 tests in 5.647s
+
+OK
+::endgroup::
+::group::tests/test_writing_format.py
+  ✅ test_block_template_uses_the_header
+  ✅ test_bug_filer_matches_the_standard
+  ✅ test_comment_examples_follow_the_header
+  ✅ test_comment_header_regex
+  ✅ test_dispatcher_reads_the_done_trailer_not_the_subject
+  ✅ test_history_is_folded_and_needs_you_sits_in_the_status_alert
+  ✅ test_needs_you_comment_is_checklist_first
+  ✅ test_no_attribution_lines
+  ✅ test_no_old_commit_shapes_in_templates
+  ✅ test_owner_word
+  ✅ test_pr_body_markers
+  ✅ test_reason_tags_are_defined_once
+  ✅ test_risk_names_door_and_blast_radius
+  ✅ test_standard_commit_examples_are_valid_subjects
+  ✅ test_status_alerts
+  ✅ test_style_table_matches_standard
+  ✅ test_subject_regex_per_style
+  ✅ test_ticket_template_has_required_sections_in_order
+  ✅ test_ticket_title_shape
+
+19/19 passed.
+::endgroup::
+Failed suite: tests/test_skill_dispatch.py
