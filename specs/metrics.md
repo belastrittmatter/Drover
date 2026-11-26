@@ -46,7 +46,8 @@ use, human effort and PR outcomes, and compares configs. Two inputs:
   |---|---|
   | First claim of a card with no open attempt | `attempt.started`: `work_item`, labels, base commit, `factory_config_version`; no `role` |
   | Builder opens the PR | `pr.linked` |
-  | QA result, review result, each gate exit | `gate` named `qa`, `review`, `merge`, `passed`, one-line `reason` |
+  | QA result, review result, each gate exit | `gate` named `qa`, `review`, `merge`, `passed`, one-line `reason`; none when review hands the card to Blocked (the `human.waiting` below says why) |
+| QA or review sends the card back to an earlier lane (changed) | `send_back`: `from` the lane, `to` `build` or `qa`, `kind` `fix-attempt`, `reason` `bounced to <column>` |
   | Card moves to Blocked | `human.waiting`, `reason` = the reason tag |
   | Card leaves Blocked | `human.resumed` |
   | `drover stop` with the card in flight | `human.waiting`, `reason` = `stopped`; the next claim sends `human.resumed` on the same attempt |
@@ -57,13 +58,14 @@ use, human effort and PR outcomes, and compares configs. Two inputs:
   `.drover/runs/attempts.json`. If the file is lost, the next claim starts a
   new attempt.
 - **FR-MET-7** Each worker process shall run with Claude Code's OTLP
-  variables and `factorybench.attempt=<attempt id>,factorybench.phase=<phase>`
-  (build `implement`, qa `verify`, review and second opinion `review`).
+  variables and `factorybench.attempt=<attempt id>,factorybench.phase=<phase>,factorybench.step=<lane>`
+  (build `implement`, qa `verify`, review and second opinion `review`; step is the lane name, so
+  FactoryBench draws one row per lane with its time and cost) (changed).
   drover shall send no `usage` events for Claude.
 - **FR-MET-8** `factory_config_version` shall be
   `drover@<drover commit>+claude-code@<version>+cfg:<first 8 hex of sha256 of .drover/config.json>`.
 - **FR-MET-9** Event keys shall be fixed per call site (`started`, `pr`,
-  `gate:<name>:<round>`, `waiting:<k>`, `resumed:<k>`, `finished`) so
+  `gate:<name>:<round>`, `send_back:<k>`, `waiting:<k>`, `resumed:<k>`, `finished`) so
   retries are duplicates, not new events.
 - **FR-MET-10** Events shall contain no prompts, code, diffs or secrets, and
   drover shall not set `OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS` or

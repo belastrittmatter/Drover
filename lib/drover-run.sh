@@ -1191,10 +1191,13 @@ fb_outcome() {
         | jq -r --arg p "issue-$1-" '[.[] | select(.headRefName | startswith($p)) | .url][0] // ""' 2>/dev/null || true)
       [ -z "$url" ] || metrics pr "$1" "$url" ;;
     qa:Review) metrics gate "$1" qa true "QA passed" ;;
-    qa:Ready|qa:Building) metrics gate "$1" qa false "bounced to $3" ;;
+    qa:Ready|qa:Building)
+      metrics gate "$1" qa false "bounced to $3"; metrics send-back "$1" qa build "bounced to $3" ;;
     review:Done) metrics gate "$1" review true "review passed"; metrics gate "$1" merge true "merged" ;;
-    review:Ready|review:Building|review:QA) metrics gate "$1" review false "bounced to $3" ;;
-    review:Blocked) metrics gate "$1" merge false "card moved to Blocked" ;;
+    review:Ready|review:Building|review:QA)
+      metrics gate "$1" review false "bounced to $3"
+      if [ "$3" = QA ]; then metrics send-back "$1" review qa "bounced to $3"; else metrics send-back "$1" review build "bounced to $3"; fi ;;
+    # review:Blocked sends no gate: a human hold is not a failed merge; the board sync's human.waiting carries the tag.
   esac
 }
 
