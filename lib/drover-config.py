@@ -6,7 +6,8 @@
     drover config slug                  print the run slug: the repo name (FR-CFG-1, FR-MET-1)
     drover config validate [FILE]       validate against config-schema.json (FR-CFG-2)
     drover config harness [NAME]        print harnesses/<NAME>.json (default: the config's harness)
-    drover config worker-argv ROLE PROMPT   NUL-separated argv of one headless worker (the runner)
+    drover config worker-argv ROLE PROMPT [MODEL]   NUL-separated argv of one headless worker (the runner)
+    drover config model ROLE [PICK] [--builder M]   the model a worker of ROLE starts on ("" = harness default)
     drover skills install [--dest DIR]  link drover's skills into the harness's user skill folder
 
 DROVER_CONFIG overrides the config path. `validate` with no config file exits 0: commands
@@ -168,16 +169,41 @@ def agent_allowed(agent, cfg=None):
     return list(agent.get("tools", [])) + [f"Bash({c}:*)" for c in cmds]
 
 
-def worker_argv(role, prompt, cwd=None, model=None):
-    """argv for one headless worker of `role`: the harness command, the prompt, the role's
-    model (else `model`, the runner's pick by card complexity) and the permissions. The runner
-    reads it NUL-separated."""
+REVIEW_MODEL, REVIEW_ALT = "sonnet", "opus"
+
+
+def role_model(cfg, role, pick=None, builder=None):
+    """The model a worker of `role` starts on; "" is the harness default. Build and qa: the
+    role's model, else `pick` (the runner's ladder cell by card complexity). Review (roles.md
+    FR-REV-13): roles.review.model, or roles.review.alt_model when that equals the model the
+    card's builder ran on, so reviewer and builder always differ."""
+    rcfg = (cfg.get("roles") or {}).get(role) or {}
+    if role != "review":
+        return rcfg.get("model") or pick or ""
+    model = rcfg.get("model") or REVIEW_MODEL
+    if builder and model == builder:
+        model = rcfg.get("alt_model") or REVIEW_ALT
+        if model == builder:
+            print(f"drover: roles.review.model and roles.review.alt_model both equal the builder's model "
+                  f"{builder!r}; set roles.review.alt_model to another model", file=sys.stderr)
+            raise SystemExit(65)
+    return model
+
+
+def load_config(cwd=None):
     p = config_path(cwd)
-    cfg = json.loads(p.read_text()) if p.is_file() else {}
+    return json.loads(p.read_text()) if p.is_file() else {}
+
+
+def worker_argv(role, prompt, cwd=None, model=None):
+    """argv for one headless worker of `role`: the harness command, the prompt, `model` (the
+    runner resolves it with role_model; else the role's own) and the permissions. The runner
+    reads it NUL-separated."""
+    cfg = load_config(cwd)
     rcfg = (cfg.get("roles") or {}).get(role) or {}
     entry = harness(rcfg.get("harness") or cfg.get("harness") or "claude")
     argv = list(entry["worker_command"]) + [prompt]
-    model = rcfg.get("model") or model
+    model = model or role_model(cfg, role)
     if model and entry.get("model_flag"):
         argv += [entry["model_flag"], model]
     perms = entry.get("permissions", {})
@@ -245,6 +271,13 @@ def main(argv):
     elif cmd == "worker-argv" and len(argv) in (3, 4):
         model = argv[3] if len(argv) == 4 else None
         sys.stdout.write("".join(a + "\0" for a in worker_argv(argv[1], argv[2], model=model)))
+    elif cmd == "model" and len(argv) >= 2:
+        rest, builder = argv[2:], None
+        if "--builder" in rest:
+            i = rest.index("--builder")
+            builder = rest[i + 1] if i + 1 < len(rest) else None
+            rest = rest[:i] + rest[i + 2:]
+        print(role_model(load_config(), argv[1], rest[0] if rest else None, builder))
     elif cmd == "skills-install":
         def opt(flag):
             if flag not in argv:

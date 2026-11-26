@@ -138,14 +138,16 @@ WORKER_LOG_DIR=".drover/runs/${RUN_DATE}-${CONFIG_SLUG}-workers"
 INFLIGHT_DIR=".claude/drover/inflight"
 RUNS_DIR=".drover/runs"
 RUNNER_LOCK=".claude/drover/runner.lock"
-mkdir -p "$WORKER_LOG_DIR" .drover/worktrees "$INFLIGHT_DIR"
+# The model each card's last build worker started on (roles.md FR-REV-13), read at review dispatch.
+MODELS_DIR="$RUNS_DIR/models"
+mkdir -p "$WORKER_LOG_DIR" .drover/worktrees "$INFLIGHT_DIR" "$MODELS_DIR"
 fi  # end non-lib-only setup
 
 # shellcheck source=drover-worker.sh
 . "$DROVER_LIB/drover-worker.sh"
 
 # Defaults so the helpers below are safe to source under `set -u` in lib-only mode.
-: "${RUN_MANIFEST:=/dev/null}" ; : "${RUNS_DIR:=/dev/null}"
+: "${RUN_MANIFEST:=/dev/null}" ; : "${RUNS_DIR:=/dev/null}" ; : "${MODELS_DIR:=/dev/null}"
 : "${WORKER_LOG_DIR:=/dev/null}"
 : "${INFLIGHT_DIR:=/dev/null}"
 : "${PROJECT_OWNER:=}" ; : "${PROJECT_NUMBER:=0}" ; : "${BOT_LOGIN:=}"
@@ -460,6 +462,12 @@ dispatch_lane() {
     log "skills-readiness: halt before claim lane=${lane} issue=#${issue}; ${skills_report}"
     exit "$skills_rc"
   fi
+  # The worker's model (roles.md FR-REV-13): build records it, review picks one that differs.
+  # A config with no model that differs halts here, before the claim.
+  local model builder=""
+  [ "$lane" != review ] || builder=$(cat "$MODELS_DIR/$issue" 2>/dev/null || echo "?")
+  model=$(python3 "$DROVER_LIB/drover-config.py" model "$lane" "$(card_model "$issue" "$lane")" \
+    ${builder:+--builder "$builder"}) || { log "review model: config error, halt before claim issue=#${issue} (see above)"; exit 65; }
   if ! try_claim_assignee "$issue"; then
     return 0
   fi
@@ -482,6 +490,9 @@ EOF
   esac
   # FR-CNV-2: the repo's commit style and three real subjects ride in every lane prompt.
   prompt="$prompt $(python3 "$DROVER_LIB/drover-commit-style.py" --root "$PWD" --config "$CONFIG_PATH" --prompt 2>/dev/null || true)"
+  [ "$lane" != build ] || printf '%s\n' "$model" > "$MODELS_DIR/$issue" 2>/dev/null || true
+  case "$builder" in '?') builder=unknown ;; '') builder=harness-default ;; esac
+  [ "$lane" != review ] || prompt="$prompt Models: builder ${builder} · reviewer ${model:-harness-default}. Put this line in the review report as it is."
   # The skills checked above, by path: the worker loads them and runs no readiness command itself.
   prompt="Skills for this card (load each SKILL.md before you start): $(printf '%s' "$skills_report" | jq -r --arg lane "$lane" '
     [.entries[] | select(.lane == $lane and .status == "resolved") | "\(.name)=\(.resolved_path)"] | join(", ")'). $prompt"
@@ -500,7 +511,7 @@ EOF
   trap 'held=TERM' TERM; trap 'held=INT' INT
   # The harness's worker command with the role's model and the headless permissions
   # (FR-HRN-4): a worker never waits on an approval prompt.
-  worker_start "$lane" "$issue" "$prompt" "$worker_log" "$(card_model "$issue" "$lane")" || { on_signals; log "worker command: no argv from harness ${HARNESS:-claude}"; exit 66; }
+  worker_start "$lane" "$issue" "$prompt" "$worker_log" "$model" || { on_signals; log "worker command: no argv from harness ${HARNESS:-claude}"; exit 66; }
   WORKER_ENV=()
   # Lock format: HANDLE / LANE / STARTED for `drover stop`, COLUMN (the card's column at
   # dispatch) for the failed-dispatch check. Readers still accept the older PID= line.
@@ -1124,9 +1135,9 @@ Why: ${why:-no reason given}" >/dev/null 2>&1 || true
 }
 
 card_model() {
-  # The model for lane $2 on card $1: the run tier's ladder cell for the card's complexity
-  # (build and qa lanes only; review and unclassified cards take the harness default). A role's
-  # configured model wins inside drover-config.py.
+  # The ladder pick for lane $2 on card $1: the run tier's cell for the card's complexity
+  # (build and qa lanes only; unclassified cards take the harness default). drover-config.py
+  # model applies the role's configured model and the review rule (roles.md FR-REV-13).
   local c=""
   case "$2" in build|qa) ;; *) return 0 ;; esac
   case "$CLASSES" in *" $1:"*) c="${CLASSES#* $1:}"; c="${c%% *}" ;; esac

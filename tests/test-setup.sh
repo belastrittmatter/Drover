@@ -69,6 +69,7 @@ cat > "$T/.claude/drover/configs/books.json" <<'JSON'
  "collect":{"window_days":14,"errors":"auto","feedback_paths":["docs/feedback"],"lookback_runs":10},
  "refine":{"rounds":10,"qa_hook_rounds":3},"human_approves_merge":true,"worker_backend":"workflow",
  "max_workers":0,"labels":["qa","bug","feature"],"truth_gate":"non-trivial",
+ "roles":{"review":{"model":"sonnet","second_opinion":"risky","second_opinion_model":"opus"}},
  "notifications":{"channel":"telegram","chat_id":"auto","bot_identity":"eric"}}
 JSON
 OUT=$(python3 "$SETUP" check --root "$T" || true)
@@ -106,7 +107,12 @@ q '.merge_policy.default == "human" and .notifications.channel == "session" and 
 q '.harness == "claude" and (has("worker_backend") or has("max_workers") or has("truth_gate") | not)' "$C" \
   || fail "fix writes harness and drops the removed keys: $(cat "$C")"
 q '(.labels | type) == "object" and .roles.qa.skills != null' "$C" || fail "the starting skill routing is added: $(cat "$C")"
+q '.roles.review == {model: "sonnet", skills: .roles.review.skills}' "$C" || fail "second_opinion keys must go, review.model stays: $(cat "$C")"
+echo "$OUT" | q '.notes | any(test("removed roles.review keys: second_opinion, second_opinion_model"))' || fail "the removal gets a change line: $(echo "$OUT" | jq -c .notes)"
 python3 "$PACK/lib/drover-config.py" validate "$C" || fail "a migrated config must pass the schema"
+echo '{"project":{"owner":"o","number":1},"roles":{"review":{"alt_model":"opus","second_opinion":"risky"}}}' > "$T/so.json"
+SO=$(python3 "$PACK/lib/drover-config.py" validate "$T/so.json" 2>&1 || true)
+echo "$SO" | grep -q "roles.review.second_opinion: unknown key" || fail "a new config must not accept roles.review.second_opinion"
 [ ! -e "$T/.claude/drover/upgrade.json" ] || fail "upgrade.json should be cleared once the upgrade is done"
 TXT=$(python3 "$SETUP" check --root "$T" --text || true)
 echo "$TXT" | grep -q "Upgraded for you" && fail "a finished upgrade must not be reported again"
