@@ -67,6 +67,12 @@ as the reference, and deleted that backend.
   (`issue`, `lane`, `worker` handle, `since`, `phase`, `phases`). On exit it
   shall drop `pid`, set `"stopped": true` and keep the last cards.
   Tested by `test-run-state.sh`.
+- **FR-RUN-18 (new)** `drover phase <name>` (name `^[a-z][a-z0-9-]{0,31}$`,
+  anything else exits 64 and writes nothing) shall append `{"name", "at"}`
+  to `.drover/runs/phases/<DROVER_ISSUE>.jsonl` in the main checkout and
+  never fail the worker otherwise. `state.json` shall show the worker's
+  entries since its `since` as `phases` and the last name as `phase`.
+  Tested by `test-phase.sh`.
 
 ### Worker interface
 

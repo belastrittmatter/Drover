@@ -648,6 +648,9 @@ When invoked by drover (env `DROVER_RUN=1` or invocation contains "drover run"):
 ### State protocol (same as drover-build)
 - Read from issue + PR comments + PR review threads.
 - Respect handed-down worktree + branch.
+- Report each main step as it starts with `drover phase <name>`: `plan` (test plan, test-gap
+  check), `security` (security pass), `tests` (running tests, capturing evidence), `evidence`
+  (committing evidence, PR blocks), `handoff` (comments, card move). A failed call never stops QA.
 - After pushing tests, evidence or fixes to a PR, refresh [PR author notes](../drover/references/pr-author-notes.md) before the handoff. Keep file summaries current and explain critical changed sections on the PR.
 
 ### Card types

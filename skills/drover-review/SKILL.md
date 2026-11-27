@@ -296,6 +296,9 @@ When invoked by drover (env `DROVER_RUN=1` or invocation contains "drover run"):
 - Read from issue + PR comments + PR review threads.
 - **GitHub budget** — every "move card" is `drover card --config <cfg> move <N> <Status>` (1 GraphQL point; `gh project item-list` / `field-list` cost ~100–200). Comments, labels and PR reads go over REST; [rate-limit-etiquette.md](../drover/references/rate-limit-etiquette.md) → "Price list" has the calls.
 - Respect handed-down worktree at `.drover/worktrees/issue-<N>-review/` and branch `issue-<N>-<slug>`.
+- Report each main step as it starts with `drover phase <name>`: `threads` (Gate 1), `review`
+  (code + tests), `tests` (the test rerun), `truth-check` (adversarial mode), `ci` (waiting on
+  checks), `merge` (merge protocol), `handoff` (report, card move). A failed call never stops the review.
 
 ### Two card types
 - **Built card (`feature`, `bug`, no label):** review the diff (code + tests).

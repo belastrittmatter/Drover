@@ -1220,7 +1220,7 @@ write_run_state() {
   # Built from the in-flight locks and the cached board only: no GitHub call. A card that
   # left its lane is dropped at once, even while its worker has its grace tick.
   # $1 = "stopped": the runner is exiting; drop pid, keep the last cards.
-  local file="$RUNS_DIR/state.json" now cards paused=null
+  local file="$RUNS_DIR/state.json" now cards phases paused=null
   now=$(date -u +%FT%TZ)
   if [ "${1:-}" = stopped ]; then
     [ -f "$file" ] || return 0
@@ -1231,8 +1231,13 @@ write_run_state() {
     worker_lock "$INFLIGHT_DIR/$issue" || continue
     cur=$(issue_status "$issue")
     [ -z "$cur" ] || case " $(lane_columns "$LANE") ${COLUMN} " in (*" $cur "*) ;; (*) continue ;; esac
+    # FR-RUN-18: this worker's `drover phase` calls, skipping bad lines and earlier workers' phases.
+    phases=$(jq -Rsc --arg since "$STARTED" '[split("\n")[] | fromjson?
+      | select(type == "object" and (.name | type) == "string" and (.at | type) == "string" and .at >= $since)
+      | {name, at}]' "$RUNS_DIR/phases/$issue.jsonl" 2>/dev/null) || phases='[]'
     jq -nc --argjson issue "$issue" --arg lane "$LANE" --arg worker "$HANDLE" --arg since "$STARTED" \
-      '{issue: $issue, lane: $lane, worker: $worker, phase: null, since: $since, phases: []}'
+      --argjson phases "$phases" \
+      '{issue: $issue, lane: $lane, worker: $worker, phase: ($phases | last | .name // null), since: $since, phases: $phases}'
   done | jq -sc .)
   [ "$USAGE_STATE" != pause ] || paused=$(jq -n --argjson t "$USAGE_UNTIL" '$t | todate')
   write_lock "$file" "$(jq -n --arg repo "$CONFIG_SLUG" --argjson pid "$$" \
