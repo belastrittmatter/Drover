@@ -71,6 +71,13 @@ class Ports(RunnerCase):
         self.assertEqual(self.agents('preflight'), [])
         self.assertIn('dispatch lane=qa issue=#1 pid=', self.manifest())
 
+    # A card back in Ready with an open PR from its own branch is a rebuild: no pre-flight.
+    def test_rebuild_skips_preflight(self):
+        self.board({'number': 1, 'status': 'Ready', 'pr': 'https://github.com/o/r/pull/10'})
+        self.run_board(cycles=1)
+        self.assertEqual(self.agents('preflight'), [])
+        self.assertIn('dispatch lane=build issue=#1 pid=', self.manifest())
+
     # A halted pre-flight (required GitHub read failed) stops the run and builds nothing.
     def test_preflight_halt(self):
         self.env['FAKE_PREFLIGHT'] = json.dumps({'1': {'verdict': 'halted', 'detail': 'read failed'}})

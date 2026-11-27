@@ -22,6 +22,9 @@ had the builder run pre-flight itself, one card at a time, after the claim
 (`references/run.md` "Builder pre-flight"). Stage 6 moved the batch into
 the runner (`lib/drover-run.sh` `preflight_ok`), with the `workflow` backend
 as the reference, and deleted that backend.
+A Ready card with an open PR from its own `issue-<N>-` branch came back for a
+rebuild (a QA or review bounce) and skips pre-flight: an agent once held such a
+card as "in progress" against its own PR.
 
 ## New or changed
 
