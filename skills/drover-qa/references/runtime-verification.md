@@ -111,11 +111,11 @@ an inconclusive report. Custom adapters must not daemonize into detached session
 
 ```bash
 python3 ~/.claude/skills/drover-qa/scripts/runtime_compare.py \
-  --config docs/runtime/search.json --output docs/drover/runs/issue-N-qa-v1/runtime
+  --config docs/runtime/search.json --output "$TMPDIR/issue-N-v1/runtime"
 ```
 
 The output directory must be new; old evidence is never overwritten. Attach
-`report.json` through the existing QA evidence handoff. Give the command under
+`report.json` with `drover evidence push` (rules/qa.md → "Evidence push"), never by committing it. Give the command under
 `Runtime checks:` alongside `Local tests:`; name the scenario, baseline/changed
 revisions, input/config hashes, medians/ranges, correctness failures and verdict.
 Only claim the relevant acceptance criterion when correctness passes and its

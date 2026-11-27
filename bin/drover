@@ -22,7 +22,7 @@ usage: drover <command> [args]
   onboard [--owner O --number N ...]  write .drover/config.json, git excludes and harness hooks
   run | stop | status                 the headless runner, its stop, the board summary
   card | gate | pr-body | github-read | gh-guard | skills-ready | qa-file-bug |
-  review-file-refactor | commit-style | preflight | ...   any lib/drover-<name> script
+  review-file-refactor | commit-style | preflight | evidence | ...   any lib/drover-<name> script
   skills install [--dest DIR]         link drover's skills into the harness's user skill folder
   config path|slug|validate|harness   the project config and harness entries
   version | help
