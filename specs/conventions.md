@@ -44,13 +44,38 @@ Part of the [drover spec](README.md). All of this is new or changed.
   it as `evidence`:
   - `{"mode": "branch", "branch": "<name>"}` (default, branch
     `drover-evidence`): an orphan branch, files under
-    `runs/issue-<n>/v<k>/`;
+    `issue-<n>/<version>/`;
   - `{"mode": "pr", "path": "<dir>"}`: the PR branch, under
-    `<dir>/issue-<n>/v<k>/` (upstream behaviour, default dir
-    `docs/drover/runs`). Evidence then reaches the base branch on merge.
+    `<dir>/issue-<n>/<version>/` (upstream behaviour, default dir
+    `docs/drover/evidence`). Evidence then reaches the base branch on merge.
+  `<version>` is the QA round, `v1`, `v2`, ...
 - **FR-EVD-2** Comments shall embed evidence with raw URLs pinned to the
-  commit SHA that added it, never a branch name.
+  commit SHA that added it, never a branch name:
+  `https://github.com/<owner>/<repo>/raw/<sha>/<path>`.
 - **FR-EVD-3** In `branch` mode, the PR branch and base branch shall contain
   no evidence files.
 - **FR-EVD-4** Images over 5 MB shall be downscaled to at most 1920 px wide
-  before commit. (Preserved rule, new location.)
+  before commit. (Preserved rule, new location.) `drover evidence push`
+  shall refuse an image over 5 MB (exit 65).
+- **FR-EVD-5** `drover evidence push <issue> <version> <files...>` shall
+  commit the files, by their base names, to the location in `evidence`,
+  push it to `origin`, and print one SHA-pinned raw URL per file, in
+  argument order. In `branch` mode it shall create the orphan branch on
+  first use, and shall refuse (exit 65) a branch equal to `base_branch`,
+  `main` or `master`. In `pr` mode it shall commit on top of `origin`'s tip of the
+  caller's current branch.
+- **FR-EVD-6** `drover evidence push` shall not change the caller's working
+  tree, index, or any local branch: it builds the commit with git plumbing
+  in a private index.
+- **FR-EVD-7** When the push is rejected because the remote branch moved,
+  `drover evidence push` shall fetch the new tip, rebuild its commit on it,
+  and push again, at most 5 attempts, so two lanes pushing at once both
+  keep their files. After the last attempt it shall exit 1 and print no URL.
+  A push refused for another reason (auth, protection, a hook) shall exit 1
+  at once with git's message.
+- **FR-EVD-8** The QA lane shall write every evidence file (screenshots,
+  logs, HARs, its report) through `drover evidence push` and never commit
+  one to the PR branch itself. Its `[qa] [report]` comment shall end with
+  the machine line `QA report: <raw URL of REPORT.md>`.
+- **FR-EVD-9** (later) `drover evidence prune --older-than <days>` removes
+  old rounds from the evidence branch once it grows. Not built.

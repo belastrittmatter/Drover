@@ -186,11 +186,12 @@ Done: AC2 CLS 0.04
 Not done: AC1 TTFB 1240 ms (want < 800) — fixed looks like first byte under 800 ms
 Next: builder
 Local tests: npx playwright test e2e/streaming
+QA report: https://github.com/<OWNER>/<REPO>/raw/<SHA>/issue-42/v1/REPORT.md
 
 | Viewport | Screenshot |
 |---|---|
-| Desktop 1920×1080 | ![desktop](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/drover/runs/issue-42-qa-v1/desktop.png) |
-| Mobile 375×667 | ![mobile](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/drover/runs/issue-42-qa-v1/mobile.png) |
+| Desktop 1920×1080 | ![desktop](https://github.com/<OWNER>/<REPO>/raw/<SHA>/issue-42/v1/desktop.png) |
+| Mobile 375×667 | ![mobile](https://github.com/<OWNER>/<REPO>/raw/<SHA>/issue-42/v1/mobile.png) |
 ```
 
 A pass uses the same table with screenshots of the **working** UI per AC.

@@ -156,6 +156,16 @@ class Split(unittest.TestCase):
             now += self.rules(p.read_text())
         # The two lines that said run.md holds the lane rules, rewritten by the split.
         retired = {l for l in self.rules(old.stdout) if l.startswith("**Scope:**") or "load this file at the start" in l}
+        # Stage 8 moved QA evidence off the PR branch (specs/conventions.md FR-EVD-8) and rewrote these.
+        evidence = ("5. Run the tests. Capture evidence to", "6. **Pass** → commit test files", "7. **Fail** → leave failing",
+                    "Inline screenshots in the GitHub", "| Desktop 1920×1080 | ![desktop](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/",
+                    "| Tablet 1024×768  | ![tablet](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/",
+                    "| Mobile 375×667   | ![mobile](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/",
+                    "| Mobile 375×667 | ![mobile](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/",
+                    "Substitution rules:", "- `<OWNER>/<REPO>` — read from", "- `<SHA>` — the commit that added",
+                    "- `<N>` and `<V>` — issue number", "For non-visual ACs (API tests, migration SQL, etc.), skip the screenshot block but",
+                    "If a screenshot file is >5MB", "5. Save evidence to `runs/issue-", "6. Commit + push. Verify ALL")
+        retired |= {l for l in self.rules(old.stdout) if l.startswith(evidence)}
         lost = {l: n for l, n in (self.rules(old.stdout) - now).items() if l not in retired}
         self.assertEqual(lost, {}, "rule lines lost in the split")
 

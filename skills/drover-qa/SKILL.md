@@ -650,7 +650,7 @@ When invoked by drover (env `DROVER_RUN=1` or invocation contains "drover run"):
 - Respect handed-down worktree + branch.
 - Report each main step as it starts with `drover phase <name>`: `plan` (test plan, test-gap
   check), `security` (security pass), `tests` (running tests, capturing evidence), `evidence`
-  (committing evidence, PR blocks), `handoff` (comments, card move). A failed call never stops QA.
+  (`drover evidence push`, PR blocks), `handoff` (comments, card move). A failed call never stops QA.
 - After pushing tests, evidence or fixes to a PR, refresh [PR author notes](../drover/references/pr-author-notes.md) before the handoff. Keep file summaries current and explain critical changed sections on the PR.
 
 ### Card types
@@ -667,10 +667,10 @@ Start from `drover context qa <N>`: it prints the lane rules (`~/.claude/skills/
 for affected selection, host readiness, real assertions and fresh proof.
 3b. Run the **Test-gap check** (above) against the Builder's diff; its High gaps join the plan.
 3c. Run the **Security pass** (above) on the PR's diff. Any kept finding → Fail (step 7).
-4. Run tests. Capture evidence to `docs/drover/runs/issue-<N>-qa-v<N>/`. **For any UI-affecting issue, capture at least one screenshot per AC** (Playwright `page.screenshot` or `browse --screenshot`). Save with descriptive names: `ac1-<short-desc>.png`, not `screenshot1.png`.
-5. **Commit the evidence directory** to the issue branch alongside test files (`git add docs/drover/runs/issue-<N>-qa-v<N>/ && git commit && git push`). This is non-optional — without it, the inline image markdown in the issue comment won't render on GitHub.
-6. **Pass** → tick the PR's `ac` block with proof lines, write `visual` for UI, append a `history` row, rewrite `status` (`drover-pr-body.sh`) → `[qa] [report] pass` PR comment with results + evidence path → **issue comment with screenshot evidence** (see "Issue-comment evidence format" below) → move QA → Review. Clean up worktree.
-7. **Fail** → leave failing ACs unchecked with the reason, append a `history` row, rewrite `status` → `[qa] [report] failing` PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" → issue comment with the failure screenshots → increment rebuild counter → move QA → Ready (label `loop:rebuild-N`). Clean up worktree.
+4. Run tests. Write evidence (screenshots, logs, `REPORT.md`) to a scratch folder outside the worktree. **For any UI-affecting issue, capture at least one screenshot per AC** (Playwright `page.screenshot` or `browse --screenshot`). Save with descriptive names: `ac1-<short-desc>.png`, not `screenshot1.png`.
+5. Commit + push the test files, then **publish the evidence** with `drover evidence push <N> v<V> <files...>` (rules/qa.md → "Evidence push"). It writes to the config's `evidence` location and prints the SHA-pinned URLs. Never commit an evidence file to the issue branch yourself: in `branch` mode the PR diff holds no QA file.
+6. **Pass** → tick the PR's `ac` block with proof lines, write `visual` for UI, append a `history` row, rewrite `status` (`drover-pr-body.sh`) → `[qa] [report] pass` PR comment with results and the `QA report: <URL>` line → **issue comment with screenshot evidence** (see "Issue-comment evidence format" below) → move QA → Review. Clean up worktree.
+7. **Fail** → leave failing ACs unchecked with the reason, append a `history` row, rewrite `status` → `[qa] [report] failing` PR comment with per-AC expected/actual + repro file:line + "what fixed should look like" → issue comment with the failure screenshots → increment rebuild counter → move QA → Ready (label `loop:rebuild-N`). Clean up worktree.
 
 ### Optional project feature verifier
 
@@ -704,11 +704,10 @@ The Tester's issue comment is the user's primary visibility into "is this actual
 **The canonical template lives in `~/.claude/skills/drover/references/rules/qa.md` → "Screenshot embed format" (right after Tester first pass).** Do not duplicate it here; both lanes (drover Tester + standalone drover-qa) follow that exact format. Summary of rules workers must obey:
 
 - Capture screenshots at the standard viewports for UI ACs: **desktop 1920×1080, tablet 1024×768, mobile 375×667**.
-- Commit the screenshots to the issue branch and push *before* writing the comment — inline image URLs won't render unless the file is on GitHub.
-- Use the `https://github.com/<OWNER>/<REPO>/raw/<SHA>/...` URL form, `<SHA>` = the commit that added the screenshots, so images keep rendering after the branch is deleted on merge. Resolve `<OWNER>/<REPO>` from `git remote get-url origin`.
+- Publish the screenshots with `drover evidence push` *before* writing the comment, and paste the `https://github.com/<OWNER>/<REPO>/raw/<SHA>/...` URLs it prints: pinned to the commit that holds them, so images keep rendering after the branch is deleted on merge.
 - Embed the same screenshots in BOTH the PR timeline comment AND the issue comment — the issue page is the user's primary view.
-- Name the evidence folder once (`runs/issue-<N>-qa-v<V>/`) — no file lists.
-- For non-visual ACs (API tests, migration SQL), skip the screenshot table but keep the evidence-path line. State the omission explicitly so the user knows it was intentional.
+- Link the report once with the `QA report: <URL>` machine line — no file lists.
+- For non-visual ACs (API tests, migration SQL), skip the screenshot table but keep the `QA report:` line. State the omission explicitly so the user knows it was intentional.
 - If screenshot capture fails (no display, headless crash), document the reason and link alternative evidence (log file, HTTP trace) rather than silently dropping the requirement.
 - Failure comments use the same format with broken-state screenshots (e.g., `before-fix-desktop.png`).
 
@@ -716,8 +715,8 @@ The Tester's issue comment is the user's primary visibility into "is this actual
 1. Read PR review threads; filter `[qa]` prefix.
 2. For each unresolved `[qa]` thread: apply fix to test files → resolve thread via `gh api graphql resolveReviewThread`.
 3. Re-run full test suite for the ticket.
-4. Save evidence to `runs/issue-<N>-qa-v<N+1>/`.
-5. Commit + push. Verify ALL `[qa]` threads resolved.
+4. Commit + push the test fixes; publish the round's evidence with `drover evidence push <N> v<V+1> <files...>`.
+5. Verify ALL `[qa]` threads resolved.
 6. Update the PR's `ac`, `history`, `status` blocks; post `[qa] [report]` PR + issue comments (writing-standard.md § 4). Move QA → Review.
 
 ### Failure → `root-cause-hash:` line required

@@ -14,7 +14,8 @@ Every template in this pack points here. Change the format here first, then the 
   plain-words rules at the bottom.
 - ONE step per line. NEVER chain steps with arrows (`→`) in Problem, Context or Steps.
 - EMBED screenshots (`![desktop](https://github.com/<o>/<r>/raw/<sha>/<path>)`), pinned to a
-  commit sha. NEVER link to them, NEVER upload to a public image host.
+  commit sha. NEVER link to them, NEVER upload to a public image host. QA evidence gets its
+  URLs from `drover evidence push` (specs/conventions.md FR-EVD).
 - NEVER write a "Not verified" section or a "Next" section in a PR body. An unchecked AC
   with its one-line reason replaces both.
 - DON'T repeat a changed-file list in status comments. Explain each file in its own PR
@@ -155,7 +156,7 @@ alert, one `> needs-you: <command>` line each; the merge gate reads it there or 
 - **Who:** any signed-in user (free plan)
 - **What happened:** the spinner never stops
 
-![receipts · desktop](https://github.com/acme/app/raw/5a2363b/docs/drover/runs/issue-790-qa-v1/desktop.png)
+![receipts · desktop](https://github.com/acme/app/raw/5a2363b/issue-790/v1/desktop.png)
 ```
 
 **Solution** — plain bullets, one change each. Docs consulted go last, as `Docs:` bullets.
@@ -178,7 +179,7 @@ goes in Before | After.
 - [x] 12 MB file shows the size message in 1 s\
   ↳ `e2e/upload-size.spec.ts:14` · failed on `5a2363b`, passes on `3f9c2a1`
 - [x] No request over 10 MB\
-  ↳ spec asserts 0 calls · HAR in `runs/issue-790-qa-v2/`
+  ↳ spec asserts 0 calls · HAR in `issue-790/v2/`
 - [ ] No new Sentry events after deploy\
   ↳ not verified: needs prod deploy · owner
 ```
@@ -194,8 +195,8 @@ fold, above the blank line and `</details>`; an older unfolded history still app
 | Lane | Result | Time | Details |
 |---|---|---|---|
 | builder | pass | Oct 2, 10:02 EDT | draft · `3f9c2a1` |
-| qa | fail v1 | Oct 2, 10:40 EDT | mobile hidden · `runs/issue-790-qa-v1/` |
-| qa | pass v2 | Oct 2, 11:55 EDT | `runs/issue-790-qa-v2/` |
+| qa | fail v1 | Oct 2, 10:40 EDT | mobile hidden · `issue-790/v1/` |
+| qa | pass v2 | Oct 2, 11:55 EDT | `issue-790/v2/` |
 | reviewer | merged | Oct 2, 12:20 EDT | squash `9c41e07` |
 
 </details>
@@ -273,7 +274,7 @@ A 12 MB PDF spins forever. The 413 is never handled.
   - c. Drag `12mb.pdf` onto the drop zone
 - **Who:** any signed-in user
 
-![receipts · desktop](https://github.com/acme/app/raw/5a2363b/docs/drover/runs/issue-790-qa-v1/desktop.png)
+![receipts · desktop](https://github.com/acme/app/raw/5a2363b/issue-790/v1/desktop.png)
 
 ## Fix
 Map 413 to the size message; check size before upload.
@@ -369,11 +370,12 @@ Next: <who acts next>
 Header regex: `^\[(builder|qa|reviewer|collect|orchestrator)\] \[(blocker|issue|suggestion|nit|question|praise|report)\] \S`
 
 - ≤ 8 lines of prose. Evidence before adjectives: the command, the sha, the file:line.
-- Machine lines (`Local tests:`, `QA head:`, `Repro test:`, `Models:`, `Hypotheses:`,
+- Machine lines (`Local tests:`, `QA report:`, `QA head:`, `Repro test:`, `Models:`, `Hypotheses:`,
   `Test edits since QA pass:`, `gh-quota-on-exit:`, `blocked-by:`, `root-cause-hash:`) go last and do
   not count toward the 8. `Hypotheses: H1 <...>; H2 <...>` is the reviewer's own pass for the reviewed
   head, recorded before `drover context review <N> --claims` shows the builder's and QA's account.
-  `QA head: <sha>` ends every `[qa] [report] pass` (the head QA passed); `Repro test: <command>`
+  `QA head: <sha>` ends every `[qa] [report] pass` (the head QA passed); `QA report: <url>` is in
+  every `[qa] [report]`, the SHA-pinned URL of the round's `REPORT.md`; `Repro test: <command>`
   ends a `bug` card's `[builder] [report]` (the reproduction test, roles.md FR-BLD-7).
 - Screenshots (QA) go below, as an embedded table. They do not count either.
 - The Block template (`block-template.md`) uses the same header and keeps its fields.
@@ -387,6 +389,7 @@ Done: AC2 no request over 10 MB
 Not done: AC1 mobile: message under the keyboard
 Next: builder
 Local tests: npx playwright test e2e/upload-size.spec.ts
+QA report: https://github.com/acme/app/raw/5a2363b/issue-790/v1/REPORT.md
 ```
 
 **Review threads** (line-level, resolvable) start with the lane that owns the fix, then the

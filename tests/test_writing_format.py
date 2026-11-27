@@ -231,7 +231,7 @@ def test_comment_header_regex():
 
 def test_comment_examples_follow_the_header():
     """Lane comments have headers; author notes use three labels without a routing prefix."""
-    machine = re.compile(r"^(Local tests|QA head|Repro test|Models|Hypotheses|Test edits since QA pass|gh-quota-on-exit|blocked-by|"
+    machine = re.compile(r"^(Local tests|QA report|QA head|Repro test|Models|Hypotheses|Test edits since QA pass|gh-quota-on-exit|blocked-by|"
                          r"root-cause-hash):|^\||^$|^<!--")
     run_md = RUN_RULES
     checked = 0
@@ -258,6 +258,21 @@ def test_comment_examples_follow_the_header():
             checked += 1
     assert checked >= 6, f"expected comment samples, checked {checked}"
     assert author_notes == 1, "expected one shared author-note example"
+
+
+def test_qa_reports_link_evidence_by_pinned_url():
+    """Every [qa] [report] example links its REPORT.md at a SHA-pinned raw URL, and the QA rules
+    publish evidence only through `drover evidence push` (specs/conventions.md FR-EVD-2, FR-EVD-8)."""
+    pinned = re.compile(r"^QA report: https://github\.com/[^/]+/[^/]+/raw/(<SHA>|[0-9a-f]{7,40})/\S+/REPORT\.md$", re.M)
+    reports = [b for t in (STANDARD, RUN_RULES) for b in fenced(t) if b.startswith("[qa] [report]")]
+    assert reports, "no [qa] [report] examples"
+    for block in reports:
+        assert pinned.search(block), f"[qa] [report] example without a pinned QA report line: {block.splitlines()[0]}"
+    qa_skill = (ROOT / "skills/drover-qa/SKILL.md").read_text(encoding="utf-8")
+    qa_rules = (REF / "rules/qa.md").read_text(encoding="utf-8")
+    for name, text in (("rules/qa.md", qa_rules), ("drover-qa/SKILL.md", qa_skill)):
+        assert "drover evidence push" in text, f"{name} must publish evidence through drover evidence push"
+        assert "docs/drover/runs" not in text, f"{name} still commits evidence into the PR branch"
 
 
 def test_block_template_uses_the_header():
