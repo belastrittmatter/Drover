@@ -104,6 +104,19 @@ class RunnerRounds(RunnerCase):
         self.assertIn('halt — failed dispatch: #5 failed 2 dispatches in a row', out)
         self.assertIn('| === dispatch lane=review issue=#5 at ', out)  # the log tail
         self.assertNotIn('RUNAWAY', manifest)
+        # Issue #22: a worker that died without a handoff is still a stale lock.
+        self.assertEqual(manifest.count('reaped stale lock + swept assignee on #5 (pid='), 2, manifest)
+        self.assertNotIn('worker done #5', manifest)
+
+    # Issue #22: a worker that handed its card on and exited logs `worker done`, not a stale lock.
+    def test_handed_off_exit_logs_worker_done(self):
+        self.env['FAKE_CLAUDE'] = 'advance'  # moves its card one column and exits
+        self.board({'number': 7, 'status': 'Ready'})
+        self.run_board(cycles=10000, max_dispatches=2)
+        manifest = self.manifest()
+        [pid] = [int(l.split('pid=')[1].split()[0]) for l in manifest.splitlines() if 'dispatch lane=build issue=#7 pid=' in l]
+        self.assertIn('worker done #7 lane=build (pid=%d)' % pid, manifest)
+        self.assertNotIn('reaped stale lock', manifest)
 
     # FR-RUN-13: a worker that posted its role's report did its job, even with the card
     # where it was (here: a reviewer waiting on the owner's merge approval).
