@@ -73,6 +73,13 @@ as the reference, and deleted that backend.
   never fail the worker otherwise. `state.json` shall show the worker's
   entries since its `since` as `phases` and the last name as `phase`.
   Tested by `test-phase.sh`.
+- **FR-RUN-19 (new)** `drover statusline` shall print one line from
+  `.drover/runs/state.json`: `drover:`, `paused` when `paused` is set, the
+  card count per lane (`build`, `qa`, `review`), then the oldest card by
+  `since` as `#<issue>` plus its `phase` when present (`idle` when there are
+  no cards). With no state file, an unreadable one or `"stopped": true` it
+  shall print nothing and exit 0. It reads only that file (no GitHub call, no
+  config validation) and runs in under 100 ms. Tested by `test-statusline.sh`.
 
 ### Worker interface
 
