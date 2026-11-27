@@ -61,7 +61,8 @@ Part of the [drover spec](README.md). All of this is new or changed.
   commit the files, by their base names, to the location in `evidence`,
   push it to `origin`, and print one SHA-pinned raw URL per file, in
   argument order. In `branch` mode it shall create the orphan branch on
-  first use. In `pr` mode it shall commit on top of `origin`'s tip of the
+  first use, and shall refuse (exit 65) a branch equal to `base_branch`,
+  `main` or `master`. In `pr` mode it shall commit on top of `origin`'s tip of the
   caller's current branch.
 - **FR-EVD-6** `drover evidence push` shall not change the caller's working
   tree, index, or any local branch: it builds the commit with git plumbing
@@ -70,6 +71,8 @@ Part of the [drover spec](README.md). All of this is new or changed.
   `drover evidence push` shall fetch the new tip, rebuild its commit on it,
   and push again, at most 5 attempts, so two lanes pushing at once both
   keep their files. After the last attempt it shall exit 1 and print no URL.
+  A push refused for another reason (auth, protection, a hook) shall exit 1
+  at once with git's message.
 - **FR-EVD-8** The QA lane shall write every evidence file (screenshots,
   logs, HARs, its report) through `drover evidence push` and never commit
   one to the PR branch itself. Its `[qa] [report]` comment shall end with

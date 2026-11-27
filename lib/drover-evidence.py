@@ -7,9 +7,10 @@ Mode `branch` (default): the orphan branch `evidence.branch` (default drover-evi
 under issue-<N>/<version>/. Mode `pr`: origin's tip of the current branch, files under
 <evidence.path>/issue-<N>/<version>/. Prints one SHA-pinned raw URL per file.
 
-Never touches the working tree, the index or a local branch: the commit is built in a private
+github.com only: URLs are built as https://github.com/<owner>/<repo>/raw/<sha>/<path>, no GitHub
+Enterprise host. Never touches the working tree, the index or a local branch: the commit is built in a private
 index (GIT_INDEX_FILE) and pushed by sha. A push rejected because the remote moved is rebuilt
-on the new tip, at most 5 attempts (FR-EVD-7).
+on the new tip, at most 5 attempts (FR-EVD-7); any other push failure stops at once.
 
 Exit: 0 pushed · 1 push failed after retries · 64 usage · 65 bad input (file, image size, config).
 `drover evidence prune` is not built yet (FR-EVD-9). Stdlib only (Python 3.9).
@@ -21,11 +22,15 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from urllib.parse import quote
 
 HERE = Path(__file__).resolve().parent
 ATTEMPTS = 5
 IMAGE_MAX = 5 * 1024 * 1024
 IMAGES = (".png", ".jpg", ".jpeg", ".gif", ".webp")
+# git's wording when the remote ref moved under us. Not bare "rejected": a hook decline is "[remote rejected]".
+# Anything else (auth, protection, hooks) is final.
+RACE = ("[rejected]", "cannot lock ref", "non-fast-forward", "fetch first", "failed to update ref")
 
 
 def load_config():
@@ -83,7 +88,8 @@ def push(argv):
     issue, version, files = argv[0], argv[1], argv[2:]
     if not issue.isdigit() or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", version):
         die("issue must be a number and version a name like v1", 64)
-    ev = load_config().get("evidence") or {"mode": "branch"}
+    cfg = load_config()
+    ev = cfg.get("evidence") or {"mode": "branch"}
     if ev["mode"] == "pr":
         base = ev.get("path", "docs/drover/evidence").strip("/")
         if not base or ".." in base.split("/"):
@@ -94,6 +100,8 @@ def push(argv):
         prefix = f"{base}/issue-{issue}/{version}"
     else:
         branch = ev.get("branch", "drover-evidence")
+        if branch in {cfg.get("base_branch", "main"), "main", "master"}:
+            die(f"evidence.branch {branch} is a base branch: pick another (default drover-evidence)", 65)
         prefix = f"issue-{issue}/{version}"
 
     blobs = {}
@@ -106,7 +114,7 @@ def push(argv):
         path = f"{prefix}/{p.name}"
         if path in blobs:
             die(f"two files named {p.name}", 65)
-        blobs[path] = git("hash-object", "-w", "--", f).stdout.strip()
+        blobs[path] = git("hash-object", "-w", "--no-filters", "--", f).stdout.strip()
 
     owner, repo = owner_repo()
     message = f"chore(evidence): issue-{issue} {version}"
@@ -118,9 +126,12 @@ def push(argv):
         r = git("push", "-q", "origin", f"{commit}:refs/heads/{branch}", check=False)
         if r.returncode == 0:
             for path in blobs:
-                print(f"https://github.com/{owner}/{repo}/raw/{commit}/{path}")
+                print(f"https://github.com/{owner}/{repo}/raw/{commit}/{quote(path)}")
             return 0
-        print(f"drover evidence: push to {branch} rejected, retrying on the new tip", file=sys.stderr)
+        err = r.stderr.strip()
+        if not any(word in err for word in RACE):
+            die(f"push to {branch} failed: {err}", 1)
+        print(f"drover evidence: push to {branch} rejected, retrying on the new tip: {err}", file=sys.stderr)
     die(f"push to {branch} failed after {ATTEMPTS} attempts: {r.stderr.strip()}", 1)
 
 
