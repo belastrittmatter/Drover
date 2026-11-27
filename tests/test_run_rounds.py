@@ -48,6 +48,8 @@ class RunnerRounds(RunnerCase):
         self.run_board(cycles=1)
         self.assertIsNone(self.lock(7))
         self.assertIn(['issue', 'edit', '7', '--remove-assignee', 'bot'], self.calls())
+        # Issue #22: a worker killed mid-lane is reaped at the next start as a stale lock.
+        self.assertIn('reaped stale lock + swept assignee on #7 (pid=%d)' % pid, self.manifest())
 
     # FR-BRD-3: the runner never moves an open card to Done; the merge gate
     # (test-merge-gate.sh) is what proves a merge before the reviewer moves it.
@@ -130,6 +132,9 @@ class RunnerRounds(RunnerCase):
         manifest = self.manifest()
         self.assertGreaterEqual(manifest.count('dispatch lane=review issue=#5 pid='), 2, manifest)
         self.assertNotIn('failed dispatch', manifest)
+        # Issue #22: a reported exit with the card in place is a normal exit too.
+        self.assertIn('worker done #5 lane=review (pid=', manifest)
+        self.assertNotIn('reaped stale lock', manifest)
 
     # FR-RUN-13: a builder that moves its card to Building and dies strands it where no lane
     # looks. It counts as failed, the card goes back to Ready, and a second time halts.
