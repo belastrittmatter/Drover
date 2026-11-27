@@ -115,6 +115,7 @@ Each name links to that skill's README. Adding a skill? Write its `SKILL.md` and
 /drover lint             # vague ACs?
 /drover status           # read-only snapshot
 /drover run              # drain the board
+drover statusline        # one line of run state, for the status line
 /drover stop             # stop workers
 /drover-collect [source]       # find problems → findings doc → /to-spec
 /ui-refine-loop <route>       # polish one page
@@ -123,6 +124,12 @@ Each name links to that skill's README. Adding a skill? Write its `SKILL.md` and
 ```
 
 Flags: `drover-collect --since 30d`
+
+**Status line.** `drover statusline` prints `drover: 2 build · 1 review · #14 tests` from `.drover/runs/state.json` and nothing when no run is live. Wire it into Claude Code in `.claude/settings.local.json`:
+
+```json
+{ "statusLine": { "type": "command", "command": "drover statusline" } }
+```
 
 ## Guards & hooks
 

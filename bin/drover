@@ -21,6 +21,7 @@ usage: drover <command> [args]
 
   onboard [--owner O --number N ...]  write .drover/config.json, git excludes and harness hooks
   run | stop | status                 the headless runner, its stop, the board summary
+  statusline                          one line of run state for the Claude Code status line
   card | gate | pr-body | github-read | gh-guard | skills-ready | qa-file-bug |
   review-file-refactor | commit-style | preflight | evidence | ...   any lib/drover-<name> script
   skills install [--dest DIR]         link drover's skills into the harness's user skill folder
@@ -51,6 +52,7 @@ esac
 
 case "$cmd" in
   setup|config|settings) ;;  # these write or check the config themselves
+  statusline) ;;             # runs on every status-line refresh: no validation, no error text
   *) python3 "$LIB/drover-config.py" validate ;;
 esac
 
