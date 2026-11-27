@@ -131,7 +131,7 @@ def parse_manifest(text: str, today_iso: str) -> dict[str, Any]:
       last_tick: HH:MM:SS of the most recent `tick —` line, or None
       start_hms: HH:MM:SS of the most recent `drover run started`, or None
       exited: True if the run has logged `exiting cleanly`
-      reaped_count: number of `reaped stale lock ...` lines seen
+      reaped_count: number of `reaped stale lock ...` and `worker done ...` lines seen
     """
     inflight: dict[str, list[dict[str, str]]] = {}
 
@@ -201,6 +201,7 @@ def parse_manifest(text: str, today_iso: str) -> dict[str, Any]:
             })
             continue
         if dn := DONE_RE.search(rest):
+            reaped_count += 1  # a clean exit frees its lock and worktree too
             issue, pid = dn.groups()
             if pid != "empty":
                 drop(lambda l, v: v["pid"] != pid)

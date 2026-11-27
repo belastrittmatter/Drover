@@ -68,7 +68,7 @@ def test_worker_done_line_frees_the_worker() -> None:
     )
     state = sbs.parse_manifest(manifest, TODAY)
     assert state["inflight"] == {}, state["inflight"]
-    assert state["reaped_count"] == 0
+    assert state["reaped_count"] == 1  # worktrees cleaned counts clean exits too
     assert [r["verb"] for r in state["recents"]] == ["dispatch", "done"]
     assert state["recents"][1]["issue"] == "#7"
 

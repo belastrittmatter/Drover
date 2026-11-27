@@ -28,9 +28,9 @@ use, human effort and PR outcomes, and compares configs. Two inputs:
   change. `pid=` shall always be a number unique within the run (the
   process id for the `process` backend, a run counter for hc).
   (Approved 2026-11-17: the zombie, clean-exit and block-rate lines lost
-  their leading emoji in stage 4; both parsers match the words after it.
+  their leading emoji in stage 4; both parsers match the words after it.)
   Issue #22: a worker that handed off logs `worker done #<n> lane=<role>
-  (pid=<p>)`; `reaped stale lock` is kept for one that died without a handoff.)
+  (pid=<p>)`; `reaped stale lock` is kept for one that died without a handoff.
 
 ## New or changed
 
