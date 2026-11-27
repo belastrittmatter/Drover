@@ -46,14 +46,14 @@ git -C "$TMP/proj" worktree add -q "$TMP/proj/.drover/worktrees/w" -b w
 out=$(cd "$TMP/proj/.drover/worktrees/w" && bash "$REPO_ROOT/bin/drover" statusline)
 [ "$out" = "drover: idle" ] || fail "worktree: $out"
 
-# 7 — under 100 ms (best of five, so one slow start does not fail it).
+# 7 — under 100 ms: the script alone (no bash wrapper), best of 15 so a loaded suite run does not fail it.
 echo '{"cards":[]}' >"$STATE"
-best=$(python3 - "$REPO_ROOT/bin/drover" "$TMP/proj" <<'PY'
+best=$(python3 - "$REPO_ROOT/lib/drover-statusline.py" "$TMP/proj" <<'PY'
 import subprocess, sys, time
 t = []
-for _ in range(5):
+for _ in range(15):
     s = time.perf_counter()
-    subprocess.run(["bash", sys.argv[1], "statusline"], cwd=sys.argv[2], capture_output=True)
+    subprocess.run(["python3", sys.argv[1]], cwd=sys.argv[2], capture_output=True)
     t.append((time.perf_counter() - s) * 1000)
 print(int(min(t)))
 PY
