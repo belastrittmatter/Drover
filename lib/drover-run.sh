@@ -636,14 +636,24 @@ runaway_summary() {
   log "   → inspect worker logs in ${WORKER_LOG_DIR}/"
 }
 
-JUDGE_QUEUE=""   # "<issue>|<lane>|<column at dispatch>|<started>" per worker that exited this run
+JUDGE_QUEUE=""   # "<issue>|<lane>|<column at dispatch>|<started>|<pid>" per worker that exited this run
 FAILS=" "        # "<issue>:<failed dispatches in a row>"
+log_stale_lock() {
+  # $1 = issue, $2 = pid. FR-MET-2: drover-status.py and FactoryBench read this line.
+  if [ -n "$BOT_LOGIN" ]; then
+    log "reaped stale lock + swept assignee on #$1 (pid=${2:-empty})"
+  else
+    log "reaped stale lock for #$1 (pid=${2:-empty})"
+  fi
+}
+
 reap_finished_locks() {
   # Sweep inflight/ for dead workers; remove locks AND sweep stale assignees so the
   # next dispatch can re-claim the card if the worker crashed without releasing.
   # The assignee remove is idempotent — no-op if the worker exited cleanly.
   # Issue locks only (issue_locks): merge.lock is the merge gate's.
-  # $1 = "judge": queue each reaped worker of this run for judge_finished_workers.
+  # $1 = "judge": queue each reaped worker of this run for judge_finished_workers, which
+  # logs `worker done` or the stale lock once the fresh board shows whether it handed off.
   local issue pid
   for issue in $(issue_locks); do
     gh_checkpoint
@@ -654,11 +664,12 @@ reap_finished_locks() {
     if [ -n "$BOT_LOGIN" ]; then
       gh_checkpoint
       gh_write_once issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
-      log "reaped stale lock + swept assignee on #${issue} (pid=${pid:-empty})"
-    else
-      log "reaped stale lock for #${issue} (pid=${pid:-empty})"
     fi
-    [ "${1:-}" = judge ] && [ -n "$COLUMN" ] && JUDGE_QUEUE="${JUDGE_QUEUE} ${issue}|${LANE}|${COLUMN}|${STARTED}"
+    if [ "${1:-}" = judge ] && [ -n "$COLUMN" ]; then
+      JUDGE_QUEUE="${JUDGE_QUEUE} ${issue}|${LANE}|${COLUMN}|${STARTED}|${pid}"
+    else
+      log_stale_lock "$issue" "$pid"
+    fi
     gh_checkpoint
     rm -f "$INFLIGHT_DIR/$issue"
     forget_handle "$HANDLE"
@@ -684,9 +695,9 @@ judge_finished_workers() {
   # is a failed dispatch (the board decides, FR-WRK-6; the report read is one GitHub call per
   # such worker). Returns 1 (halt) after two failed dispatches in a row on one card, with
   # the tail of its worker log.
-  local entry issue lane col started cur n worker_log
+  local entry issue lane col started pid cur n worker_log
   for entry in $JUDGE_QUEUE; do
-    IFS='|' read -r issue lane col started <<EOF
+    IFS='|' read -r issue lane col started pid <<EOF
 $entry
 EOF
     n=0
@@ -694,8 +705,13 @@ EOF
     FAILS=$(printf '%s' "$FAILS" | sed "s/ $issue:[0-9]* / /")
     cur=$(issue_status "$issue")
     fb_outcome "$issue" "$lane" "$cur"
-    [ -n "$cur" ] && { [ "$cur" = "$col" ] || [ "$cur" = Building ]; } || continue
-    role_reported "$issue" "$lane" "$started" && continue
+    # Handed off: the card left its lane, or the worker posted its role's report (issue #22).
+    if [ -z "$cur" ] || { [ "$cur" != "$col" ] && [ "$cur" != Building ]; } \
+      || role_reported "$issue" "$lane" "$started"; then
+      log "worker done #${issue} lane=${lane} (pid=${pid:-empty})"
+      continue
+    fi
+    log_stale_lock "$issue" "$pid"
     n=$((n + 1))
     FAILS="${FAILS}${issue}:${n} "
     log "failed dispatch lane=${lane} issue=#${issue} — worker exited, card in '${cur}', no report (${n} in a row)"

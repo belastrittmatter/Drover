@@ -60,6 +60,19 @@ def test_dispatch_all_three_lanes() -> None:
     assert set(state["inflight"].keys()) == {"build", "qa", "review"}
 
 
+def test_worker_done_line_frees_the_worker() -> None:
+    """Issue #22: `worker done #N lane=L (pid=P)` ends that worker; it is not a stale-lock reap."""
+    manifest = (
+        "[10:00:00] dispatch lane=build issue=#7 pid=100 claim=bot\n"
+        "[10:04:00] worker done #7 lane=build (pid=100)\n"
+    )
+    state = sbs.parse_manifest(manifest, TODAY)
+    assert state["inflight"] == {}, state["inflight"]
+    assert state["reaped_count"] == 1  # worktrees cleaned counts clean exits too
+    assert [r["verb"] for r in state["recents"]] == ["dispatch", "done"]
+    assert state["recents"][1]["issue"] == "#7"
+
+
 def test_unknown_lane_is_ignored() -> None:
     """A typo'd lane in the manifest must not crash the renderer."""
     manifest = "[10:00:00] dispatch lane=design issue=#5 pid=999 claim=bot\n"

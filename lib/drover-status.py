@@ -85,8 +85,11 @@ DISPATCH_RE = re.compile(r"dispatch lane=(build|qa|review) issue=#(\d+) pid=(\d+
 # Two reap variants in the dispatcher:
 #   `reaped stale lock + swept assignee on #N (pid=P)`
 #   `reaped stale lock for #N (pid=P)`
+# for a worker that died without a handoff (a normal exit logs `worker done`, below).
 # And `pid=${PID:-empty}` can expand to `pid=empty` when the PID was lost.
 REAP_RE = re.compile(r"reaped stale lock\b[^#]*#(\d+) \(pid=(\d+|empty)\)")
+# A worker that exited after handing its card on: `worker done #N lane=L (pid=P)`.
+DONE_RE = re.compile(r"worker done #(\d+) lane=\w+ \(pid=(\d+|empty)\)")
 ZOMBIE_RE = re.compile(r"zombie [a-z]+ worker on #(\d+) \(pid=(\d+)\)(.*)$")
 ALERT_RE = re.compile(r"block-rate alert: (.+)$")
 
@@ -128,7 +131,7 @@ def parse_manifest(text: str, today_iso: str) -> dict[str, Any]:
       last_tick: HH:MM:SS of the most recent `tick —` line, or None
       start_hms: HH:MM:SS of the most recent `drover run started`, or None
       exited: True if the run has logged `exiting cleanly`
-      reaped_count: number of `reaped stale lock ...` lines seen
+      reaped_count: number of `reaped stale lock ...` and `worker done ...` lines seen
     """
     inflight: dict[str, list[dict[str, str]]] = {}
 
@@ -196,6 +199,13 @@ def parse_manifest(text: str, today_iso: str) -> dict[str, Any]:
                 "issue": f"#{issue}", "target": "",
                 "detail": "stale lock + assignee swept",
             })
+            continue
+        if dn := DONE_RE.search(rest):
+            reaped_count += 1  # a clean exit frees its lock and worktree too
+            issue, pid = dn.groups()
+            if pid != "empty":
+                drop(lambda l, v: v["pid"] != pid)
+            recents.append({"epoch": ep, "verb": "done", "issue": f"#{issue}", "target": "", "detail": "worker exited"})
             continue
         if zm := ZOMBIE_RE.search(rest):
             issue, pid, det = zm.groups()

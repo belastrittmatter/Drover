@@ -170,7 +170,7 @@ mode:   auto-merge                 reviewer: sonnet (alt opus)
 ▎Recent  (last 5 manifest events)
    T-6m    dispatch  #26  → Building  attempt 2/3
    T-6m    dispatch  #29  → QA        attempt 1/3
-   T-6m    reap      #29            stale lock + assignee swept
+   T-6m    done      #29            worker exited
    T-16m   reap      #26            stale lock + assignee swept
    T-22m   dispatch  #29  → Building  attempt 1/3
 
