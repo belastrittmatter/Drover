@@ -982,6 +982,7 @@ Read ${DROVER_HOME}/skills/drover/references/run.md → \"Builder pre-flight\" a
 Run once for the whole batch: drover preflight --repo ${REPO_SLUG} --issues ${batch} --inflight ${PWD}/${inflight}. Then judge its candidates semantically, and add too-big: likely over ${AUTO_MAX_LINES} changed lines, or spans many areas.
 Two Ready cards overlapping each other with no open PR: the lower-numbered one proceeds; sequence only the other, blockedBy [the lower]. Never both.
 Required GitHub reads use drover github-read; exit 79 means verdict halted for every card.
+Run each command in its own Bash call, with no && or ; chains; read files with the Read tool.
 End your reply with one line of JSON and nothing after it, one verdict per issue, never dropping one:
 {\"verdicts\":[{\"number\":N,\"verdict\":\"proceed|hold|sequence|halted\",\"tag\":\"done|in-progress|unclear|too-big|overlap|clean\",\"blockedBy\":[M],\"detail\":\"one line\"}]}"
   run_agent preflight "${batch%%,*}" "$prompt" "$([ "$MODEL_TIER" = low ] && echo haiku || echo sonnet)" verdicts
@@ -1081,6 +1082,7 @@ classify_card() {
   for l in $labels; do case "$TYPE_LABELS" in *" $l "*) typed="$l"; break ;; esac; done
   run_agent classify "$issue" "Classify GitHub issue #${issue} for the board runner. Config: ${CONFIG_PATH}.
 Read its body and comments: drover github-read --kind issue -- issue view ${issue} --json number,title,body, and drover github-read --kind comments -- api repos/{owner}/{repo}/issues/${issue}/comments --paginate --slurp. You write no code and make no GitHub writes.
+Run each command in its own Bash call, with no && or ; chains; read files with the Read tool.
 kind: $([ -n "$typed" ] && echo "its label says \"${typed}\": return kind \"${typed}\"; the label routes the card." || echo "it has no type label: return feature or bug, never qa.")
 complexity: low, medium or high, by the scope of the change.
 risk: each of security, migration, payments, auth the change touches (security: secrets, input handling, access control; migration: database schema or data migration; payments: money, billing; auth: login, sessions, permissions). Empty when none.
