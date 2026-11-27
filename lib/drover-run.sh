@@ -961,6 +961,12 @@ pf_cleared() {
   fi
 }
 
+own_pr_url() {
+  # The open PR from card $1's own issue branch, or nothing (also on a failed read).
+  python3 "$SB_GITHUB_READ" --kind array -- pr list --state open --json headRefName,url --limit 100 2>/dev/null \
+    | jq -r --arg p "issue-$1-" '[.[] | select(.headRefName | startswith($p)) | .url][0] // ""' 2>/dev/null || true
+}
+
 preflight_ok() {
   # FR-RUN-5: 0 when the latest pre-flight batch cleared Ready card $1 for a builder. Otherwise
   # one agent judges $1 and up to 4 more free Ready build cards; held and sequenced cards go to
@@ -969,6 +975,8 @@ preflight_ok() {
   # may run side by side (FR-RUN-2).
   local first="$1" batch n inflight prompt v verdict tag detail by summary="" reason e count
   pf_cleared "$first" && return 0
+  # Its own branch's open PR means the card came back for a rebuild, never a duplicate (run.md → Builder pre-flight).
+  [ -z "$(own_pr_url "$first")" ] || return 0
   PF_CLEARED=" "
   batch="$first"
   for n in $(echo "$PROJECT_ITEMS_JSON" | jq -r --argjson f "$first" '
@@ -1200,8 +1208,7 @@ fb_outcome() {
   local url
   case "$2:$3" in
     build:QA)
-      url=$(python3 "$SB_GITHUB_READ" --kind array -- pr list --state open --json headRefName,url --limit 100 2>/dev/null \
-        | jq -r --arg p "issue-$1-" '[.[] | select(.headRefName | startswith($p)) | .url][0] // ""' 2>/dev/null || true)
+      url=$(own_pr_url "$1")
       [ -z "$url" ] || metrics pr "$1" "$url" ;;
     qa:Review) metrics gate "$1" qa true "QA passed" ;;
     qa:Ready|qa:Building)
