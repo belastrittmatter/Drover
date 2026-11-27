@@ -369,8 +369,12 @@ Next: <who acts next>
 Header regex: `^\[(builder|qa|reviewer|collect|orchestrator)\] \[(blocker|issue|suggestion|nit|question|praise|report)\] \S`
 
 - ≤ 8 lines of prose. Evidence before adjectives: the command, the sha, the file:line.
-- Machine lines (`Local tests:`, `gh-quota-on-exit:`, `blocked-by:`, `root-cause-hash:`) go
-  last and do not count toward the 8.
+- Machine lines (`Local tests:`, `QA head:`, `Repro test:`, `Models:`, `Hypotheses:`,
+  `Test edits since QA pass:`, `gh-quota-on-exit:`, `blocked-by:`, `root-cause-hash:`) go last and do
+  not count toward the 8. `Hypotheses: H1 <...>; H2 <...>` is the reviewer's own pass for the reviewed
+  head, recorded before `drover context review <N> --claims` shows the builder's and QA's account.
+  `QA head: <sha>` ends every `[qa] [report] pass` (the head QA passed); `Repro test: <command>`
+  ends a `bug` card's `[builder] [report]` (the reproduction test, roles.md FR-BLD-7).
 - Screenshots (QA) go below, as an embedded table. They do not count either.
 - The Block template (`block-template.md`) uses the same header and keeps its fields.
 
@@ -389,26 +393,37 @@ Local tests: npx playwright test e2e/upload-size.spec.ts
 label: `[builder] [blocker] uses new Date() — replace with clock.now()`. Owners: `builder`,
 `qa`, `reviewer`.
 
-**Reviewer report** — ONE comment per PR, edited in place every round (find it by the
-`<!-- drover-review:report -->` marker, PATCH it; post a new one only on the first round).
-R-ids never change; a new finding takes the next free id.
+**Reviewer report** — ONE comment per PR, edited in place every round. Read it with
+`drover review-report get --pr <P>` and write it only with
+`drover review-report put --pr <P> --head <reviewed sha> --file <report.md>`: put adds the
+marker with the reviewed head (`<!-- drover-review:report head=<sha> -->`) and the
+`Test edits since QA pass:` line, refuses a report that breaks the rules below, and edits the
+comment in place (roles.md FR-REV-5, FR-REV-6). R-ids never change; a new finding takes the
+next free id; rows are never deleted. Write the file without the marker:
 
 ```
-<!-- drover-review:report -->
 [reviewer] [report] bounced · round 2
 Did: re-checked R1–R2, fresh pass skipped (R2 open)
 Done: R1 fixed `src/cart.py:12`
 Not done: R2 not fixed `src/cart.py:31`
 Next: builder
+Models: builder opus · reviewer sonnet
 
-| ID | Owner | Class | Where | Finding | Status |
-|---|---|---|---|---|---|
-| R1 | builder | Bug | `src/cart.py:12` | average_price divides by zero on an empty cart | fixed |
-| R2 | builder | Bug | `src/cart.py:31` | discount_pct not clamped to 0–100 | not fixed |
+| ID | Owner | Class | Severity | Where | Finding | Status |
+|---|---|---|---|---|---|---|
+| R1 | builder | Bug | Blocker | `src/cart.py:12` | average_price divides by zero on an empty cart | fixed |
+| R2 | builder | Bug | Should fix | `src/cart.py:31` | discount_pct not clamped to 0–100 | not fixed |
 ```
 
-Reviewer status words: `merge-ready` · `bounced` · `blocked` · `human-gated` · `unverified` ·
-`merged`. Classes: Gap · Bug · Verification miss · Scope drift · Over-engineering.
+The words are fixed, in `lib/drover-markers.json` → `review_report` (FR-CNV-4). Header states:
+`merge-ready` · `bounced` · `blocked` · `human-gated` · `unverified` · `merged`. Owners: `builder` ·
+`qa` · `ui` · `owner`. Classes: Gap · Bug · Verification miss · Scope drift · Over-engineering.
+Severities: Blocker · Should fix · Nit. Statuses: `open` · `fixed` · `not fixed` ·
+`no longer applies`. `Models:` names the builder's and the reviewer's model as the runner gave
+them. On a new head no earlier row stays `open`, and a row that turns `fixed` cites a
+`file:line` in a file that changed since the last reviewed head. A `merge-ready` report has no
+Blocker that is `open` or `not fixed`; the gate merges only on such a report for the head it
+merges (gate exit 6 otherwise).
 
 ## Plain-words rules (when `humanizer` is not installed)
 

@@ -73,8 +73,10 @@
 #   3  PR is closed without a merge; no merge attempted
 #   4  could not take the lock within the timeout
 #   5  the base could not be merged in (real conflict) — needs a rebase pass
-#   6  the PR head is not the commit that was reviewed — review evidence is void,
-#      the card goes back to Review (not Blocked, not a rebase pass)
+#   6  the PR head is not the commit that was reviewed, or the latest review report
+#      (drover review-report check) does not name this head, is not merge-ready, or
+#      has an open Blocker — review evidence is void, the card goes back to Review
+#      (not Blocked, not a rebase pass)
 #   7  merge policy says a human merges this one (money / auth / destructive
 #      schema, a diff over auto_max_lines — default 400, "big PR — please
 #      review" — or merge_policy.default "human"). Stdout lists each
@@ -112,6 +114,9 @@ set -euo pipefail
 export SB_GITHUB_READ_STRICT=1
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 GITHUB_READ="$HERE/drover-github-read.py"
+# Gate output prefixes, defined once in drover-markers.json (FR-CNV-4).
+HUMAN_GATE=$(jq -r .gate_lines.human_gate "$HERE/drover-markers.json")
+NEEDS_YOU=$(jq -r .gate_lines.needs_you "$HERE/drover-markers.json")
 
 CONFIG=""; PR=""; LOCK_TIMEOUT=1800; STALE_AFTER=""; DRY=0; EXPECT_HEAD=""; SUBJECT=""; MSG_FILE=""
 while [ $# -gt 0 ]; do
@@ -228,6 +233,13 @@ if [ -n "$EXPECT_HEAD" ]; then
 else
   say "WARNING: no --expect-head; pinning the head read now (${HEAD_SHA}), not the reviewed one"
 fi
+# ---- the review report (FR-REV-8) -----------------------------------------
+# The latest review report must name this head, say merge-ready and hold no open Blocker.
+RR=0; python3 "$HERE/drover-review-report.py" check --pr "$PR" ${REPO:+--repo "$REPO"} --head "$HEAD_SHA" || RR=$?
+if [ "$RR" -ne 0 ]; then
+  [ "$RR" -eq 6 ] && say "the review report does not clear ${HEAD_SHA} — send the card back to Review"
+  exit "$RR"
+fi
 
 # ---- merge policy + migration plan ----------------------------------------
 # One read of the PR's labels, paths, size and body plus its diff, classified by
@@ -239,7 +251,7 @@ META=$(mktemp); DIFF=$(mktemp)
 python3 "$GITHUB_READ" --kind metadata -- pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,files,additions,deletions,changedFiles,body > "$META"
 python3 "$GITHUB_READ" --kind diff --meta "$META" -- pr diff "$PR" ${REPO:+--repo "$REPO"} > "$DIFF"
 PLAN=$(python3 "$HERE/drover-merge-policy.py" --config "$CONFIG" --meta "$META" --diff "$DIFF") || {
-  echo "human-gate: policy — could not classify the PR (unreadable metadata)"
+  echo "${HUMAN_GATE}policy — could not classify the PR (unreadable metadata)"
   say "merge policy could not be evaluated — a human merges this one"; exit 7; }
 
 # The label is display-only. A request posted before `done` pins the exact head
@@ -255,13 +267,13 @@ approval_request() {
   python3 "$HERE/drover-approval.py" --request --repo "$REPO" --pr "$PR" \
     --head "$HEAD_SHA" --plan "$PLAN"
 }
-HUMAN=$(echo "$PLAN" | jq -r '.human[] | "human-gate: \(.category) — \(.why)"')
+HUMAN=$(echo "$PLAN" | jq -r --arg p "$HUMAN_GATE" '.human[] | "\($p)\(.category) — \(.why)"')
 if [ -n "$HUMAN" ] || [ "$(echo "$PLAN" | jq '.needs_you | length')" -gt 0 ]; then
   approval_check
 fi
 if [ -n "$HUMAN" ] && [ "$APPROVED" != true ]; then
   echo "$HUMAN"
-  echo "$PLAN" | jq -r '.needs_you[] | "needs-you: " + .'
+  echo "$PLAN" | jq -r --arg p "$NEEDS_YOU" '.needs_you[] | $p + .'
   approval_request
   say "merge policy: waiting for a trusted human to approve this exact head"; exit 7
 fi
@@ -314,7 +326,7 @@ if [ "${#NEEDS[@]}" -gt 0 ]; then
   if [ "$APPROVED" = true ] && [ "$(echo "$PLAN" | jq '.needs_you | length')" -eq "${#NEEDS[@]}" ]; then
     say "a trusted human confirmed the current head and human steps"
   else
-    for n in "${NEEDS[@]}"; do echo "needs-you: $n"; done
+    for n in "${NEEDS[@]}"; do echo "${NEEDS_YOU}$n"; done
     approval_request
     say "[needs-you] the owner acts before this merges — card → Blocked with the commands above"
     exit 8

@@ -28,4 +28,6 @@ Part of the [drover spec](README.md).
   | 8 | a human step is required (e.g. migration) | Blocked `[needs-you]` |
   | 9 | `verify_commands` unusable | run halts |
 
-  The bold part of exit 6 is the only change from upstream (FR-REV-6/8).
+  The bold part of exit 6 is the only change from upstream (FR-REV-6/8). The
+  gate runs `drover review-report check --pr <n> --head <head>` after the
+  head guard, so it refuses before policy, verification or migrations.

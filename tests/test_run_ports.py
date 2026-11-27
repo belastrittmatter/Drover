@@ -106,6 +106,49 @@ class Ports(RunnerCase):
         # The label routing it added reaches the skills: bug -> diagnosing-bugs.
         self.assertIn('diagnosing-bugs=', ' '.join(self.worker_args(8)))
 
+    # roles.md FR-REV-13: a build records the model its worker started on; the reviewer of that
+    # card starts on roles.review.model (sonnet), or alt_model (opus) when that equals the
+    # builder's, and its prompt names both models.
+    def test_reviewer_model_differs_from_builder(self):
+        model = lambda n: (lambda a: a[a.index('--model') + 1] if '--model' in a else None)(self.worker_args(n))
+        self.env['FAKE_CLASSIFY'] = json.dumps({'8': {'kind': 'feature', 'complexity': 'medium', 'risk': [], 'why': 'x'},
+                                                '9': {'kind': 'feature', 'complexity': 'low', 'risk': [], 'why': 'x'}})
+        self.board({'number': 8, 'status': 'Ready'}, {'number': 9, 'status': 'Ready'})
+        self.run_board(cycles=1, roles=dict(build=dict(max_workers=2)))
+        models = self.root / '.drover/runs/models'
+        self.assertEqual([model(8), model(9)], ['opus', 'sonnet'])
+        self.assertEqual([(models / n).read_text() for n in ('8', '9')], ['opus\n', 'sonnet\n'])
+        self.stop_workers()
+        for p in self.state.glob('inflight/*'):
+            p.unlink()
+        for p in self.workers.glob('*'):
+            p.unlink()
+        (models / '7').write_text('\n')  # built on the harness default
+        self.board({'number': 7, 'status': 'Review'}, {'number': 8, 'status': 'Review'},
+                   {'number': 9, 'status': 'Review'}, {'number': 6, 'status': 'Review', 'labels': ['qa']})
+        self.run_board(cycles=1, roles=dict(review=dict(max_workers=4)))
+        self.assertEqual([model(6), model(7), model(8), model(9)], ['sonnet', 'sonnet', 'sonnet', 'opus'])
+        prompt = lambda n: self.worker_args(n)[1]
+        self.assertIn('Models: builder opus · reviewer sonnet.', prompt(8))
+        self.assertIn('Models: builder sonnet · reviewer opus.', prompt(9))
+        self.assertIn('Models: builder harness-default · reviewer sonnet.', prompt(7))
+        self.assertIn('Models: builder unknown · reviewer sonnet.', prompt(6))
+        # Configured: review.model equals the builder's -> alt_model; both equal -> config error.
+        self.stop_workers()
+        for p in list(self.state.glob('inflight/*')) + list(self.workers.glob('*')):
+            p.unlink()
+        self.board({'number': 9, 'status': 'Review'})
+        self.run_board(cycles=1, roles=dict(review=dict(model='sonnet', alt_model='haiku')))
+        self.assertEqual(model(9), 'haiku')
+        self.stop_workers()
+        for p in list(self.state.glob('inflight/*')) + list(self.workers.glob('*')):
+            p.unlink()
+        claims = lambda: len([c for c in self.calls() if c[:2] == ['issue', 'edit'] and '--add-assignee' in c])
+        before = claims()
+        out = self.run_board(cycles=1, rc=65, roles=dict(review=dict(model='sonnet', alt_model='sonnet')))
+        self.assertIn('review model: config error, halt before claim', out)
+        self.assertEqual(claims(), before, 'no claim before the halt')
+
     # A label the repo lacks: no comment, and the card is still built.
     def test_classifier_label_failure_still_builds(self):
         self.env['LABEL_FAILS'] = '1'

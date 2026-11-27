@@ -45,8 +45,7 @@ Example:
   "roles": {
     "build":  { "skills": ["tdd"], "model": "opus", "max_workers": 2 },
     "qa":     { "skills": ["playwright-best-practices", "pr-security-review"] },
-    "review": { "skills": ["code-review"],
-                "second_opinion": "risky", "second_opinion_model": "sonnet" }
+    "review": { "skills": ["code-review"], "model": "sonnet", "alt_model": "opus" }
   },
   "labels": { "bug": { "build": ["diagnosing-bugs"] } },
   "merge_policy": { "default": "auto", "auto_max_lines": 400 },
@@ -75,7 +74,8 @@ audit: it only fed an outside skill drover does not ship).
 | `labels` (upstream: fixed informational list) | Replaced by the skill routing map `labels.<label>.<role>` (FR-CFG-3); card paths stay fixed (README domain model) |
 | `paths.runs_dir` | Fixed at `.drover/runs` (metrics.md FR-MET-3); removed from config |
 | `roles.<role>.skills`, `.model`, `.harness`, `.template` | New (FR-CFG-3, FR-CFG-6). `model` overrides `model_tier` for that role |
-| `roles.review.second_opinion`, `.second_opinion_model` | New (roles.md FR-REV-9, FR-REV-10) |
+| `roles.review.model`, `.alt_model` | New: the reviewer's model (default `sonnet`) and the one it switches to when that equals the card's builder model (default `opus`), roles.md FR-REV-13 |
+| `roles.review.second_opinion`, `.second_opinion_model` | Removed in stage 7 before any release; `drover setup fix` drops them with a change line |
 | `commit_style` | New (conventions.md FR-CNV-1) |
 | `evidence` | New (conventions.md FR-EVD-1) |
 | `metrics.commit_email` | New (metrics.md FR-MET-11) |

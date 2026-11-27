@@ -20,6 +20,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 REF = ROOT / "skills" / "drover" / "references"
 STANDARD = (REF / "writing-standard.md").read_text(encoding="utf-8")
+# run.md (the runner) plus the lane rules split out of it (rules/*.md, specs/roles.md FR-CTX).
+RUN_RULES = "\n".join(p.read_text(encoding="utf-8") for p in [REF / "run.md", *sorted((REF / "rules").glob("*.md"))])
 
 TYPES = "feat|fix|chore|refactor|test|perf|docs|ci|ui|security|revert|wip"
 # One subject regex per commit_style (writing-standard.md § 1). `other` copies the repo's examples.
@@ -229,8 +231,9 @@ def test_comment_header_regex():
 
 def test_comment_examples_follow_the_header():
     """Lane comments have headers; author notes use three labels without a routing prefix."""
-    machine = re.compile(r"^(Local tests|gh-quota-on-exit|blocked-by|root-cause-hash):|^\||^$|^<!--")
-    run_md = (REF / "run.md").read_text(encoding="utf-8")
+    machine = re.compile(r"^(Local tests|QA head|Repro test|Models|Hypotheses|Test edits since QA pass|gh-quota-on-exit|blocked-by|"
+                         r"root-cause-hash):|^\||^$|^<!--")
+    run_md = RUN_RULES
     checked = 0
     author_notes = 0
     for text in (STANDARD, run_md):
@@ -288,6 +291,38 @@ def test_reason_tags_are_defined_once():
         assert "drover-reasons.json" in src, f"{script} must read the tags from drover-reasons.json"
 
 
+MARKERS = json.loads((ROOT / "lib" / "drover-markers.json").read_text(encoding="utf-8"))
+
+
+def test_review_report_example_is_what_put_accepts():
+    """The report in the standard is the shape `drover review-report put` parses and accepts (FR-CNV-4)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("rr", ROOT / "lib" / "drover-review-report.py")
+    rr = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rr)
+    [example] = [b for b in fenced(STANDARD) if b.startswith("[reviewer] [report]")]
+    head = "a" * 40
+    parsed = rr.parse(f"{MARKERS['review_report']['marker']} head={head} -->\n" + example)
+    assert parsed and parsed["state"] == "bounced" and [r["id"] for r in parsed["rows"]] == ["R1", "R2"], parsed
+    assert rr.validate(parsed, None, head) == [], rr.validate(parsed, None, head)
+    cols = "| " + " | ".join(MARKERS["review_report"]["columns"]) + " |"
+    assert cols in example, f"the example table must use the columns in drover-markers.json: {cols}"
+
+
+def test_markers_are_defined_once():
+    """Gate lines and the report marker come from drover-markers.json, not literals (FR-CNV-4)."""
+    gate = (ROOT / "lib" / "drover-merge-gate.sh").read_text(encoding="utf-8")
+    assert "drover-markers.json" in gate and not re.search(r'echo "(human-gate|needs-you): ', gate), \
+        "the gate must write its human-gate and needs-you lines from drover-markers.json"
+    for script in ("lib/drover-approval.py", "lib/drover-merge-policy.py", "lib/drover-review-report.py",
+                   "skills/drover-collect/scripts/collect_prs.py"):
+        src = (ROOT / script).read_text(encoding="utf-8")
+        assert "drover-markers.json" in src, f"{script} must read its markers from drover-markers.json"
+    for script in ("lib/drover-approval.py", "skills/drover-collect/scripts/collect_prs.py"):
+        src = (ROOT / script).read_text(encoding="utf-8")
+        assert '= "approval-request: "' not in src and '= "<!-- drover-review:report' not in src, script
+
+
 def test_needs_you_comment_is_checklist_first():
     """The [needs-you] comment shows what to do first; why and evidence fold away; the planner's lines stay."""
     text = (REF / "block-template.md").read_text(encoding="utf-8")
@@ -310,7 +345,7 @@ def test_pr_body_markers():
                          capture_output=True, text=True, check=True).stdout
     for b in PR_BLOCKS:
         assert f"<!-- sb:{b} -->" in out and f"<!-- /sb:{b} -->" in out, f"skeleton lacks {b}"
-    run_md = (REF / "run.md").read_text(encoding="utf-8")
+    run_md = RUN_RULES
     for b in ["status", "problem", "solution", "ac", "history", "risk"]:
         assert f"<!-- sb:{b} -->" in run_md and f"<!-- /sb:{b} -->" in run_md, f"run.md PR template lacks {b}"
     assert "## Not verified" not in run_md and "**Status:**" not in run_md
@@ -318,7 +353,7 @@ def test_pr_body_markers():
 
 def test_history_is_folded_and_needs_you_sits_in_the_status_alert():
     """From the pr-skill template: history folds in <details>; a human step can ride the status alert."""
-    run_md = (REF / "run.md").read_text(encoding="utf-8")
+    run_md = RUN_RULES
     for name, text in (("writing-standard.md", STANDARD), ("run.md", run_md)):
         hist = text[text.index("<!-- sb:history -->"):text.index("<!-- /sb:history -->")] if "<!-- sb:history -->\n" in text else \
             next(b for b in fenced(text) if "Iteration history" in b)
@@ -329,7 +364,7 @@ def test_history_is_folded_and_needs_you_sits_in_the_status_alert():
 
 def test_risk_names_door_and_blast_radius():
     """Risk carries the merge danger: a two-way or one-way door and a blast radius."""
-    run_md = (REF / "run.md").read_text(encoding="utf-8")
+    run_md = RUN_RULES
     std_risk = next(b for b in fenced(STANDARD) if b.startswith("## Risk\n**Low**"))
     run_risk = run_md[run_md.index("<!-- sb:risk -->\n## Risk"):run_md.index("<!-- /sb:risk -->")]
     for name, risk in (("writing-standard.md", std_risk), ("run.md", run_risk)):

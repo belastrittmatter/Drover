@@ -637,9 +637,8 @@ def main() -> int:
     human = cfg.get("human_approves_merge") is True or policy == "human" or (
         policy is None and (cfg.get("harness") or cfg.get("host") or "claude") != "claude")
     mode_label = "human-approves" if human else "auto-merge"
-    tg = cfg.get("truth_gate", "off")
-    tt = cfg.get("truth_threshold", 70)
-    gate_label = {"off": "off", "always": "always"}.get(tg, f"non-trivial (≥{tt})")
+    review = (cfg.get("roles") or {}).get("review") or {}
+    review_label = f"{review.get('model') or 'sonnet'} (alt {review.get('alt_model') or 'opus'})"
     bot_login = (
         cfg.get("notifications", {}).get("bot_identity")
         or cfg.get("claim", {}).get("assignee_login")
@@ -650,7 +649,7 @@ def main() -> int:
     print(f"drover · {proj['title']} (#{proj['number']})")
     print("─" * 80)
     print(f"config: {config_slug}   labels: qa · bug · feature   base: {cfg.get('base_branch', '?')}")
-    print(f"mode:   {mode_label:<22} truth gate: {gate_label}")
+    print(f"mode:   {mode_label:<22} reviewer: {review_label}")
     print()
 
     # ── kanban ──

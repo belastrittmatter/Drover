@@ -381,6 +381,13 @@ def migrate_config(cfg, host=None):
         del c[k]
     if gone:
         changes.append("removed keys: " + ", ".join(gone))
+    review = (c.get("roles") or {}).get("review")
+    gone = [k for k in ("second_opinion", "second_opinion_model") if isinstance(review, dict) and k in review]
+    for k in gone:
+        del review[k]
+    if gone:
+        changes.append("removed roles.review keys: " + ", ".join(gone)
+                       + " (the reviewer runs on a model other than the builder's: roles.review.model, alt_model)")
     if "max_workers" in c:
         cap = c.pop("max_workers")
         changes.append("max_workers moved to roles.<role>.max_workers (default 1)")

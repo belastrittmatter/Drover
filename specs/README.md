@@ -10,7 +10,7 @@ needs.
 |---|---|---|
 | [board.md](board.md) | Board, columns, blocking, status | FR-BRD, FR-STS |
 | [runner.md](runner.md) | Scheduling, workers, hc, herdr-app | FR-RUN, FR-WRK |
-| [roles.md](roles.md) | Builder, QA, reviewer, review memory, second opinion | FR-BLD, FR-QA, FR-REV |
+| [roles.md](roles.md) | Builder, QA, reviewer, review memory, reviewer model | FR-BLD, FR-QA, FR-REV |
 | [gate.md](gate.md) | Merge gate and its exit-code contract | FR-MRG |
 | [config.md](config.md) | Project config, skill routing, harnesses | FR-CFG, FR-HRN |
 | [conventions.md](conventions.md) | Commit style, markers, emoji, evidence | FR-CNV, FR-EVD |
@@ -73,10 +73,13 @@ It is super-board cut down and made harness-independent:
 | Skill routing | Per project config (role, label, issue `Skills:`) | Hardcoded `REGISTRY` |
 | Commit / PR titles | Match the repo's detected style; conventional commits as fallback | Upstream emoji format |
 | QA evidence | Chosen at onboard: orphan branch (default `drover-evidence`) or the PR branch; SHA-pinned raw URLs | One fixed location |
-| Reviewer extras | Inline history check; one independent second opinion on risky cards from a different model, no score | Code-grounder + historian subagents with confidence threshold |
+| Reviewer extras | Inline history check; no extra reviewer subagents, no score | Code-grounder + historian subagents with confidence threshold |
+| Reviewer model | The one reviewer of a PR runs on a different model than its builder: `roles.review.model` (default `sonnet`), `roles.review.alt_model` (default `opus`) when that equals the builder's model; `roles.review.harness` for another model family (roles.md FR-REV-13). Applies to every PR. Owner decision, stage 7 | A second-opinion reviewer on risky cards (`second_opinion`, `second_opinion_model`) |
 | Review memory | Enforced by `drover review-report put` and the gate | Prompt only |
+| Review report marker | Keep the marker the skills, collect and open PRs already use, `<!-- drover-review:report -->`, with `head=<sha>` added inside it (stage 7) | Rename to `<!-- drover:review-report -->` and lose earlier reports |
+| Builder model record | Local runner state, `.drover/runs/models/<issue>`, like `attempts.json`; lost state means the reviewer runs on `roles.review.model` | A PR comment or commit trailer per build |
 | Test-first | Bugs only, via the builder's reproduction test | Separate test-writing stage for every card |
-| Role context | Context packs built by the CLI (roles.md FR-CTX) | Agents load their own context |
+| Role context | Context packs built by the CLI (roles.md FR-CTX); the worker runs `drover context` as its first step, pointed there by the lane prompt | Agents load their own context; the runner building the pack into the prompt (large diffs in argv, GitHub reads on the runner) |
 | QA crawl mode | Own branch and PR per iteration, through the gate | Direct commits to the active branch |
 | Test locking | Deferred; revisit when FR-REV-12 shows builders editing QA tests | Hook + gate exit 10 |
 | Hidden checks | Deferred; needs storage that keeps FR-BRD-1 | Local hidden tests per card |
@@ -106,11 +109,6 @@ It is super-board cut down and made harness-independent:
 | Evidence | QA artefacts for one card and QA round | issue, version, files, evidence commit |
 | Harness | A coding-agent CLI drover can drive | name, worker command, skill dirs, usage probe |
 | Config | Per-project settings | `.drover/config.json` |
-
-**Risky card**: labelled `security`, `migration`, `payments` or `auth` (by
-the owner or by the classifier, FR-RUN-7), or a diff over
-`merge_policy.auto_max_lines`, or a diff the merge policy classes as money,
-auth or schema (FR-MRG-3). Used by FR-REV-9.
 
 Card paths by label:
 
@@ -213,7 +211,7 @@ New or changed:
 | 5 CLI + harness | config.md (incl. FR-HRN-4) |
 | 0 baseline | also metrics.md FR-MET-1 |
 | 6 runner | runner.md FR-RUN-2, 5, 7, 8, 13, 14, 15, 16, FR-WRK-1/2/6/8/10; board.md FR-BRD-3, 5, 7, 8; metrics.md FR-MET |
-| 7 reviewer | roles.md FR-REV-1, 3, 6, 8-12, FR-BLD-7, FR-CTX; gate.md FR-MRG-4 |
+| 7 reviewer | roles.md FR-REV-1, 3, 5, 6, 8, 12, 13, FR-BLD-7, FR-CTX; gate.md FR-MRG-4; conventions.md FR-CNV-4 |
 | 8 evidence | conventions.md FR-EVD |
 | 9 hc add-on | runner.md FR-WRK-3/4/5/7, board.md FR-STS-2 |
 | 10 herdr-app | runner.md FR-WRK-9 |

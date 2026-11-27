@@ -90,7 +90,7 @@ strings. Do **not** improvise.
 drover · <Project Title> (#<number>)
 ────────────────────────────────────────────────────────────────────────────────
 config: <slug>   labels: qa · bug · feature   base: <base_branch>
-mode:   <auto-merge|human-approves>        truth gate: <off|non-trivial (≥N)|always>
+mode:   <auto-merge|human-approves>        reviewer: <roles.review.model> (alt <roles.review.alt_model>)
 
 ┌─ Backlog  [N] ───────────────────────────────────────────────────────────────┐
 │ <collapsed line — see §D>                                                    │
@@ -134,7 +134,7 @@ mode:   <auto-merge|human-approves>        truth gate: <off|non-trivial (≥N)|a
 drover · My App Board (#1)
 ────────────────────────────────────────────────────────────────────────────────
 config: my-app-drover   labels: qa · bug · feature   base: staging
-mode:   auto-merge                 truth gate: non-trivial (≥70)
+mode:   auto-merge                 reviewer: sonnet (alt opus)
 
 ┌─ Backlog  [3] ───────────────────────────────────────────────────────────────┐
 │ #33 #31 #30   (not started, collapsed)                                       │
@@ -192,7 +192,7 @@ mode:   auto-merge                 truth gate: non-trivial (≥70)
 
 1. Header line (project + `#number`)
 2. Separator (80 × `─`)
-3. Config strip (2 lines: `config/labels/base`, `mode/truth-gate`)
+3. Config strip (2 lines: `config/labels/base`, `mode/reviewer`)
 4. Kanban — 7 boxes in board order, left to right as on GitHub: Backlog · Ready · Building · QA · Review · Blocked · Done (`BOARD_ORDER` in the script; there is no Skipped column since v3.0.0)
 5. `▎Workers`
 6. `▎Block reasons`

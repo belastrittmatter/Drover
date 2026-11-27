@@ -26,4 +26,4 @@ The Builder: turns a `Ready` card into a branch, the smallest safe change, tests
 
 ## Install
 
-Part of the drover pack: `drover skills install` links it into `~/.claude/skills`. Lane details: `skills/drover/references/run.md` → Builder.
+Part of the drover pack: `drover skills install` links it into `~/.claude/skills`. Lane details: `skills/drover/references/rules/build.md`, via `drover context build <issue>`.

@@ -210,14 +210,14 @@ build in parallel with `max_workers: 2`; tests green.
 
 - Fold the history check (`git log`/`git blame` on changed hunks, reverted
   attempts) into the main reviewer steps.
-- Replace adversarial mode with `second_opinion: off | risky | always`.
-  Risky = risk label (owner or classifier), diff over `auto_max_lines`,
-  or a diff the merge policy classes as money/auth/schema. The second reviewer gets ACs + diff only, returns
-  file:line findings with class and severity. A Blocker it finds that the
-  main reviewer missed bounces or blocks the card. No score.
-- `second_opinion_model`: must differ from the reviewer's model; the
-  report names both.
-- Remove `truth_gate`, `truth_threshold` and the verbatim subagent brief.
+- Remove adversarial mode, `truth_gate`, `truth_threshold` and the verbatim
+  subagent brief. No second-opinion reviewer (owner decision, specs/README.md
+  decisions): instead the one reviewer of every PR runs on a different model
+  than the card's builder (roles.md FR-REV-13). `roles.review.model` (default
+  `sonnet`), `roles.review.alt_model` (default `opus`) when that equals the
+  builder's model; `roles.review.harness` for another model family. The
+  runner records each card's build model; the report names both models.
+  `drover setup fix` drops `second_opinion` and `second_opinion_model`.
 - Enforce review memory in code (specs/roles.md FR-REV-5, 6, 8; specs/gate.md exit 6): `drover review-report
   get|put` loads the previous report, rejects a new one that drops a prior
   finding id, uses an unknown status, or marks `fixed` without a `file:line`
@@ -237,9 +237,9 @@ build in parallel with `max_workers: 2`; tests green.
 
 Spec: specs/README.md, specs/roles.md, specs/gate.md.
 
-Exit: a risky test PR gets a second opinion from a different model; a clean
-small PR does not; a bug card whose reproduction test passes on base is
-bounced; tests green.
+Exit: a PR built on model X is reviewed on a model other than X (a test
+proves it for the default and the alt case); a bug card whose reproduction
+test passes on base is bounced; tests green.
 
 ## Stage 8: evidence (0.5 day)
 

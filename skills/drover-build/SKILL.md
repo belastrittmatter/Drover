@@ -133,7 +133,7 @@ handoff complete. Add file summaries and critical inline notes on the PR, not in
 
 **On dispatcher exit 0 (success):**
 - `git -C .drover/worktrees/issue-N push -u origin loop/issue-N`
-- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<subject in commit_style>" --body-file <body.md>` — title in the repo's commit style (writing-standard.md § 1), body = the marker-block template from `skills/drover/references/run.md` (writing-standard.md § 2), `Closes #N` in the status card, `Docs:` bullets in Solution, Door + Blast radius in Risk
+- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<subject in commit_style>" --body-file <body.md>` — title in the repo's commit style (writing-standard.md § 1), body = the marker-block template from `skills/drover/references/rules/shared.md` (writing-standard.md § 2), `Closes #N` in the status card, `Docs:` bullets in Solution, Door + Blast radius in Risk
 - `gh issue edit N --remove-label loop:in-progress`
 - `gh issue comment N --body "[builder] [report] built · PR <URL>"` (Next line: `qa`)
 - Move the project card to `QA`. The Tester and Reviewer take it from there; the issue closes when the Reviewer merges through the merge gate.
@@ -241,13 +241,13 @@ When invoked by drover (env `DROVER_RUN=1` set by the runner, or invocation cont
   the phase for the runner's `state.json`; a failed call never stops the build.
 
 ### Lifecycle (Builder, first pass)
-Follow spec `~/.claude/skills/drover/references/run.md` → Builder (first pass). Summary:
+Start from `drover context build <N>`: it prints the lane rules (`~/.claude/skills/drover/references/rules/build.md` → Builder (first pass), and `rules/shared.md`) with the card's issue, diff, `[builder]` threads and your open review findings. Summary:
 1. Worktree off `config.base_branch`.
 2. Branch `issue-<N>-<slug>` from `config.base_branch`.
 3. Docs check (section below) — if the ticket touches a third-party surface, an upgrade, or auth/billing, read the current official docs first.
 4. Implement smallest safe change covering ACs — under the PR size cap (section below).
 5. Commit + push (always).
-6. Open **draft PR** with the PR description template from `run.md` — title in commit-subject format, every marker block filled, `Docs:` bullets in Solution, Door + Blast radius in Risk.
+6. Open **draft PR** with the PR description template from `rules/shared.md` — title in commit-subject format, every marker block filled, `Docs:` bullets in Solution, Door + Blast radius in Risk.
 7. Follow [PR author notes](../drover/references/pr-author-notes.md), then post the `[builder] [report]` PR comment + the short issue comment with the PR URL (writing-standard.md § 4).
 8. Move card Ready/Building → QA.
 
@@ -298,7 +298,7 @@ On any failure-handoff comment, include:
 ```
 root-cause-hash: <sha256 first 12 hex chars>
 ```
-Hash inputs (joined with `|`): lane (`build`) | error class | first 3 unique normalized file:line frames. See `~/.claude/skills/drover/references/run.md` → Root-cause hash.
+Hash inputs (joined with `|`): lane (`build`) | error class | first 3 unique normalized file:line frames. See `~/.claude/skills/drover/references/rules/shared.md` → Root-cause hash.
 
 ### Never merge
 Builder NEVER squash-merges. Reviewer owns merge.

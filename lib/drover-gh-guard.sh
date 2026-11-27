@@ -4,8 +4,8 @@
 # Sourced by drover workers (Builder / Tester / Reviewer) before any
 # burst of gh calls. The dispatcher's gh_rate_guard only protects the
 # dispatcher's own ticks; workers run as independent claude -p sessions and
-# share the same gh-auth bucket. Without this guard, a single Reviewer in
-# adversarial mode can drain the 5000/hr GraphQL bucket and the next tick
+# share the same gh-auth bucket. Without this guard, a single worker with
+# sub-agents can drain the 5000/hr GraphQL bucket and the next tick
 # of the dispatcher (and every other worker on the same machine) opens to
 # "0 remaining".
 #
@@ -20,7 +20,7 @@
 SB_GH_GUARD_MIN_REMAINING_DEFAULT=200
 SB_GH_GUARD_REST_MIN_REMAINING=500
 SB_GH_GUARD_BUDGET_DEFAULT=150     # per-worker soft cap on gh calls
-SB_GH_GUARD_SUBAGENT_BUDGET=50     # per adversarial-mode sub-agent cap
+SB_GH_GUARD_SUBAGENT_BUDGET=50     # per sub-agent cap
 # One budget per worker across separate `drover gh-guard` calls: keyed on the role and
 # issue the runner sets (DROVER_ROLE, DROVER_ISSUE), else on the calling shell's parent.
 SB_GH_GUARD_STATE_FILE="${SB_GH_GUARD_STATE_FILE:-${TMPDIR:-/tmp}/drover-gh-budget-${DROVER_ROLE:-x}-${DROVER_ISSUE:-$PPID}}"

@@ -35,7 +35,7 @@ Workers (`drover-build`, `drover-qa`, `drover-review`) share the dispatcher's `g
 - Check its `--check` before GitHub writes, migrations, merges, and new dispatch; preserve work when halted.
 - Run `drover gh-guard check 200` at worker start and before any burst of `gh` calls.
 - Prefer local `git blame` / `git log` over `gh api graphql` for any sub-agent that doesn't need fresh state.
-- Cap adversarial sub-agents at 50 gh calls each. If a sub-agent runs out, it returns `confidence: insufficient_data` rather than burning the shared quota.
+- Cap sub-agents at 50 gh calls each. If a sub-agent runs out, it returns `confidence: insufficient_data` rather than burning the shared quota.
 - Append `gh-quota-on-exit: graphql=<n>/5000 rest=<n>/5000` to the PR handoff comment.
 
 See `skills/drover/references/rate-limit-etiquette.md` for the full discipline.

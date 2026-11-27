@@ -59,7 +59,7 @@ use, human effort and PR outcomes, and compares configs. Two inputs:
   new attempt.
 - **FR-MET-7** Each worker process shall run with Claude Code's OTLP
   variables and `factorybench.attempt=<attempt id>,factorybench.phase=<phase>,factorybench.step=<lane>`
-  (build `implement`, qa `verify`, review and second opinion `review`; step is the lane name, so
+  (build `implement`, qa `verify`, review `review`; step is the lane name, so
   FactoryBench draws one row per lane with its time and cost) (changed).
   drover shall send no `usage` events for Claude.
 - **FR-MET-8** `factory_config_version` shall be

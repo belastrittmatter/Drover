@@ -127,10 +127,16 @@
               "$ref": "#/definitions/skills"
             },
             "model": {
-              "type": "string"
+              "type": "string",
+              "description": "The reviewer's model. Default \"sonnet\" (roles.md FR-REV-13)."
+            },
+            "alt_model": {
+              "type": "string",
+              "description": "The reviewer's model when `model` equals the model the card's builder ran on. Default \"opus\" (FR-REV-13)."
             },
             "harness": {
-              "type": "string"
+              "type": "string",
+              "description": "Another harness for the reviewer: a different model family (FR-REV-13)."
             },
             "template": {
               "type": "string"
@@ -138,18 +144,6 @@
             "max_workers": {
               "type": "integer",
               "minimum": 1
-            },
-            "second_opinion": {
-              "enum": [
-                "off",
-                "risky",
-                "always"
-              ],
-              "description": "roles.md FR-REV-9."
-            },
-            "second_opinion_model": {
-              "type": "string",
-              "description": "Must differ from the reviewer's model (FR-REV-10)."
             }
           }
         }

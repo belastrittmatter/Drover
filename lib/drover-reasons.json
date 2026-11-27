@@ -8,7 +8,7 @@
     "[blocked:access]": "permissions: gh scope denied, org admin required, write access missing",
     "[blocked:unclear]": "ambiguity or spec gap: two valid readings, AC contradicts PROJECT.md, dependency unclear",
     "[blocked:unsafe]": "safety or destructive step: would drop a table, push to prod, rotate live secrets",
-    "[blocked:review]": "human review needed: unresolved human PR comment, product or branding decision, truth-check below threshold",
+    "[blocked:review]": "human review needed: unresolved human PR comment, product or branding decision",
     "[blocked:design]": "pure design: no measurable AC, needs a design pass first",
     "[blocked:duplicate]": "pre-flight: a merged PR already delivers it, or an open PR or card is building it",
     "[blocked:sequenced]": "pre-flight: an open PR touches the same files; waits on the issue that PR closes",

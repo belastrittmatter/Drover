@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from pathlib import Path
 import re
 import subprocess
 import sys
@@ -22,7 +23,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import collect_common as cc  # noqa: E402
 
-MARKER = "<!-- drover-review:report -->"
+# The report marker is defined once, in the drover install's lib/drover-markers.json (FR-CNV-4);
+# a report's marker may carry the reviewed head (`<!-- drover-review:report head=<sha> -->`).
+MARKER = json.loads((Path(__file__).resolve().parents[3] / "lib/drover-markers.json")
+                    .read_text(encoding="utf-8"))["review_report"]["marker"]
 BODY_MAX = 4000
 
 QUERY = """
